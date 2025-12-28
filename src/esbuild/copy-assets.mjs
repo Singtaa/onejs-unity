@@ -68,6 +68,24 @@ function copyDirSync(src, dest, options = {}) {
 /**
  * Find all packages with onejs.assets configuration
  */
+/**
+ * Check if entry is a directory or symlink to directory
+ */
+function isDirectoryEntry(entry, parentPath) {
+    if (entry.isDirectory()) return true
+    if (entry.isSymbolicLink()) {
+        // Check if symlink target is a directory
+        try {
+            const fullPath = path.join(parentPath, entry.name)
+            const stat = fs.statSync(fullPath)
+            return stat.isDirectory()
+        } catch {
+            return false
+        }
+    }
+    return false
+}
+
 function findAssetPackages(nodeModulesPath) {
     const packages = []
 
@@ -76,7 +94,7 @@ function findAssetPackages(nodeModulesPath) {
     const entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true })
 
     for (const entry of entries) {
-        if (!entry.isDirectory()) continue
+        if (!isDirectoryEntry(entry, nodeModulesPath)) continue
 
         const entryPath = path.join(nodeModulesPath, entry.name)
 
@@ -84,7 +102,7 @@ function findAssetPackages(nodeModulesPath) {
         if (entry.name.startsWith("@")) {
             const scopedEntries = fs.readdirSync(entryPath, { withFileTypes: true })
             for (const scopedEntry of scopedEntries) {
-                if (!scopedEntry.isDirectory()) continue
+                if (!isDirectoryEntry(scopedEntry, entryPath)) continue
 
                 const pkgPath = path.join(entryPath, scopedEntry.name)
                 const pkgJsonPath = path.join(pkgPath, "package.json")
