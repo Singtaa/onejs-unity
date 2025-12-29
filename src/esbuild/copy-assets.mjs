@@ -1,18 +1,21 @@
 /**
- * esbuild plugin for copying assets from npm packages to StreamingAssets
+ * esbuild plugin for copying assets to StreamingAssets
  *
- * Scans node_modules for packages with "onejs.assets" field in their package.json.
- * Copies their assets to a destination folder (typically StreamingAssets/onejs/).
+ * Handles two types of assets:
+ * 1. User assets from {WorkingDir}/assets/ → StreamingAssets/onejs/
+ * 2. npm package assets (with "onejs.assets" field) → StreamingAssets/onejs/
  *
- * Usage in package.json:
+ * npm packages should namespace their assets with @package-name/ prefix:
  * {
- *   "name": "@my-scope/my-ui-kit",
- *   "onejs": {
- *     "assets": "assets"  // folder containing images, fonts, etc.
- *   }
+ *   "name": "rainbow-sample",
+ *   "onejs": { "assets": "assets" }
  * }
+ * With structure:
+ *   rainbow-sample/assets/@rainbow-sample/bg.png
  *
- * Assets will be copied to: <dest>/@my-scope/my-ui-kit/...
+ * This copies FLAT to StreamingAssets/onejs/@rainbow-sample/bg.png
+ *
+ * Also generates a manifest file for Editor path resolution.
  */
 
 import fs from "node:fs"
@@ -37,11 +40,12 @@ function getFileHash(filePath) {
 function copyDirSync(src, dest, options = {}) {
     const { filter, onCopy } = options
 
-    if (!fs.existsSync(src)) return
+    if (!fs.existsSync(src)) return 0
 
     fs.mkdirSync(dest, { recursive: true })
 
     const entries = fs.readdirSync(src, { withFileTypes: true })
+    let copied = 0
 
     for (const entry of entries) {
         const srcPath = path.join(src, entry.name)
@@ -50,8 +54,16 @@ function copyDirSync(src, dest, options = {}) {
         // Apply filter if provided
         if (filter && !filter(srcPath, entry)) continue
 
-        if (entry.isDirectory()) {
-            copyDirSync(srcPath, destPath, options)
+        if (entry.isDirectory() || entry.isSymbolicLink()) {
+            // For symlinks, check if target is directory
+            try {
+                const stat = fs.statSync(srcPath)
+                if (stat.isDirectory()) {
+                    copied += copyDirSync(srcPath, destPath, options)
+                }
+            } catch {
+                continue
+            }
         } else {
             // Check if file needs copying (hash comparison)
             const srcHash = getFileHash(srcPath)
@@ -59,22 +71,21 @@ function copyDirSync(src, dest, options = {}) {
 
             if (srcHash !== destHash) {
                 fs.copyFileSync(srcPath, destPath)
+                copied++
                 if (onCopy) onCopy(srcPath, destPath)
             }
         }
     }
+
+    return copied
 }
 
-/**
- * Find all packages with onejs.assets configuration
- */
 /**
  * Check if entry is a directory or symlink to directory
  */
 function isDirectoryEntry(entry, parentPath) {
     if (entry.isDirectory()) return true
     if (entry.isSymbolicLink()) {
-        // Check if symlink target is a directory
         try {
             const fullPath = path.join(parentPath, entry.name)
             const stat = fs.statSync(fullPath)
@@ -86,6 +97,9 @@ function isDirectoryEntry(entry, parentPath) {
     return false
 }
 
+/**
+ * Find all packages with onejs.assets configuration
+ */
 function findAssetPackages(nodeModulesPath) {
     const packages = []
 
@@ -109,13 +123,14 @@ function findAssetPackages(nodeModulesPath) {
 
                 if (fs.existsSync(pkgJsonPath)) {
                     const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"))
-                    const assetsPath = pkgJson.onejs?.assets
+                    const assetsConfig = pkgJson.onejs?.assets
 
-                    if (assetsPath) {
+                    if (assetsConfig) {
                         packages.push({
                             name: `${entry.name}/${scopedEntry.name}`,
                             path: pkgPath,
-                            assetsPath: path.join(pkgPath, assetsPath),
+                            assetsPath: path.join(pkgPath, assetsConfig),
+                            assetsDir: assetsConfig,
                         })
                     }
                 }
@@ -126,13 +141,14 @@ function findAssetPackages(nodeModulesPath) {
 
             if (fs.existsSync(pkgJsonPath)) {
                 const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"))
-                const assetsPath = pkgJson.onejs?.assets
+                const assetsConfig = pkgJson.onejs?.assets
 
-                if (assetsPath) {
+                if (assetsConfig) {
                     packages.push({
                         name: entry.name,
                         path: entryPath,
-                        assetsPath: path.join(entryPath, assetsPath),
+                        assetsPath: path.join(entryPath, assetsConfig),
+                        assetsDir: assetsConfig,
                     })
                 }
             }
@@ -143,16 +159,39 @@ function findAssetPackages(nodeModulesPath) {
 }
 
 /**
+ * Scan a directory for @-prefixed folders (package asset namespaces)
+ */
+function findAssetNamespaces(assetsPath) {
+    const namespaces = []
+
+    if (!fs.existsSync(assetsPath)) return namespaces
+
+    const entries = fs.readdirSync(assetsPath, { withFileTypes: true })
+
+    for (const entry of entries) {
+        if (entry.name.startsWith("@") && isDirectoryEntry(entry, assetsPath)) {
+            namespaces.push(entry.name)
+        }
+    }
+
+    return namespaces
+}
+
+/**
  * Creates the esbuild plugin for copying assets
  *
  * @param {Object} options - Plugin options
  * @param {string} options.dest - Destination folder (default: "Assets/StreamingAssets/onejs")
+ * @param {string} options.userAssets - User assets folder (default: "assets")
+ * @param {string} options.manifestPath - Manifest file path (default: ".onejs/assets-manifest.json")
  * @param {Function} options.filter - Optional filter function (srcPath, entry) => boolean
  * @param {boolean} options.verbose - Log copied files (default: false)
  */
 export function copyAssetsPlugin(options = {}) {
     const {
         dest = "Assets/StreamingAssets/onejs",
+        userAssets = "assets",
+        manifestPath = ".onejs/assets-manifest.json",
         filter = null,
         verbose = false,
     } = options
@@ -165,19 +204,48 @@ export function copyAssetsPlugin(options = {}) {
             build.onEnd(async (result) => {
                 if (result.errors.length > 0) return
 
-                const nodeModulesPath = path.resolve(process.cwd(), "node_modules")
-                const destPath = path.resolve(process.cwd(), "..", dest)
-
-                const packages = findAssetPackages(nodeModulesPath)
-
-                if (packages.length === 0) {
-                    if (verbose) {
-                        console.log("[copy-assets] No packages with onejs.assets found")
-                    }
-                    return
-                }
+                const workingDir = process.cwd()
+                const nodeModulesPath = path.resolve(workingDir, "node_modules")
+                const destPath = path.resolve(workingDir, "..", dest)
+                const userAssetsPath = path.resolve(workingDir, userAssets)
+                const manifestFullPath = path.resolve(workingDir, manifestPath)
 
                 let totalCopied = 0
+                const manifest = {
+                    // Maps @namespace to source path (for Editor resolution)
+                    namespaces: {},
+                    // User assets base path
+                    userAssetsPath: userAssets,
+                    // Build destination
+                    destPath: dest,
+                }
+
+                // 1. Copy user assets (if exists)
+                if (fs.existsSync(userAssetsPath)) {
+                    const copied = copyDirSync(userAssetsPath, destPath, {
+                        filter,
+                        onCopy: (src, dst) => {
+                            if (verbose) {
+                                const relSrc = path.relative(workingDir, src)
+                                const relDst = path.relative(workingDir, dst)
+                                console.log(`[copy-assets] ${relSrc} -> ${relDst}`)
+                            }
+                        },
+                    })
+                    totalCopied += copied
+
+                    // Find any @-namespaces in user assets
+                    const userNamespaces = findAssetNamespaces(userAssetsPath)
+                    for (const ns of userNamespaces) {
+                        manifest.namespaces[ns] = {
+                            type: "user",
+                            path: path.join(userAssets, ns),
+                        }
+                    }
+                }
+
+                // 2. Copy npm package assets
+                const packages = findAssetPackages(nodeModulesPath)
 
                 for (const pkg of packages) {
                     if (!fs.existsSync(pkg.assetsPath)) {
@@ -185,23 +253,40 @@ export function copyAssetsPlugin(options = {}) {
                         continue
                     }
 
-                    const pkgDestPath = path.join(destPath, pkg.name)
-
-                    copyDirSync(pkg.assetsPath, pkgDestPath, {
+                    // Copy FLAT to dest (not nested under package name)
+                    const copied = copyDirSync(pkg.assetsPath, destPath, {
                         filter,
                         onCopy: (src, dst) => {
-                            totalCopied++
                             if (verbose) {
-                                const relSrc = path.relative(process.cwd(), src)
-                                const relDst = path.relative(process.cwd(), dst)
+                                const relSrc = path.relative(workingDir, src)
+                                const relDst = path.relative(workingDir, dst)
                                 console.log(`[copy-assets] ${relSrc} -> ${relDst}`)
                             }
                         },
                     })
+                    totalCopied += copied
+
+                    // Find @-namespaces in this package's assets
+                    const pkgNamespaces = findAssetNamespaces(pkg.assetsPath)
+                    for (const ns of pkgNamespaces) {
+                        manifest.namespaces[ns] = {
+                            type: "package",
+                            package: pkg.name,
+                            path: path.join("node_modules", pkg.name, pkg.assetsDir, ns),
+                        }
+                    }
+                }
+
+                // 3. Write manifest file
+                fs.mkdirSync(path.dirname(manifestFullPath), { recursive: true })
+                fs.writeFileSync(manifestFullPath, JSON.stringify(manifest, null, 2))
+
+                if (verbose) {
+                    console.log(`[copy-assets] Wrote manifest: ${manifestPath}`)
                 }
 
                 if (totalCopied > 0 || verbose) {
-                    console.log(`[copy-assets] Copied ${totalCopied} files from ${packages.length} packages`)
+                    console.log(`[copy-assets] Copied ${totalCopied} files`)
                 }
             })
         },
