@@ -50,30 +50,23 @@ const config = loadJson("@my-ui-kit/config.json")
 
 ### Creating Asset Packages
 
-npm packages can distribute assets by:
+npm packages can distribute assets using a simple folder convention:
 
-1. Adding `onejs.assets` to package.json:
-```json
-{
-    "name": "my-ui-kit",
-    "onejs": {
-        "assets": "assets"
-    }
-}
-```
-
-2. Namespacing assets with `@package-name/` prefix:
 ```
 my-ui-kit/
 ├── package.json
 ├── assets/
-│   └── @my-ui-kit/          ← namespace prefix
+│   └── @my-ui-kit/          ← namespace prefix (required)
 │       ├── backgrounds/
 │       │   └── hero.png
 │       └── config.json
+└── src/
+    └── index.ts
 ```
 
-The `copyAssetsPlugin` copies these flat to `StreamingAssets/onejs/assets/@my-ui-kit/...`
+The `@namespace/` folder inside `assets/` is automatically detected. No package.json configuration needed.
+
+During Unity builds, these are copied flat to `StreamingAssets/onejs/assets/@my-ui-kit/...`
 
 ## Build Plugins
 

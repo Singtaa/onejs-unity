@@ -1,5 +1,5 @@
 /**
- * esbuild plugin for generating asset manifest (and optionally copying assets)
+ * esbuild plugin for generating asset manifest
  *
  * By default, this plugin ONLY generates a manifest file for Editor path resolution.
  * Asset copying to StreamingAssets is handled by Unity's JSRunnerBuildProcessor during
@@ -7,17 +7,12 @@
  *
  * Handles two types of assets:
  * 1. User assets from {WorkingDir}/assets/
- * 2. npm package assets (packages with "onejs.assets" field in package.json)
+ * 2. npm package assets (packages with assets/@namespace/ folders)
  *
- * npm packages should namespace their assets with @package-name/ prefix:
- * {
- *   "name": "rainbow-sample",
- *   "onejs": { "assets": "assets" }
- * }
- * With structure:
- *   rainbow-sample/assets/@rainbow-sample/bg.png
+ * Convention: packages namespace their assets with @package-name/ prefix inside an assets/ folder:
+ *   my-package/assets/@my-package/images/bg.png
  *
- * During Unity build, assets are copied FLAT to StreamingAssets/onejs/assets/@rainbow-sample/bg.png
+ * During Unity build, assets are copied FLAT to StreamingAssets/onejs/assets/@my-package/images/bg.png
  */
 
 import fs from "node:fs"
@@ -41,12 +36,13 @@ function isDirectoryEntry(entry, parentPath) {
 }
 
 /**
- * Find all packages with onejs.assets configuration
+ * Find all packages with assets/@namespace/ folders
+ * No package.json configuration needed - just the folder convention
  */
-function findAssetPackages(nodeModulesPath) {
-    const packages = []
+function findPackageAssetNamespaces(nodeModulesPath) {
+    const results = []
 
-    if (!fs.existsSync(nodeModulesPath)) return packages
+    if (!fs.existsSync(nodeModulesPath)) return results
 
     const entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true })
 
@@ -62,43 +58,33 @@ function findAssetPackages(nodeModulesPath) {
                 if (!isDirectoryEntry(scopedEntry, entryPath)) continue
 
                 const pkgPath = path.join(entryPath, scopedEntry.name)
-                const pkgJsonPath = path.join(pkgPath, "package.json")
-
-                if (fs.existsSync(pkgJsonPath)) {
-                    const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"))
-                    const assetsConfig = pkgJson.onejs?.assets
-
-                    if (assetsConfig) {
-                        packages.push({
-                            name: `${entry.name}/${scopedEntry.name}`,
-                            path: pkgPath,
-                            assetsPath: path.join(pkgPath, assetsConfig),
-                            assetsDir: assetsConfig,
-                        })
-                    }
-                }
+                const pkgName = `${entry.name}/${scopedEntry.name}`
+                scanPackageAssets(pkgPath, pkgName, results)
             }
         } else {
             // Non-scoped package
-            const pkgJsonPath = path.join(entryPath, "package.json")
-
-            if (fs.existsSync(pkgJsonPath)) {
-                const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"))
-                const assetsConfig = pkgJson.onejs?.assets
-
-                if (assetsConfig) {
-                    packages.push({
-                        name: entry.name,
-                        path: entryPath,
-                        assetsPath: path.join(entryPath, assetsConfig),
-                        assetsDir: assetsConfig,
-                    })
-                }
-            }
+            scanPackageAssets(entryPath, entry.name, results)
         }
     }
 
-    return packages
+    return results
+}
+
+/**
+ * Scan a package for assets/@namespace/ folders
+ */
+function scanPackageAssets(pkgPath, pkgName, results) {
+    const assetsPath = path.join(pkgPath, "assets")
+    if (!fs.existsSync(assetsPath)) return
+
+    const namespaces = findAssetNamespaces(assetsPath)
+    for (const ns of namespaces) {
+        results.push({
+            namespace: ns,
+            package: pkgName,
+            path: path.join("node_modules", pkgName, "assets", ns),
+        })
+    }
 }
 
 /**
@@ -173,23 +159,14 @@ export function copyAssetsPlugin(options = {}) {
                     }
                 }
 
-                // 2. Scan npm packages for assets
-                const packages = findAssetPackages(nodeModulesPath)
+                // 2. Scan npm packages for assets/@namespace/ folders
+                const pkgNamespaces = findPackageAssetNamespaces(nodeModulesPath)
 
-                for (const pkg of packages) {
-                    if (!fs.existsSync(pkg.assetsPath)) {
-                        console.warn(`[copy-assets] Assets path not found for ${pkg.name}: ${pkg.assetsPath}`)
-                        continue
-                    }
-
-                    // Find @-namespaces in this package's assets
-                    const pkgNamespaces = findAssetNamespaces(pkg.assetsPath)
-                    for (const ns of pkgNamespaces) {
-                        manifest.namespaces[ns] = {
-                            type: "package",
-                            package: pkg.name,
-                            path: path.join("node_modules", pkg.name, pkg.assetsDir, ns),
-                        }
+                for (const item of pkgNamespaces) {
+                    manifest.namespaces[item.namespace] = {
+                        type: "package",
+                        package: item.package,
+                        path: item.path,
                     }
                 }
 
