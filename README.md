@@ -122,12 +122,13 @@ import styles from "./Button.module.uss"
 
 #### `copyAssetsPlugin(options)`
 
-Copies assets to StreamingAssets and generates a manifest for Editor path resolution.
+Generates a manifest file for Editor path resolution. **Does not copy assets** during esbuild runs.
 
-- `dest` - Destination directory (default: `"Assets/StreamingAssets/onejs/assets"`)
+Asset copying to `StreamingAssets` is handled by Unity's `JSRunnerBuildProcessor` during actual Unity builds. This keeps `StreamingAssets` clean during development and avoids Unity's asset import overhead.
+
 - `userAssets` - User assets folder (default: `"assets"`)
 - `manifestPath` - Manifest file path (default: `".onejs/assets-manifest.json"`)
-- `verbose` - Log copied files (default: `false`)
+- `verbose` - Log details (default: `false`)
 
 ### PostCSS Plugins
 

@@ -1,9 +1,13 @@
 /**
- * esbuild plugin for copying assets to StreamingAssets
+ * esbuild plugin for generating asset manifest (and optionally copying assets)
+ *
+ * By default, this plugin ONLY generates a manifest file for Editor path resolution.
+ * Asset copying to StreamingAssets is handled by Unity's JSRunnerBuildProcessor during
+ * actual Unity builds - this keeps StreamingAssets clean during development.
  *
  * Handles two types of assets:
- * 1. User assets from {WorkingDir}/assets/ → StreamingAssets/onejs/assets/
- * 2. npm package assets (with "onejs.assets" field) → StreamingAssets/onejs/assets/
+ * 1. User assets from {WorkingDir}/assets/
+ * 2. npm package assets (packages with "onejs.assets" field in package.json)
  *
  * npm packages should namespace their assets with @package-name/ prefix:
  * {
@@ -13,72 +17,11 @@
  * With structure:
  *   rainbow-sample/assets/@rainbow-sample/bg.png
  *
- * This copies FLAT to StreamingAssets/onejs/assets/@rainbow-sample/bg.png
- *
- * Also generates a manifest file for Editor path resolution.
+ * During Unity build, assets are copied FLAT to StreamingAssets/onejs/assets/@rainbow-sample/bg.png
  */
 
 import fs from "node:fs"
 import path from "node:path"
-import crypto from "node:crypto"
-
-/**
- * Get MD5 hash of a file for change detection
- */
-function getFileHash(filePath) {
-    try {
-        const content = fs.readFileSync(filePath)
-        return crypto.createHash("md5").update(content).digest("hex")
-    } catch {
-        return null
-    }
-}
-
-/**
- * Recursively copy directory with optional filtering
- */
-function copyDirSync(src, dest, options = {}) {
-    const { filter, onCopy } = options
-
-    if (!fs.existsSync(src)) return 0
-
-    fs.mkdirSync(dest, { recursive: true })
-
-    const entries = fs.readdirSync(src, { withFileTypes: true })
-    let copied = 0
-
-    for (const entry of entries) {
-        const srcPath = path.join(src, entry.name)
-        const destPath = path.join(dest, entry.name)
-
-        // Apply filter if provided
-        if (filter && !filter(srcPath, entry)) continue
-
-        if (entry.isDirectory() || entry.isSymbolicLink()) {
-            // For symlinks, check if target is directory
-            try {
-                const stat = fs.statSync(srcPath)
-                if (stat.isDirectory()) {
-                    copied += copyDirSync(srcPath, destPath, options)
-                }
-            } catch {
-                continue
-            }
-        } else {
-            // Check if file needs copying (hash comparison)
-            const srcHash = getFileHash(srcPath)
-            const destHash = getFileHash(destPath)
-
-            if (srcHash !== destHash) {
-                fs.copyFileSync(srcPath, destPath)
-                copied++
-                if (onCopy) onCopy(srcPath, destPath)
-            }
-        }
-    }
-
-    return copied
-}
 
 /**
  * Check if entry is a directory or symlink to directory
@@ -178,21 +121,22 @@ function findAssetNamespaces(assetsPath) {
 }
 
 /**
- * Creates the esbuild plugin for copying assets
+ * Creates the esbuild plugin for generating asset manifest
+ *
+ * By default, only generates a manifest file. Asset copying is handled by Unity's
+ * build processor to keep StreamingAssets clean during development.
  *
  * @param {Object} options - Plugin options
- * @param {string} options.dest - Destination folder (default: "Assets/StreamingAssets/onejs/assets")
+ * @param {string} options.dest - Destination folder for manifest reference (default: "Assets/StreamingAssets/onejs/assets")
  * @param {string} options.userAssets - User assets folder (default: "assets")
  * @param {string} options.manifestPath - Manifest file path (default: ".onejs/assets-manifest.json")
- * @param {Function} options.filter - Optional filter function (srcPath, entry) => boolean
- * @param {boolean} options.verbose - Log copied files (default: false)
+ * @param {boolean} options.verbose - Log details (default: false)
  */
 export function copyAssetsPlugin(options = {}) {
     const {
         dest = "Assets/StreamingAssets/onejs/assets",
         userAssets = "assets",
         manifestPath = ".onejs/assets-manifest.json",
-        filter = null,
         verbose = false,
     } = options
 
@@ -206,35 +150,20 @@ export function copyAssetsPlugin(options = {}) {
 
                 const workingDir = process.cwd()
                 const nodeModulesPath = path.resolve(workingDir, "node_modules")
-                const destPath = path.resolve(workingDir, "..", dest)
                 const userAssetsPath = path.resolve(workingDir, userAssets)
                 const manifestFullPath = path.resolve(workingDir, manifestPath)
 
-                let totalCopied = 0
                 const manifest = {
                     // Maps @namespace to source path (for Editor resolution)
                     namespaces: {},
                     // User assets base path
                     userAssetsPath: userAssets,
-                    // Build destination
+                    // Build destination (used by Unity build processor)
                     destPath: dest,
                 }
 
-                // 1. Copy user assets (if exists)
+                // 1. Scan user assets for @-namespaces
                 if (fs.existsSync(userAssetsPath)) {
-                    const copied = copyDirSync(userAssetsPath, destPath, {
-                        filter,
-                        onCopy: (src, dst) => {
-                            if (verbose) {
-                                const relSrc = path.relative(workingDir, src)
-                                const relDst = path.relative(workingDir, dst)
-                                console.log(`[copy-assets] ${relSrc} -> ${relDst}`)
-                            }
-                        },
-                    })
-                    totalCopied += copied
-
-                    // Find any @-namespaces in user assets
                     const userNamespaces = findAssetNamespaces(userAssetsPath)
                     for (const ns of userNamespaces) {
                         manifest.namespaces[ns] = {
@@ -244,7 +173,7 @@ export function copyAssetsPlugin(options = {}) {
                     }
                 }
 
-                // 2. Copy npm package assets
+                // 2. Scan npm packages for assets
                 const packages = findAssetPackages(nodeModulesPath)
 
                 for (const pkg of packages) {
@@ -252,19 +181,6 @@ export function copyAssetsPlugin(options = {}) {
                         console.warn(`[copy-assets] Assets path not found for ${pkg.name}: ${pkg.assetsPath}`)
                         continue
                     }
-
-                    // Copy FLAT to dest (not nested under package name)
-                    const copied = copyDirSync(pkg.assetsPath, destPath, {
-                        filter,
-                        onCopy: (src, dst) => {
-                            if (verbose) {
-                                const relSrc = path.relative(workingDir, src)
-                                const relDst = path.relative(workingDir, dst)
-                                console.log(`[copy-assets] ${relSrc} -> ${relDst}`)
-                            }
-                        },
-                    })
-                    totalCopied += copied
 
                     // Find @-namespaces in this package's assets
                     const pkgNamespaces = findAssetNamespaces(pkg.assetsPath)
@@ -282,11 +198,8 @@ export function copyAssetsPlugin(options = {}) {
                 fs.writeFileSync(manifestFullPath, JSON.stringify(manifest, null, 2))
 
                 if (verbose) {
-                    console.log(`[copy-assets] Wrote manifest: ${manifestPath}`)
-                }
-
-                if (totalCopied > 0 || verbose) {
-                    console.log(`[copy-assets] Copied ${totalCopied} files`)
+                    console.log(`[copy-assets] Generated manifest: ${manifestPath}`)
+                    console.log(`[copy-assets] Found ${Object.keys(manifest.namespaces).length} asset namespace(s)`)
                 }
             })
         },
