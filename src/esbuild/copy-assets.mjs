@@ -2,8 +2,8 @@
  * esbuild plugin for copying assets to StreamingAssets
  *
  * Handles two types of assets:
- * 1. User assets from {WorkingDir}/assets/ → StreamingAssets/onejs/
- * 2. npm package assets (with "onejs.assets" field) → StreamingAssets/onejs/
+ * 1. User assets from {WorkingDir}/assets/ → StreamingAssets/onejs/assets/
+ * 2. npm package assets (with "onejs.assets" field) → StreamingAssets/onejs/assets/
  *
  * npm packages should namespace their assets with @package-name/ prefix:
  * {
@@ -13,7 +13,7 @@
  * With structure:
  *   rainbow-sample/assets/@rainbow-sample/bg.png
  *
- * This copies FLAT to StreamingAssets/onejs/@rainbow-sample/bg.png
+ * This copies FLAT to StreamingAssets/onejs/assets/@rainbow-sample/bg.png
  *
  * Also generates a manifest file for Editor path resolution.
  */
@@ -181,7 +181,7 @@ function findAssetNamespaces(assetsPath) {
  * Creates the esbuild plugin for copying assets
  *
  * @param {Object} options - Plugin options
- * @param {string} options.dest - Destination folder (default: "Assets/StreamingAssets/onejs")
+ * @param {string} options.dest - Destination folder (default: "Assets/StreamingAssets/onejs/assets")
  * @param {string} options.userAssets - User assets folder (default: "assets")
  * @param {string} options.manifestPath - Manifest file path (default: ".onejs/assets-manifest.json")
  * @param {Function} options.filter - Optional filter function (srcPath, entry) => boolean
@@ -189,7 +189,7 @@ function findAssetNamespaces(assetsPath) {
  */
 export function copyAssetsPlugin(options = {}) {
     const {
-        dest = "Assets/StreamingAssets/onejs",
+        dest = "Assets/StreamingAssets/onejs/assets",
         userAssets = "assets",
         manifestPath = ".onejs/assets-manifest.json",
         filter = null,

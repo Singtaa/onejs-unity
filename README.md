@@ -1,6 +1,6 @@
 # onejs-unity
 
-Unity integration utilities for OneJS. Provides TypeScript APIs for Unity-specific features and build tooling for USS (Unity Style Sheets).
+Unity integration utilities for OneJS. Provides asset loading, build plugins for USS transformation, and GPU compute APIs.
 
 ## Installation
 
@@ -10,9 +10,70 @@ npm install onejs-unity
 
 ## Features
 
+- **Asset Loading** - Load images, fonts, and data from disk with Editor/Build path resolution
 - **Build Plugins** - esbuild and PostCSS plugins for USS transformation
 - **GPU Compute** - Access Unity compute shaders from JavaScript
-- **Compute Buffers** - Create and manage GPU buffers with typed structs
+
+## Asset Loading
+
+Load assets from your project or npm packages with automatic path resolution between Editor and Build modes.
+
+```typescript
+import { loadImage, loadFont, loadJson } from "onejs-unity/assets"
+
+// Load user assets (from App/assets/)
+const logo = loadImage("images/logo.png")
+const font = loadFont("fonts/Inter.ttf")
+
+// Load package assets (prefixed with @package-name/)
+const bg = loadImage("@my-ui-kit/backgrounds/hero.png")
+const config = loadJson("@my-ui-kit/config.json")
+```
+
+### Path Resolution
+
+| Context | `@my-pkg/bg.png` | `images/logo.png` |
+|---------|------------------|-------------------|
+| **Editor** | `App/node_modules/.../assets/@my-pkg/bg.png` | `App/assets/images/logo.png` |
+| **Build** | `StreamingAssets/onejs/assets/@my-pkg/bg.png` | `StreamingAssets/onejs/assets/images/logo.png` |
+
+### Asset Functions
+
+- `loadImage(path)` - Load as Texture2D
+- `loadFont(path)` - Load as Font
+- `loadFontDefinition(path)` - Load as FontDefinition (for UI Toolkit)
+- `loadText(path)` - Load as string
+- `loadJson<T>(path)` - Load and parse JSON
+- `loadBytes(path)` - Load as Uint8Array
+- `assetExists(path)` - Check if asset exists
+- `getAssetPath(path)` - Get resolved full path
+
+### Creating Asset Packages
+
+npm packages can distribute assets by:
+
+1. Adding `onejs.assets` to package.json:
+```json
+{
+    "name": "my-ui-kit",
+    "onejs": {
+        "assets": "assets"
+    }
+}
+```
+
+2. Namespacing assets with `@package-name/` prefix:
+```
+my-ui-kit/
+├── package.json
+├── assets/
+│   └── @my-ui-kit/          ← namespace prefix
+│       ├── backgrounds/
+│       │   └── hero.png
+│       └── config.json
+```
+
+The `copyAssetsPlugin` copies these flat to `StreamingAssets/onejs/assets/@my-ui-kit/...`
 
 ## Build Plugins
 
@@ -21,9 +82,7 @@ npm install onejs-unity
 ```javascript
 import { ussModulesPlugin, tailwindPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
 
-// In your esbuild config
 const config = {
-    // ...
     plugins: [
         // Tailwind CSS → USS transformation
         tailwindPlugin({ tailwindConfig: "./tailwind.config.js" }),
@@ -31,8 +90,8 @@ const config = {
         // CSS Modules for .module.uss files
         ussModulesPlugin({ generateTypes: true }),
 
-        // Copy npm package assets to StreamingAssets
-        copyAssetsPlugin({ dest: "Assets/StreamingAssets/onejs" }),
+        // Copy assets to StreamingAssets
+        copyAssetsPlugin({ verbose: true }),
     ],
 }
 ```
@@ -63,28 +122,18 @@ import styles from "./Button.module.uss"
 
 #### `copyAssetsPlugin(options)`
 
-Copies assets from npm packages with `onejs.assets` field to Unity's StreamingAssets.
+Copies assets to StreamingAssets and generates a manifest for Editor path resolution.
 
-- `dest` - Destination directory (default: `"Assets/StreamingAssets/onejs"`)
-- `filter` - Package name filter (default: all packages)
+- `dest` - Destination directory (default: `"Assets/StreamingAssets/onejs/assets"`)
+- `userAssets` - User assets folder (default: `"assets"`)
+- `manifestPath` - Manifest file path (default: `".onejs/assets-manifest.json"`)
 - `verbose` - Log copied files (default: `false`)
-
-Package authors can specify assets in their package.json:
-```json
-{
-    "name": "my-onejs-package",
-    "onejs": {
-        "assets": ["assets/textures", "assets/fonts"]
-    }
-}
-```
 
 ### PostCSS Plugins
 
 ```javascript
 import { ussTransform, ussCleanup, ussUnwrapIs } from "onejs-unity/postcss"
 
-// Use with PostCSS
 const result = await postcss([
     ussTransform(),
     ussUnwrapIs(),
@@ -120,35 +169,23 @@ Flattens `:is()` and `:where()` selectors (used by Tailwind v3):
 .button.secondary { color: blue; }
 ```
 
-## Runtime API
+## GPU Compute
 
 ```typescript
 import { compute, Platform } from "onejs-unity"
 
-// Check platform support
 if (Platform.supportsComputeShaders) {
-    // Load a compute shader
     const shader = compute("MyComputeShader")
-
-    // Get a kernel and configure it
     const kernel = shader.kernel("CSMain")
         .buffer("inputBuffer", inputData)
         .buffer("outputBuffer", outputBuffer)
-
-    // Dispatch the compute shader
     kernel.dispatch(groupsX, groupsY, groupsZ)
 }
 ```
 
-### `Platform`
-
-Static class for checking GPU capabilities:
-- `Platform.supportsComputeShaders` - Whether compute shaders are supported
-- `Platform.maxComputeWorkGroupSize` - Maximum work group size
-
 ## Peer Dependencies
 
-When using the build plugins, ensure you have these packages installed:
+When using the build plugins:
 
 ```bash
 npm install -D esbuild postcss tailwindcss

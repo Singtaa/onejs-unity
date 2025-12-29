@@ -67,7 +67,7 @@ function loadManifest(): AssetManifest {
         manifestCache = {
             namespaces: {},
             userAssetsPath: "assets",
-            destPath: "Assets/StreamingAssets/onejs",
+            destPath: "Assets/StreamingAssets/onejs/assets",
         }
     }
 
@@ -105,9 +105,9 @@ function resolveAssetPath(assetPath: string): string {
         // User asset - resolve from assets/ folder
         return Path.Combine(workingDir, manifest.userAssetsPath, assetPath)
     } else {
-        // Build mode - everything is in StreamingAssets/onejs/
+        // Build mode - everything is in StreamingAssets/onejs/assets/
         const streamingAssets = CS.UnityEngine.Application.streamingAssetsPath
-        return Path.Combine(streamingAssets, "onejs", assetPath)
+        return Path.Combine(streamingAssets, "onejs", "assets", assetPath)
     }
 }
 
