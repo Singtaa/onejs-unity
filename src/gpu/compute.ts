@@ -6,6 +6,8 @@ import type {
     ComputeModule,
     ComputeShader,
     ComputeBuffer,
+    RenderTexture,
+    RenderTextureOptions,
     KernelBuilder,
     BufferOptions,
     StructSchema,
@@ -37,6 +39,20 @@ declare const CS: {
                 RequestReadback(bufferHandle: number): number // Returns request ID
                 IsReadbackComplete(requestId: number): boolean
                 GetReadbackData(requestId: number): string // JSON array
+                // Shader registration
+                RegisterShader(shader: unknown): number
+                // RenderTexture API
+                CreateRenderTexture(width: number, height: number, enableRandomWrite: boolean): number
+                ResizeRenderTexture(handle: number, width: number, height: number): boolean
+                DisposeRenderTexture(handle: number): void
+                GetRenderTextureObject(handle: number): unknown
+                GetRenderTextureAsBackground(handle: number): unknown
+                GetRenderTextureWidth(handle: number): number
+                GetRenderTextureHeight(handle: number): number
+                SetTexture(shaderHandle: number, kernelIndex: number, name: string, textureHandle: number): void
+                // Screen API
+                GetScreenWidth(): number
+                GetScreenHeight(): number
             }
         }
     }
@@ -87,6 +103,87 @@ const FIELD_SIZES: Record<string, number> = {
     float: 4, float2: 8, float3: 12, float4: 16,
     int: 4, int2: 8, int3: 12, int4: 16,
     uint: 4, uint2: 8, uint3: 12, uint4: 16,
+}
+
+/**
+ * RenderTexture implementation with optional auto-resize support.
+ */
+class RenderTextureImpl implements RenderTexture {
+    readonly __handle: number
+    readonly autoResize: boolean
+    private _width: number
+    private _height: number
+    private _didResize: boolean = false
+
+    constructor(handle: number, width: number, height: number, autoResize: boolean = false) {
+        this.__handle = handle
+        this._width = width
+        this._height = height
+        this.autoResize = autoResize
+    }
+
+    /**
+     * Get width, checking for auto-resize if enabled.
+     */
+    get width(): number {
+        if (this.autoResize) {
+            this._checkAutoResize()
+        }
+        return this._width
+    }
+
+    /**
+     * Get height, checking for auto-resize if enabled.
+     */
+    get height(): number {
+        if (this.autoResize) {
+            this._checkAutoResize()
+        }
+        return this._height
+    }
+
+    /**
+     * Check if resized since last check and reset the flag.
+     */
+    get didResize(): boolean {
+        const result = this._didResize
+        this._didResize = false
+        return result
+    }
+
+    /**
+     * Internal: check if screen size changed and resize if needed.
+     */
+    private _checkAutoResize(): void {
+        const sw = CS.OneJS.GPU.GPUBridge.GetScreenWidth()
+        const sh = CS.OneJS.GPU.GPUBridge.GetScreenHeight()
+        if (this._width !== sw || this._height !== sh) {
+            this.resize(sw, sh)
+            this._didResize = true
+        }
+    }
+
+    resize(width: number, height: number): boolean {
+        const success = CS.OneJS.GPU.GPUBridge.ResizeRenderTexture(this.__handle, width, height)
+        if (success) {
+            this._width = width
+            this._height = height
+        }
+        return success
+    }
+
+    /**
+     * @deprecated Pass the RenderTexture directly to backgroundImage instead
+     */
+    getUnityObject(): unknown {
+        // Return a marker object with the RT handle
+        // The style system will detect this and use SetElementBackgroundImage
+        return { __rtHandle: this.__handle }
+    }
+
+    dispose(): void {
+        CS.OneJS.GPU.GPUBridge.DisposeRenderTexture(this.__handle)
+    }
 }
 
 /**
@@ -231,6 +328,17 @@ class KernelBuilderImpl implements KernelBuilder {
         return this.buffer(name, data)
     }
 
+    texture(name: string, tex: RenderTexture): KernelBuilder {
+        CS.OneJS.GPU.GPUBridge.SetTexture(this._shader.__handle, this._kernelIndex, name, tex.__handle)
+        return this
+    }
+
+    textureRW(name: string, tex: RenderTexture): KernelBuilder {
+        // Same binding for RW textures - the RW distinction is in the HLSL declaration
+        CS.OneJS.GPU.GPUBridge.SetTexture(this._shader.__handle, this._kernelIndex, name, tex.__handle)
+        return this
+    }
+
     dispatch(groupsX: number, groupsY = 1, groupsZ = 1): ComputeShader {
         CS.OneJS.GPU.GPUBridge.Dispatch(
             this._shader.__handle,
@@ -240,6 +348,12 @@ class KernelBuilderImpl implements KernelBuilder {
             groupsZ
         )
         return this._shader
+    }
+
+    dispatchAuto(texture: RenderTexture, threadGroupSize = 8): ComputeShader {
+        const groupsX = Math.ceil(texture.width / threadGroupSize)
+        const groupsY = Math.ceil(texture.height / threadGroupSize)
+        return this.dispatch(groupsX, groupsY, 1)
     }
 
     repeat(iterations: number): ComputeShader {
@@ -325,6 +439,14 @@ export const compute: ComputeModule = {
         })
     },
 
+    register(shaderObject: unknown, name = "registered"): ComputeShader {
+        const handle = CS.OneJS.GPU.GPUBridge.RegisterShader(shaderObject)
+        if (handle < 0) {
+            throw new Error("Failed to register compute shader. Make sure the object is a valid ComputeShader.")
+        }
+        return new ComputeShaderImpl(handle, name)
+    },
+
     buffer<T extends TypedArray>(options: BufferOptions<T>): ComputeBuffer<T> {
         const { data, count: optCount, type } = options
         const count = data ? data.length : (optCount || 0)
@@ -355,7 +477,45 @@ export const compute: ComputeModule = {
         return buffer
     },
 
+    renderTexture(options: RenderTextureOptions): RenderTexture {
+        const { enableRandomWrite = true, autoResize = false } = options
+
+        // Determine initial dimensions
+        let width: number
+        let height: number
+
+        if (autoResize) {
+            // Use screen dimensions for auto-resize textures
+            width = CS.OneJS.GPU.GPUBridge.GetScreenWidth()
+            height = CS.OneJS.GPU.GPUBridge.GetScreenHeight()
+        } else {
+            // Use provided dimensions
+            width = options.width ?? 0
+            height = options.height ?? 0
+        }
+
+        if (width <= 0 || height <= 0) {
+            throw new Error(`Invalid RenderTexture dimensions: ${width}x${height}. ` +
+                `Provide width/height or use autoResize: true`)
+        }
+
+        const handle = CS.OneJS.GPU.GPUBridge.CreateRenderTexture(width, height, enableRandomWrite)
+        if (handle < 0) {
+            throw new Error("Failed to create RenderTexture")
+        }
+
+        return new RenderTextureImpl(handle, width, height, autoResize)
+    },
+
     struct(schema: StructSchema): StructType {
         return new StructTypeImpl(schema)
+    },
+
+    get screenWidth(): number {
+        return CS.OneJS.GPU.GPUBridge.GetScreenWidth()
+    },
+
+    get screenHeight(): number {
+        return CS.OneJS.GPU.GPUBridge.GetScreenHeight()
     },
 }

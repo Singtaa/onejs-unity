@@ -56,6 +56,73 @@ export interface BufferOptions<T extends TypedArray = Float32Array> {
     usage?: BufferUsage
 }
 
+export interface RenderTextureOptions {
+    /** Texture width (ignored if autoResize is true) */
+    width?: number
+    /** Texture height (ignored if autoResize is true) */
+    height?: number
+    /** Enable random write for RWTexture2D (default: true) */
+    enableRandomWrite?: boolean
+    /**
+     * Automatically resize to match screen dimensions.
+     * When enabled, the texture will check and resize on each width/height property access.
+     * @default false
+     */
+    autoResize?: boolean
+}
+
+/**
+ * Represents a GPU render texture for compute shader output.
+ *
+ * Can be passed directly to View's backgroundImage style property:
+ * @example
+ * const rt = compute.renderTexture({ autoResize: true })
+ * <View style={{ backgroundImage: rt }} />
+ */
+export interface RenderTexture {
+    /** Internal handle for C# interop */
+    readonly __handle: number
+
+    /**
+     * Current width of the texture.
+     * If autoResize is enabled, accessing this will check and resize to screen dimensions.
+     */
+    readonly width: number
+
+    /**
+     * Current height of the texture.
+     * If autoResize is enabled, accessing this will check and resize to screen dimensions.
+     */
+    readonly height: number
+
+    /** Whether auto-resize is enabled for this texture */
+    readonly autoResize: boolean
+
+    /**
+     * Check if the texture was resized since last check.
+     * Useful for updating UI bindings after resize.
+     */
+    readonly didResize: boolean
+
+    /**
+     * Resize the texture to new dimensions.
+     * @returns true if resize succeeded
+     */
+    resize(width: number, height: number): boolean
+
+    /**
+     * Get the underlying Unity RenderTexture object.
+     * Use this for UI binding (e.g., backgroundImage style property).
+     * @deprecated Pass the RenderTexture directly to backgroundImage instead
+     */
+    getUnityObject(): unknown
+
+    /**
+     * Release the texture resources
+     */
+    dispose(): void
+}
+
 /**
  * Represents a GPU compute buffer
  */
@@ -123,18 +190,34 @@ export interface KernelBuilder {
     buffer(name: string, data: TypedArray | ComputeBuffer): KernelBuilder
     bufferReadOnly(name: string, data: TypedArray | ComputeBuffer): KernelBuilder
 
-    // Texture bindings (future)
-    // texture(name: string, tex: unknown): KernelBuilder
-    // textureRW(name: string, tex: unknown): KernelBuilder
+    // Texture bindings
+    texture(name: string, tex: RenderTexture): KernelBuilder
+    textureRW(name: string, tex: RenderTexture): KernelBuilder
 
     /**
-     * Dispatch the kernel
+     * Dispatch the kernel with explicit thread group counts.
      * @param groupsX Number of thread groups in X
      * @param groupsY Number of thread groups in Y (default 1)
      * @param groupsZ Number of thread groups in Z (default 1)
      * @returns The parent ComputeShader for chaining
      */
     dispatch(groupsX: number, groupsY?: number, groupsZ?: number): ComputeShader
+
+    /**
+     * Dispatch the kernel with automatic thread group calculation based on texture dimensions.
+     * Calculates thread groups as ceil(width/threadGroupSize) x ceil(height/threadGroupSize).
+     *
+     * @param texture The RenderTexture to dispatch for
+     * @param threadGroupSize Thread group size (default 8, matching common [numthreads(8,8,1)])
+     * @returns The parent ComputeShader for chaining
+     *
+     * @example
+     * shader.kernel("CSMain")
+     *     .float("_Time", time)
+     *     .textureRW("_Result", rt)
+     *     .dispatchAuto(rt)  // Calculates ceil(width/8) x ceil(height/8) x 1
+     */
+    dispatchAuto(texture: RenderTexture, threadGroupSize?: number): ComputeShader
 
     /**
      * Dispatch multiple times (for iterative solvers)
@@ -181,14 +264,33 @@ export interface ComputeModule {
     load(name: string): Promise<ComputeShader>
 
     /**
+     * Register a compute shader from a Unity object (e.g., from JSRunner globals)
+     * @param shaderObject The ComputeShader object injected via globals
+     * @param name Optional name for debugging
+     */
+    register(shaderObject: unknown, name?: string): ComputeShader
+
+    /**
      * Create a compute buffer
      * @param options Buffer configuration
      */
     buffer<T extends TypedArray>(options: BufferOptions<T>): ComputeBuffer<T>
 
     /**
+     * Create a render texture for compute shader output
+     * @param options Texture configuration
+     */
+    renderTexture(options: RenderTextureOptions): RenderTexture
+
+    /**
      * Define a struct type for structured buffers
      * @param schema Field definitions
      */
     struct(schema: StructSchema): StructType
+
+    /**
+     * Get current screen dimensions
+     */
+    readonly screenWidth: number
+    readonly screenHeight: number
 }
