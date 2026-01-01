@@ -41,17 +41,11 @@ export interface UseComputeTextureOptions {
  */
 export interface UseComputeTextureResult {
     /**
-     * The RenderTexture instance.
-     * Pass this directly to View's backgroundImage style.
+     * The RenderTexture for use with backgroundImage and compute shaders.
+     * Pass directly to View's backgroundImage style.
      * Will be null until initialized.
      */
     texture: RenderTexture | null
-
-    /**
-     * Whether the texture was resized this frame.
-     * Useful for triggering re-renders or updates.
-     */
-    didResize: boolean
 }
 
 /**
@@ -60,7 +54,7 @@ export interface UseComputeTextureResult {
  * Handles creation, auto-resize, and cleanup automatically.
  *
  * @param options Configuration options
- * @returns The managed RenderTexture and resize state
+ * @returns The managed RenderTexture
  *
  * @example
  * function BackgroundEffect({ shader }) {
@@ -82,7 +76,6 @@ export function useComputeTexture(options: UseComputeTextureOptions = {}): UseCo
     const { autoResize = true, width, height, enableRandomWrite = true } = options
 
     const [texture, setTexture] = useState<RenderTexture | null>(null)
-    const [didResize, setDidResize] = useState(false)
 
     useEffect(() => {
         const rtOptions: RenderTextureOptions = {
@@ -103,17 +96,7 @@ export function useComputeTexture(options: UseComputeTextureOptions = {}): UseCo
         }
     }, [autoResize, width, height, enableRandomWrite])
 
-    // Update didResize state when texture is accessed
-    useEffect(() => {
-        if (texture && texture.didResize) {
-            setDidResize(true)
-            // Reset after a frame
-            const id = requestAnimationFrame(() => setDidResize(false))
-            return () => cancelAnimationFrame(id)
-        }
-    })
-
-    return { texture, didResize }
+    return { texture }
 }
 
 /**
