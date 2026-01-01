@@ -46,6 +46,18 @@ export interface UseComputeTextureResult {
      * Will be null until initialized.
      */
     texture: RenderTexture | null
+
+    /**
+     * Counter that increments on each resize.
+     * Include in style object dependencies to force re-application after resize.
+     *
+     * @example
+     * const { texture, resizeCount } = useComputeTexture({ autoResize: true })
+     * const style = useMemo(() => ({
+     *     backgroundImage: texture
+     * }), [texture, resizeCount])
+     */
+    resizeCount: number
 }
 
 /**
@@ -76,6 +88,7 @@ export function useComputeTexture(options: UseComputeTextureOptions = {}): UseCo
     const { autoResize = true, width, height, enableRandomWrite = true } = options
 
     const [texture, setTexture] = useState<RenderTexture | null>(null)
+    const [resizeCount, setResizeCount] = useState(0)
 
     useEffect(() => {
         const rtOptions: RenderTextureOptions = {
@@ -96,7 +109,36 @@ export function useComputeTexture(options: UseComputeTextureOptions = {}): UseCo
         }
     }, [autoResize, width, height, enableRandomWrite])
 
-    return { texture }
+    // Track resize events and increment counter
+    useEffect(() => {
+        if (!texture || !autoResize) return
+
+        let animationId: number
+        let lastWidth = texture.width
+        let lastHeight = texture.height
+
+        function checkResize() {
+            if (!texture) return
+
+            // Accessing width/height triggers auto-resize
+            const w = texture.width
+            const h = texture.height
+
+            if (w !== lastWidth || h !== lastHeight) {
+                lastWidth = w
+                lastHeight = h
+                setResizeCount(c => c + 1)
+            }
+
+            animationId = requestAnimationFrame(checkResize)
+        }
+
+        animationId = requestAnimationFrame(checkResize)
+
+        return () => cancelAnimationFrame(animationId)
+    }, [texture, autoResize])
+
+    return { texture, resizeCount }
 }
 
 /**
