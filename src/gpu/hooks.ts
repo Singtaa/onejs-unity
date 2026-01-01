@@ -5,7 +5,7 @@
  * and render textures in React components.
  */
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import { compute } from "./compute"
 import type { RenderTexture, ComputeShader, RenderTextureOptions } from "./types"
 
@@ -37,40 +37,16 @@ export interface UseComputeTextureOptions {
 }
 
 /**
- * Return type for useComputeTexture hook.
- */
-export interface UseComputeTextureResult {
-    /**
-     * The RenderTexture for use with backgroundImage and compute shaders.
-     * Pass directly to View's backgroundImage style.
-     * Will be null until initialized.
-     */
-    texture: RenderTexture | null
-
-    /**
-     * Counter that increments on each resize.
-     * Include in style object dependencies to force re-application after resize.
-     *
-     * @example
-     * const { texture, resizeCount } = useComputeTexture({ autoResize: true })
-     * const style = useMemo(() => ({
-     *     backgroundImage: texture
-     * }), [texture, resizeCount])
-     */
-    resizeCount: number
-}
-
-/**
  * Hook that creates and manages a RenderTexture for compute shader output.
  *
  * Handles creation, auto-resize, and cleanup automatically.
  *
  * @param options Configuration options
- * @returns The managed RenderTexture
+ * @returns The managed RenderTexture (null until initialized)
  *
  * @example
  * function BackgroundEffect({ shader }) {
- *     const { texture } = useComputeTexture({ autoResize: true })
+ *     const texture = useComputeTexture({ autoResize: true })
  *
  *     useAnimationFrame(() => {
  *         if (!texture) return
@@ -84,11 +60,10 @@ export interface UseComputeTextureResult {
  *     return <View style={{ width: "100%", height: "100%", backgroundImage: texture }} />
  * }
  */
-export function useComputeTexture(options: UseComputeTextureOptions = {}): UseComputeTextureResult {
+export function useComputeTexture(options: UseComputeTextureOptions = {}): RenderTexture | null {
     const { autoResize = true, width, height, enableRandomWrite = true } = options
 
     const [texture, setTexture] = useState<RenderTexture | null>(null)
-    const [resizeCount, setResizeCount] = useState(0)
 
     useEffect(() => {
         const rtOptions: RenderTextureOptions = {
@@ -109,36 +84,7 @@ export function useComputeTexture(options: UseComputeTextureOptions = {}): UseCo
         }
     }, [autoResize, width, height, enableRandomWrite])
 
-    // Track resize events and increment counter
-    useEffect(() => {
-        if (!texture || !autoResize) return
-
-        let animationId: number
-        let lastWidth = texture.width
-        let lastHeight = texture.height
-
-        function checkResize() {
-            if (!texture) return
-
-            // Accessing width/height triggers auto-resize
-            const w = texture.width
-            const h = texture.height
-
-            if (w !== lastWidth || h !== lastHeight) {
-                lastWidth = w
-                lastHeight = h
-                setResizeCount(c => c + 1)
-            }
-
-            animationId = requestAnimationFrame(checkResize)
-        }
-
-        animationId = requestAnimationFrame(checkResize)
-
-        return () => cancelAnimationFrame(animationId)
-    }, [texture, autoResize])
-
-    return { texture, resizeCount }
+    return texture
 }
 
 /**

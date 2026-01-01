@@ -22,7 +22,7 @@
  *
  * function Background({ shaderGlobal }) {
  *     const shader = useComputeShader(shaderGlobal)
- *     const { texture } = useComputeTexture({ autoResize: true })
+ *     const texture = useComputeTexture({ autoResize: true })
  *
  *     useAnimationFrame(() => {
  *         if (!shader || !texture) return
@@ -61,6 +61,5 @@ export type {
 
 export type {
     UseComputeTextureOptions,
-    UseComputeTextureResult,
     UseAnimationFrameOptions,
 } from "./hooks"
