@@ -279,6 +279,9 @@ class ActionBuilderImpl implements ActionBuilder {
         } else {
             this._handle = getInputBridge().AddValueAction(mapHandle, name)
         }
+
+        // Register this action's handle with the map builder
+        mapBuilder._registerAction(name, this._handle)
     }
 
     _getHandle(): number {
@@ -302,7 +305,7 @@ class ActionBuilderImpl implements ActionBuilder {
 class ActionMapBuilderImpl implements ActionMapBuilder {
     private readonly _name: string
     private _handle: number = -1
-    private readonly _actions: Map<string, number> = new Map()
+    private readonly _actionHandles: Map<string, number> = new Map()
 
     constructor(name: string) {
         this._name = name
@@ -311,6 +314,10 @@ class ActionMapBuilderImpl implements ActionMapBuilder {
 
     _getHandle(): number {
         return this._handle
+    }
+
+    _registerAction(name: string, handle: number): void {
+        this._actionHandles.set(name, handle)
     }
 
     button(name: string): ActionBuilder {
@@ -329,31 +336,46 @@ class ActionMapBuilderImpl implements ActionMapBuilder {
         // Enable the map
         getInputBridge().EnableDynamicMap(this._handle)
 
-        // Create a wrapper that uses the dynamic map
-        // For now, use the map handle as the "asset" handle since it's similar
-        return new DynamicInputActionsImpl(this._handle, this._name)
+        // Create a wrapper that uses the dynamic map with action handles
+        return new DynamicInputActionsImpl(this._handle, this._name, this._actionHandles)
     }
 }
 
 class DynamicInputActionsImpl implements InputActions {
     private readonly _mapHandle: number
     private readonly _mapName: string
+    private readonly _actionHandles: Map<string, number>
     private readonly _actions: Map<string, InputActionImpl> = new Map()
 
-    constructor(mapHandle: number, mapName: string) {
+    constructor(mapHandle: number, mapName: string, actionHandles: Map<string, number>) {
         this._mapHandle = mapHandle
         this._mapName = mapName
+        this._actionHandles = actionHandles
     }
 
     action(path: string): InputAction {
-        // For dynamic actions, path is just the action name
-        let action = this._actions.get(path)
-        if (!action) {
-            // Find action in the dynamic map
-            // This requires looking up the action handle we stored during creation
-            // For now, throw an error - need to track action handles properly
-            throw new Error(`Dynamic action lookup not fully implemented: ${path}`)
+        // For dynamic actions, path can be "ActionName" or "MapName/ActionName"
+        // Strip the map name prefix if present
+        let actionName = path
+        if (path.startsWith(this._mapName + "/")) {
+            actionName = path.slice(this._mapName.length + 1)
         }
+
+        // Check cache first
+        let action = this._actions.get(actionName)
+        if (action) {
+            return action
+        }
+
+        // Look up the action handle
+        const handle = this._actionHandles.get(actionName)
+        if (handle === undefined) {
+            throw new Error(`Action "${path}" not found. Available actions: ${Array.from(this._actionHandles.keys()).join(", ")}`)
+        }
+
+        // Create and cache the InputAction wrapper
+        action = new InputActionImpl(actionName, handle)
+        this._actions.set(actionName, action)
         return action
     }
 
