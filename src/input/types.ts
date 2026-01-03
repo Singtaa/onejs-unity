@@ -7,6 +7,29 @@ export type Vector2 = { x: number; y: number }
 
 // ============ Keyboard ============
 
+/** Key binding - single key or array of keys (any match = true) */
+export type KeyBinding = string | string[]
+
+/** Configuration for axis2D helper */
+export interface Axis2DConfig {
+    /** Key(s) for positive Y */
+    up: KeyBinding
+    /** Key(s) for negative Y */
+    down: KeyBinding
+    /** Key(s) for negative X */
+    left: KeyBinding
+    /** Key(s) for positive X */
+    right: KeyBinding
+}
+
+/** Configuration for 1D axis helper */
+export interface AxisConfig {
+    /** Key(s) for negative direction (-1) */
+    negative: KeyBinding
+    /** Key(s) for positive direction (+1) */
+    positive: KeyBinding
+}
+
 export interface Keyboard {
     /** Check if a key is currently held down */
     isKeyDown(key: string): boolean
@@ -34,6 +57,30 @@ export interface Keyboard {
 
     /** Any key was pressed this frame */
     readonly anyKeyPressed: boolean
+
+    /**
+     * Get 2D axis from 4 keys (e.g., WASD)
+     * @returns Vector2 with x,y in range -1 to 1
+     */
+    axis2D(config: Axis2DConfig): Vector2
+
+    /**
+     * Get 1D axis from 2 keys
+     * @returns -1, 0, or 1
+     */
+    axis(config: AxisConfig): number
+
+    /**
+     * Preset: WASD keys for movement (W=up, S=down, A=left, D=right)
+     * @returns Vector2 with x,y in range -1 to 1
+     */
+    wasd(): Vector2
+
+    /**
+     * Preset: Arrow keys for movement
+     * @returns Vector2 with x,y in range -1 to 1
+     */
+    arrows(): Vector2
 }
 
 // ============ Mouse ============
@@ -285,6 +332,90 @@ export interface ActionMapBuilder {
     build(): InputActions
 }
 
+// ============ Zero-Alloc Input Reader ============
+
+/** Mouse property for vec2 bindings */
+export type MouseVec2Property = "position" | "delta" | "scroll"
+
+/** Mouse property for float bindings */
+export type MouseFloatProperty = "scrollX" | "scrollY" | "positionX" | "positionY" | "deltaX" | "deltaY"
+
+/** Mouse button for button bindings */
+export type MouseButtonType = "left" | "right" | "middle" | "forward" | "back"
+
+/** Gamepad property for vec2 bindings */
+export type GamepadVec2Property = "leftStick" | "rightStick"
+
+/** Gamepad property for float bindings */
+export type GamepadFloatProperty = "leftTrigger" | "rightTrigger" | "leftStickX" | "leftStickY" | "rightStickX" | "rightStickY"
+
+/**
+ * Fluent builder for creating an InputReader.
+ * Chain binding methods and call build() to create the reader.
+ */
+export interface InputReaderBuilder {
+    /** Bind a keyboard key (isKeyDown state) */
+    key(name: string, key: string): InputReaderBuilder
+
+    /** Bind a keyboard key (wasKeyPressed this frame) */
+    keyPressed(name: string, key: string): InputReaderBuilder
+
+    /** Bind a keyboard key (wasKeyReleased this frame) */
+    keyReleased(name: string, key: string): InputReaderBuilder
+
+    /** Bind a keyboard axis from two keys (-1, 0, or 1) */
+    keyAxis(name: string, config: { negative: string; positive: string }): InputReaderBuilder
+
+    /** Bind a mouse button */
+    mouseButton(name: string, button: MouseButtonType): InputReaderBuilder
+
+    /** Bind a mouse Vector2 property (position, delta, scroll) */
+    mouseVec2(name: string, property: MouseVec2Property): InputReaderBuilder
+
+    /** Bind a mouse float property */
+    mouseFloat(name: string, property: MouseFloatProperty): InputReaderBuilder
+
+    /** Bind a gamepad button */
+    gamepadButton(name: string, button: string, index?: number): InputReaderBuilder
+
+    /** Bind a gamepad Vector2 property (leftStick, rightStick) */
+    gamepadVec2(name: string, property: GamepadVec2Property, index?: number): InputReaderBuilder
+
+    /** Bind a gamepad float property (triggers, stick axes) */
+    gamepadFloat(name: string, property: GamepadFloatProperty, index?: number): InputReaderBuilder
+
+    /** Build the InputReader */
+    build(): InputReader
+}
+
+/**
+ * Zero-allocation input reader.
+ * All Vector2 objects are pre-allocated and reused.
+ * Call tick() once per frame to update all bindings.
+ */
+export interface InputReader {
+    /** Update all bindings. Call once per frame. */
+    tick(): void
+
+    /** Get boolean binding value (current down state) */
+    down(name: string): boolean
+
+    /** Get boolean binding value (pressed this frame) */
+    pressed(name: string): boolean
+
+    /** Get boolean binding value (released this frame) */
+    released(name: string): boolean
+
+    /** Get float binding value */
+    float(name: string): number
+
+    /** Get Vector2 binding value (returns same cached object each frame) */
+    vec2(name: string): Vector2
+
+    /** Dispose the reader and release resources */
+    dispose(): void
+}
+
 // ============ Main Input Module ============
 
 export interface InputModule {
@@ -326,4 +457,30 @@ export interface InputModule {
 
     /** Resume all gamepad haptics */
     resumeHaptics(): void
+
+    /**
+     * Create a zero-allocation input reader with a fluent builder.
+     * Use this for performance-critical game loops.
+     */
+    createReader(): InputReaderBuilder
+
+    /**
+     * Enable or disable PointerMoveEvent dispatching to JavaScript.
+     * When disabled, React's onPointerMove handlers won't fire, but onPointerEnter/Leave still work.
+     *
+     * Use this when polling mouse input via InputReader instead of React events.
+     * This eliminates ~0.6KB/frame GC allocation from pointer move event dispatching.
+     *
+     * @param enabled Whether to dispatch pointermove events (default: true)
+     *
+     * @example
+     * // Disable pointer events for zero-alloc game loop
+     * input.setPointerMoveEventsEnabled(false)
+     *
+     * // Use InputReader for mouse delta instead
+     * const reader = input.createReader()
+     *     .mouseVec2("look", "delta")
+     *     .build()
+     */
+    setPointerMoveEventsEnabled(enabled: boolean): void
 }

@@ -23,6 +23,9 @@ export { mouse } from "./mouse"
 export { getGamepad, getGamepads, getGamepadCount, pauseHaptics, resumeHaptics } from "./gamepad"
 export { getTouches, getTouchCount } from "./touch"
 
+// Zero-alloc input reader
+export { createReader } from "./reader"
+
 // React hooks
 export {
     // Device hooks
@@ -78,6 +81,15 @@ export type {
     ActionMapBuilder,
     ActionBuilder,
     CompositeBindingBuilder,
+
+    // Zero-alloc reader types
+    InputReader,
+    InputReaderBuilder,
+    MouseVec2Property,
+    MouseFloatProperty,
+    MouseButtonType,
+    GamepadVec2Property,
+    GamepadFloatProperty,
 
     // Main module type
     InputModule,

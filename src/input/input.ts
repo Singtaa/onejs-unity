@@ -4,6 +4,7 @@
 
 import type {
     InputModule,
+    InputReaderBuilder,
     Keyboard,
     Mouse,
     Gamepad,
@@ -19,6 +20,8 @@ import type {
     ActionCallbackContext,
     Vector2,
 } from "./types"
+
+import { createReader } from "./reader"
 
 // Global declarations for QuickJS environment
 declare const performance: { now(): number }
@@ -447,6 +450,14 @@ class InputModuleImpl implements InputModule {
 
     resumeHaptics(): void {
         resumeHaptics()
+    }
+
+    createReader(): InputReaderBuilder {
+        return createReader()
+    }
+
+    setPointerMoveEventsEnabled(enabled: boolean): void {
+        getInputBridge().SetPointerMoveEventsEnabled(enabled)
     }
 }
 
