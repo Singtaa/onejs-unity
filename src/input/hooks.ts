@@ -60,6 +60,10 @@ export interface KeyboardState {
     meta: boolean
     /** Any key currently held */
     anyKeyDown: boolean
+    /** WASD keys as Vector2 (W=+y, S=-y, A=-x, D=+x) */
+    wasd: () => Vector2
+    /** Arrow keys as Vector2 */
+    arrows: () => Vector2
 }
 
 /**
@@ -90,6 +94,8 @@ export function useKeyboard(): KeyboardState {
         alt: false,
         meta: false,
         anyKeyDown: false,
+        wasd: () => input.keyboard.wasd(),
+        arrows: () => input.keyboard.arrows(),
     }))
 
     useAnimationFrame(() => {
@@ -102,6 +108,8 @@ export function useKeyboard(): KeyboardState {
             alt: input.keyboard.alt,
             meta: input.keyboard.meta,
             anyKeyDown: input.keyboard.anyKeyDown,
+            wasd: () => input.keyboard.wasd(),
+            arrows: () => input.keyboard.arrows(),
         })
     })
 
