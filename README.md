@@ -191,7 +191,18 @@ function BackgroundEffect({ shaderGlobal }) {
 
 ### Zero-Allocation Dispatch
 
-For performance-critical code, use `createDispatcher()` to eliminate per-frame allocations.
+The GPU module provides two APIs for dispatching compute shaders:
+
+| API | Allocations | Use Case |
+|-----|-------------|----------|
+| `shader.kernel()` | ~26KB/frame | Prototyping, one-off dispatches |
+| `shader.createDispatcher()` | **0 bytes** | Per-frame rendering, games |
+
+**Why does `kernel()` allocate?** It uses the standard C# interop which involves reflection, string marshaling, and object boxing on every call.
+
+**Why is `createDispatcher()` zero-alloc?** It uses pre-registered native bindings (`__zaInvokeN`) that pass primitives directly to C# without any managed allocations. Property name→ID conversions are cached.
+
+Use `createDispatcher()` for any code that runs every frame:
 
 #### Basic Usage (lazy ID resolution)
 
