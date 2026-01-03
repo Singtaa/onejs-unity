@@ -199,23 +199,133 @@ input.pauseHaptics()   // Pause all gamepad haptics
 input.resumeHaptics()  // Resume all gamepad haptics
 ```
 
-## Usage with React
+## React Hooks
+
+The input module provides React hooks for cleaner integration:
 
 ```typescript
-import { useState, useEffect, useRef } from "react"
-import { render, View, Label } from "onejs-react"
+import {
+    useKeyboard, useMouse, useGamepad, useTouch, useInput,
+    useKeyPress, useKeyDown, useMouseClick, useGamepadButton,
+    useAction, useActionValue, useActionCallback
+} from "onejs-unity/input"
+```
+
+### Device Hooks
+
+```typescript
+function Game() {
+    const keyboard = useKeyboard()  // Auto-updates each frame
+    const mouse = useMouse()
+    const gamepad = useGamepad()
+    const touch = useTouch()
+
+    return (
+        <View>
+            <Label>Mouse: ({mouse.position.x}, {mouse.position.y})</Label>
+            <Label>Shift: {keyboard.shift ? "ON" : "off"}</Label>
+            <Label>Gamepad: {gamepad.connected ? "Connected" : "None"}</Label>
+        </View>
+    )
+}
+```
+
+### Event Hooks
+
+```typescript
+function Game() {
+    // Fire callback on key press
+    useKeyPress("Space", () => {
+        player.jump()
+    })
+
+    // Fire callback while key is held
+    useKeyDown("W", () => {
+        player.moveForward()
+    })
+
+    // Fire callback on mouse click
+    useMouseClick("left", (pos) => {
+        shoot(pos.x, pos.y)
+    })
+
+    // Fire callback on gamepad button
+    useGamepadButton("South", (gp) => {
+        player.jump()
+        gp.rumblePulse(0.3, 0.1)
+    })
+}
+```
+
+### Combined Hook
+
+```typescript
+function Game() {
+    const { keyboard, mouse, gamepad } = useInput()
+
+    // Movement from keyboard or gamepad
+    let moveX = 0
+    if (keyboard.isKeyDown("A")) moveX -= 1
+    if (keyboard.isKeyDown("D")) moveX += 1
+    if (gamepad.connected) moveX += gamepad.leftStick.x
+
+    // Aim with mouse
+    player.aimAt(mouse.position)
+}
+```
+
+### InputAction Hooks
+
+```typescript
+const actions = input.loadActions(playerActionsAsset)
+
+function Game() {
+    const jump = useAction("Player/Jump", actions)
+    const moveDir = useActionValue<Vector2>("Player/Move", actions)
+
+    if (jump.triggered) {
+        player.jump()
+    }
+    player.move(moveDir.x, moveDir.y)
+
+    // Or use callbacks
+    useActionCallback("Player/Attack", "performed", () => {
+        player.attack()
+    }, actions)
+}
+```
+
+### Hook Reference
+
+| Hook | Description |
+|------|-------------|
+| `useKeyboard()` | Keyboard state (modifiers, isKeyDown, wasKeyPressed) |
+| `useMouse()` | Mouse state (position, delta, scroll, buttons) |
+| `useGamepad(index?)` | Gamepad state (sticks, triggers, buttons, dpad) |
+| `useTouch()` | Touch state (touches array, count) |
+| `useInput()` | Combined state for all devices |
+| `useKeyPress(key, cb)` | Callback on key press |
+| `useKeyDown(key, cb)` | Callback while key held |
+| `useKeyRelease(key, cb)` | Callback on key release |
+| `useMouseClick(btn, cb)` | Callback on mouse button click |
+| `useGamepadButton(btn, cb)` | Callback on gamepad button press |
+| `useAction(path, actions)` | InputAction state |
+| `useActionValue<T>(path, actions)` | InputAction value |
+| `useActionCallback(path, event, cb, actions)` | InputAction event callback |
+
+## Manual Polling (Alternative)
+
+If you prefer manual control, you can use `input` directly with your own animation loop:
+
+```typescript
 import { input } from "onejs-unity/input"
 
 function useAnimationFrame(callback: () => void) {
     const ref = useRef(callback)
     ref.current = callback
-
     useEffect(() => {
         let id: number
-        const tick = () => {
-            ref.current()
-            id = requestAnimationFrame(tick)
-        }
+        const tick = () => { ref.current(); id = requestAnimationFrame(tick) }
         id = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(id)
     }, [])
@@ -225,24 +335,14 @@ function Game() {
     const [pos, setPos] = useState({ x: 0, y: 0 })
 
     useAnimationFrame(() => {
-        // Update mouse position every frame
-        const p = input.mouse.position
-        setPos({ x: Math.round(p.x), y: Math.round(p.y) })
-
-        // Handle input
+        setPos(input.mouse.position)
         if (input.keyboard.wasKeyPressed("Space")) {
-            console.log("Jump!")
+            player.jump()
         }
     })
 
-    return (
-        <View>
-            <Label>Mouse: ({pos.x}, {pos.y})</Label>
-        </View>
-    )
+    return <Label>Mouse: ({pos.x}, {pos.y})</Label>
 }
-
-render(<Game />, __root)
 ```
 
 ## Architecture

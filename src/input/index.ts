@@ -23,6 +23,38 @@ export { mouse } from "./mouse"
 export { getGamepad, getGamepads, getGamepadCount, pauseHaptics, resumeHaptics } from "./gamepad"
 export { getTouches, getTouchCount } from "./touch"
 
+// React hooks
+export {
+    // Device hooks
+    useKeyboard,
+    useMouse,
+    useGamepad,
+    useTouch,
+    useInput,
+
+    // Event hooks
+    useKeyPress,
+    useKeyDown,
+    useKeyRelease,
+    useMouseClick,
+    useGamepadButton,
+
+    // InputAction hooks
+    useAction,
+    useActionValue,
+    useActionCallback,
+} from "./hooks"
+
+// Hook state types
+export type {
+    KeyboardState,
+    MouseState,
+    GamepadState,
+    TouchState,
+    InputState,
+    ActionState,
+} from "./hooks"
+
 // Types
 export type {
     // Device types
