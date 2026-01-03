@@ -10,6 +10,7 @@ import type {
     RenderTextureOptions,
     KernelBuilder,
     KernelDispatcher,
+    DispatcherSchema,
     BufferOptions,
     StructSchema,
     StructType,
@@ -486,10 +487,10 @@ class KernelDispatcherImpl implements KernelDispatcher {
     private readonly _shaderHandle: number
     private readonly _kernelIndex: number
     // Property ID cache: string name -> integer ID
-    // Populated lazily on first use of each property
+    // Populated upfront if schema provided, otherwise lazily on first use
     private readonly _propertyIdCache: Map<string, number> = new Map()
 
-    constructor(shaderHandle: number, kernelName: string) {
+    constructor(shaderHandle: number, kernelName: string, schema?: DispatcherSchema) {
         // Initialize zero-alloc system if needed
         initZeroAllocInvokers()
 
@@ -498,16 +499,24 @@ class KernelDispatcherImpl implements KernelDispatcher {
         if (this._kernelIndex < 0) {
             throw new Error(`Kernel "${kernelName}" not found`)
         }
+
+        // Pre-resolve all property IDs from schema (if provided)
+        if (schema) {
+            for (const name of Object.keys(schema)) {
+                const id = _invokers!.propertyToId(name)
+                this._propertyIdCache.set(name, id)
+            }
+        }
     }
 
     /**
-     * Get cached property ID. First call uses propertyToId binding,
-     * subsequent calls return cached value (zero-alloc).
+     * Get cached property ID. If schema was provided, ID is already cached.
+     * Otherwise, first call uses propertyToId binding, subsequent calls use cache.
      */
     private _getPropertyId(name: string): number {
         let id = this._propertyIdCache.get(name)
         if (id === undefined) {
-            // First time: call PropertyToID (allocates for string param)
+            // Not in cache - resolve now (only happens without schema or for unlisted props)
             id = _invokers!.propertyToId(name)
             this._propertyIdCache.set(name, id)
         }
@@ -608,8 +617,8 @@ class ComputeShaderImpl implements ComputeShader {
         return new KernelBuilderImpl(this, name)
     }
 
-    createDispatcher(kernelName: string): KernelDispatcher {
-        return new KernelDispatcherImpl(this.__handle, kernelName)
+    createDispatcher(kernelName: string, schema?: DispatcherSchema): KernelDispatcher {
+        return new KernelDispatcherImpl(this.__handle, kernelName, schema)
     }
 
     readback<T extends TypedArray>(bufferName: string): Promise<T> {

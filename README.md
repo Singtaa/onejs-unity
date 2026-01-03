@@ -191,7 +191,23 @@ function BackgroundEffect({ shaderGlobal }) {
 
 ### Zero-Allocation Dispatch
 
-For performance-critical code, use `createDispatcher()` to eliminate per-frame allocations:
+For performance-critical code, use `createDispatcher()` to eliminate per-frame allocations.
+
+#### Basic Usage (lazy ID resolution)
+
+```typescript
+const dispatch = shader.createDispatcher("CSMain")
+
+// Property IDs resolved on first use, then cached
+dispatch
+    .float("_Time", t)
+    .vec2("_Resolution", w, h)
+    .dispatchAuto(texture)
+```
+
+#### Declarative Usage (upfront ID resolution)
+
+Pass a schema to pre-resolve all property IDs at creation time:
 
 ```typescript
 import { useMemo } from "react"
@@ -201,19 +217,23 @@ function ZeroAllocEffect({ shaderGlobal }) {
     const shader = useComputeShader(shaderGlobal)
     const texture = useComputeTexture({ autoResize: true })
 
-    // Create dispatcher once - caches property IDs
+    // Declarative: all IDs pre-resolved at creation
     const dispatch = useMemo<KernelDispatcher | null>(
-        () => shader?.createDispatcher("CSMain") ?? null,
+        () => shader?.createDispatcher("CSMain", {
+            _Time: "float",
+            _Resolution: "vec2",
+            _Result: "textureRW",
+        }) ?? null,
         [shader]
     )
 
     useAnimationFrame(() => {
         if (!dispatch || !texture) return
 
-        // Zero allocations per frame!
+        // Zero work on first frame - all IDs already cached!
         dispatch
             .float("_Time", performance.now() / 1000)
-            .vec2("_Resolution", texture.width, texture.height)  // No array allocation
+            .vec2("_Resolution", texture.width, texture.height)
             .textureRW("_Result", texture)
             .dispatchAuto(texture)
     })
@@ -222,12 +242,25 @@ function ZeroAllocEffect({ shaderGlobal }) {
 }
 ```
 
+#### Schema Property Types
+
+| Type | Method | Description |
+|------|--------|-------------|
+| `"float"` | `.float(name, value)` | Single float uniform |
+| `"int"` | `.int(name, value)` | Single int uniform |
+| `"bool"` | `.bool(name, value)` | Boolean (as int 0/1) |
+| `"vec2"` | `.vec2(name, x, y)` | 2D vector |
+| `"vec3"` | `.vec3(name, x, y, z)` | 3D vector |
+| `"vec4"` | `.vec4(name, x, y, z, w)` | 4D vector |
+| `"texture"` | `.texture(name, tex)` | Read-only texture |
+| `"textureRW"` | `.textureRW(name, tex)` | Read-write texture |
+
 ### API Reference
 
 | Method | Description |
 |--------|-------------|
 | `shader.kernel(name)` | Fluent builder (allocates) |
-| `shader.createDispatcher(name)` | Zero-alloc dispatcher (cache and reuse) |
+| `shader.createDispatcher(name, schema?)` | Zero-alloc dispatcher with optional schema |
 | `compute.renderTexture(options)` | Create render texture |
 | `compute.buffer(options)` | Create compute buffer |
 

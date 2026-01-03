@@ -45,6 +45,44 @@ export interface StructType {
 // Buffer usage modes
 export type BufferUsage = "readonly" | "readwrite" | "gpuonly"
 
+// ============================================================================
+// Dispatcher Schema Types
+// ============================================================================
+
+/**
+ * Property types for dispatcher schema.
+ * These map to the fluent methods on KernelDispatcher.
+ */
+export type DispatcherPropertyType =
+    | "float"
+    | "int"
+    | "bool"
+    | "vec2"
+    | "vec3"
+    | "vec4"
+    | "matrix"
+    | "texture"
+    | "textureRW"
+
+/**
+ * Schema defining properties for a KernelDispatcher.
+ *
+ * When provided to createDispatcher(), all property IDs are resolved
+ * upfront instead of lazily on first use.
+ *
+ * @example
+ * ```typescript
+ * const schema = {
+ *     _Time: "float",
+ *     _Resolution: "vec2",
+ *     _Result: "textureRW",
+ * } as const
+ *
+ * const dispatch = shader.createDispatcher("CSMain", schema)
+ * ```
+ */
+export type DispatcherSchema = Record<string, DispatcherPropertyType>
+
 export interface BufferOptions<T extends TypedArray = Float32Array> {
     /** Initial data to upload */
     data?: T
@@ -232,15 +270,28 @@ export interface KernelBuilder {
  * Unlike KernelBuilder which is created fresh each frame, KernelDispatcher
  * caches property IDs and uses specialized bindings to avoid allocations.
  *
- * @example
+ * ## Basic Usage (lazy ID resolution)
  * ```typescript
- * // Create once at init
  * const dispatch = shader.createDispatcher("CSMain")
  *
- * // Per-frame - zero allocations
+ * dispatch
+ *     .float("_Time", time)        // ID resolved on first call, cached
+ *     .vec2("_Resolution", w, h)   // ID resolved on first call, cached
+ *     .dispatchAuto(texture)
+ * ```
+ *
+ * ## Declarative Usage (upfront ID resolution)
+ * ```typescript
+ * const dispatch = shader.createDispatcher("CSMain", {
+ *     _Time: "float",
+ *     _Resolution: "vec2",
+ *     _Result: "textureRW",
+ * })
+ *
+ * // All IDs already resolved - zero work on first frame!
  * dispatch
  *     .float("_Time", time)
- *     .vec2("_Resolution", width, height)
+ *     .vec2("_Resolution", w, h)
  *     .textureRW("_Result", texture)
  *     .dispatchAuto(texture)
  * ```
@@ -293,15 +344,31 @@ export interface ComputeShader {
      * Create a reusable dispatcher for zero-allocation per-frame dispatch.
      *
      * @param kernelName Kernel function name (e.g., "CSMain")
+     * @param schema Optional property schema for upfront ID resolution
      * @returns A KernelDispatcher that caches property IDs
      *
-     * @example
+     * @example Basic usage (lazy ID resolution)
      * ```typescript
      * const dispatch = shader.createDispatcher("CSMain")
-     * // Use dispatch.float(...).dispatch(...) per frame
+     * dispatch.float("_Time", t).dispatchAuto(texture)
+     * ```
+     *
+     * @example Declarative usage (upfront ID resolution)
+     * ```typescript
+     * const dispatch = shader.createDispatcher("CSMain", {
+     *     _Time: "float",
+     *     _Resolution: "vec2",
+     *     _Result: "textureRW",
+     * })
+     * // All IDs pre-resolved - no lazy lookups needed
+     * dispatch
+     *     .float("_Time", t)
+     *     .vec2("_Resolution", w, h)
+     *     .textureRW("_Result", tex)
+     *     .dispatchAuto(tex)
      * ```
      */
-    createDispatcher(kernelName: string): KernelDispatcher
+    createDispatcher(kernelName: string, schema?: DispatcherSchema): KernelDispatcher
 
     /**
      * Read back data from a buffer bound to this shader
