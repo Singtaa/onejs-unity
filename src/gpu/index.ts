@@ -51,6 +51,7 @@ export {
 export type {
     ComputeShader,
     KernelBuilder,
+    KernelDispatcher,
     ComputeBuffer,
     RenderTexture,
     RenderTextureOptions,

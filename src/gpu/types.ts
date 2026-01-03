@@ -227,6 +227,54 @@ export interface KernelBuilder {
 }
 
 /**
+ * Reusable kernel dispatcher for zero-allocation per-frame dispatch.
+ *
+ * Unlike KernelBuilder which is created fresh each frame, KernelDispatcher
+ * caches property IDs and uses specialized bindings to avoid allocations.
+ *
+ * @example
+ * ```typescript
+ * // Create once at init
+ * const dispatch = shader.createDispatcher("CSMain")
+ *
+ * // Per-frame - zero allocations
+ * dispatch
+ *     .float("_Time", time)
+ *     .vec2("_Resolution", width, height)
+ *     .textureRW("_Result", texture)
+ *     .dispatchAuto(texture)
+ * ```
+ */
+export interface KernelDispatcher {
+    // Scalar uniforms (uses cached property IDs)
+    float(name: string, value: number): KernelDispatcher
+    int(name: string, value: number): KernelDispatcher
+    bool(name: string, value: boolean): KernelDispatcher
+
+    // Vector uniforms - separate args to avoid array allocation
+    vec2(name: string, x: number, y: number): KernelDispatcher
+    vec3(name: string, x: number, y: number, z: number): KernelDispatcher
+    vec4(name: string, x: number, y: number, z: number, w: number): KernelDispatcher
+
+    // Matrix uniforms
+    matrix(name: string, value: Float32Array): KernelDispatcher
+
+    // Texture bindings
+    texture(name: string, tex: RenderTexture): KernelDispatcher
+    textureRW(name: string, tex: RenderTexture): KernelDispatcher
+
+    /**
+     * Dispatch the kernel with explicit thread group counts.
+     */
+    dispatch(groupsX: number, groupsY?: number, groupsZ?: number): void
+
+    /**
+     * Dispatch with automatic thread group calculation based on texture dimensions.
+     */
+    dispatchAuto(texture: RenderTexture, threadGroupSize?: number): void
+}
+
+/**
  * Represents a loaded compute shader
  */
 export interface ComputeShader {
@@ -240,6 +288,20 @@ export interface ComputeShader {
      * @param name Kernel function name (e.g., "CSMain")
      */
     kernel(name: string): KernelBuilder
+
+    /**
+     * Create a reusable dispatcher for zero-allocation per-frame dispatch.
+     *
+     * @param kernelName Kernel function name (e.g., "CSMain")
+     * @returns A KernelDispatcher that caches property IDs
+     *
+     * @example
+     * ```typescript
+     * const dispatch = shader.createDispatcher("CSMain")
+     * // Use dispatch.float(...).dispatch(...) per frame
+     * ```
+     */
+    createDispatcher(kernelName: string): KernelDispatcher
 
     /**
      * Read back data from a buffer bound to this shader

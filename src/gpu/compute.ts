@@ -9,6 +9,7 @@ import type {
     RenderTexture,
     RenderTextureOptions,
     KernelBuilder,
+    KernelDispatcher,
     BufferOptions,
     StructSchema,
     StructType,
@@ -53,6 +54,19 @@ declare const CS: {
                 // Screen API
                 GetScreenWidth(): number
                 GetScreenHeight(): number
+                // Property ID conversion (for zero-alloc dispatch)
+                PropertyToID(name: string): number
+                // Zero-alloc binding system
+                GetZeroAllocBindingIds(): {
+                    dispatch: number
+                    propertyToId: number
+                    setFloatById: number
+                    setIntById: number
+                    setVectorById: number
+                    setTextureById: number
+                    getScreenWidth: number
+                    getScreenHeight: number
+                }
             }
         }
     }
@@ -153,10 +167,12 @@ class RenderTextureImpl implements RenderTexture {
 
     /**
      * Internal: check if screen size changed and resize if needed.
+     * Uses zero-alloc path when available.
      */
     private _checkAutoResize(): void {
-        const sw = CS.OneJS.GPU.GPUBridge.GetScreenWidth()
-        const sh = CS.OneJS.GPU.GPUBridge.GetScreenHeight()
+        // Use zero-alloc invokers if initialized, otherwise fall back to CS proxy
+        const sw = _invokers ? _invokers.getScreenWidth() : CS.OneJS.GPU.GPUBridge.GetScreenWidth()
+        const sh = _invokers ? _invokers.getScreenHeight() : CS.OneJS.GPU.GPUBridge.GetScreenHeight()
         if (this._width !== sw || this._height !== sh) {
             this.resize(sw, sh)
             this._didResize = true
@@ -368,6 +384,209 @@ class KernelBuilderImpl implements KernelBuilder {
     }
 }
 
+// ============ Zero-Alloc Binding System ============
+// These are initialized lazily on first KernelDispatcher creation
+
+// Binding IDs from C# (cached once)
+interface ZeroAllocBindingIds {
+    dispatch: number
+    propertyToId: number
+    setFloatById: number
+    setIntById: number
+    setVectorById: number
+    setTextureById: number
+    getScreenWidth: number
+    getScreenHeight: number
+}
+
+// Zero-alloc invoker function types
+type InvokerFn = (...args: unknown[]) => unknown
+
+// Native zero-alloc invoke functions (registered by quickjs_unity.c)
+declare const __zaInvoke0: (bindingId: number) => unknown
+declare const __zaInvoke1: (bindingId: number, a0: unknown) => unknown
+declare const __zaInvoke3: (bindingId: number, a0: unknown, a1: unknown, a2: unknown) => unknown
+declare const __zaInvoke4: (bindingId: number, a0: unknown, a1: unknown, a2: unknown, a3: unknown) => unknown
+declare const __zaInvoke5: (bindingId: number, a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown) => unknown
+declare const __zaInvoke6: (bindingId: number, a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown) => unknown
+
+// Cached invokers - created once on first use
+let _invokers: {
+    dispatch: (sh: number, ki: number, gx: number, gy: number, gz: number) => void
+    propertyToId: (name: string) => number
+    setFloatById: (sh: number, id: number, v: number) => void
+    setIntById: (sh: number, id: number, v: number) => void
+    setVectorById: (sh: number, id: number, x: number, y: number, z: number, w: number) => void
+    setTextureById: (sh: number, ki: number, id: number, th: number) => void
+    getScreenWidth: () => number
+    getScreenHeight: () => number
+} | null = null
+
+/**
+ * Initialize zero-alloc invokers. Called once on first KernelDispatcher creation.
+ */
+function initZeroAllocInvokers(): void {
+    if (_invokers) return
+
+    // Get binding IDs from C#
+    const ids = CS.OneJS.GPU.GPUBridge.GetZeroAllocBindingIds() as ZeroAllocBindingIds
+
+    // Create invokers using the native __zaInvokeN functions
+    _invokers = {
+        // dispatch: 5 args (shaderHandle, kernelIndex, groupsX, groupsY, groupsZ)
+        dispatch: (sh, ki, gx, gy, gz) => {
+            __zaInvoke5(ids.dispatch, sh, ki, gx, gy, gz)
+        },
+        // propertyToId: 1 arg (name) -> returns int
+        propertyToId: (name) => __zaInvoke1(ids.propertyToId, name) as number,
+        // setFloatById: 3 args (shaderHandle, propertyId, value)
+        setFloatById: (sh, id, v) => {
+            __zaInvoke3(ids.setFloatById, sh, id, v)
+        },
+        // setIntById: 3 args (shaderHandle, propertyId, value)
+        setIntById: (sh, id, v) => {
+            __zaInvoke3(ids.setIntById, sh, id, v)
+        },
+        // setVectorById: 6 args (shaderHandle, propertyId, x, y, z, w)
+        setVectorById: (sh, id, x, y, z, w) => {
+            __zaInvoke6(ids.setVectorById, sh, id, x, y, z, w)
+        },
+        // setTextureById: 4 args (shaderHandle, kernelIndex, propertyId, textureHandle)
+        setTextureById: (sh, ki, id, th) => {
+            __zaInvoke4(ids.setTextureById, sh, ki, id, th)
+        },
+        // getScreenWidth: 0 args -> returns int
+        getScreenWidth: () => __zaInvoke0(ids.getScreenWidth) as number,
+        // getScreenHeight: 0 args -> returns int
+        getScreenHeight: () => __zaInvoke0(ids.getScreenHeight) as number,
+    }
+}
+
+/**
+ * KernelDispatcher implementation - zero-allocation per-frame dispatch.
+ *
+ * Uses pre-registered C# bindings and cached property IDs to achieve
+ * zero managed allocations per frame. All string->int conversions happen
+ * once on first use and are cached.
+ *
+ * @example
+ * ```typescript
+ * // Create once at init
+ * const dispatch = shader.createDispatcher("CSMain")
+ *
+ * // Per-frame - zero allocations!
+ * dispatch
+ *     .float("_Time", time)
+ *     .vec2("_Resolution", width, height)
+ *     .textureRW("_Result", texture)
+ *     .dispatchAuto(texture)
+ * ```
+ */
+class KernelDispatcherImpl implements KernelDispatcher {
+    private readonly _shaderHandle: number
+    private readonly _kernelIndex: number
+    // Property ID cache: string name -> integer ID
+    // Populated lazily on first use of each property
+    private readonly _propertyIdCache: Map<string, number> = new Map()
+
+    constructor(shaderHandle: number, kernelName: string) {
+        // Initialize zero-alloc system if needed
+        initZeroAllocInvokers()
+
+        this._shaderHandle = shaderHandle
+        this._kernelIndex = CS.OneJS.GPU.GPUBridge.FindKernel(shaderHandle, kernelName)
+        if (this._kernelIndex < 0) {
+            throw new Error(`Kernel "${kernelName}" not found`)
+        }
+    }
+
+    /**
+     * Get cached property ID. First call uses propertyToId binding,
+     * subsequent calls return cached value (zero-alloc).
+     */
+    private _getPropertyId(name: string): number {
+        let id = this._propertyIdCache.get(name)
+        if (id === undefined) {
+            // First time: call PropertyToID (allocates for string param)
+            id = _invokers!.propertyToId(name)
+            this._propertyIdCache.set(name, id)
+        }
+        return id
+    }
+
+    float(name: string, value: number): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setFloatById(this._shaderHandle, id, value)
+        return this
+    }
+
+    int(name: string, value: number): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setIntById(this._shaderHandle, id, Math.floor(value))
+        return this
+    }
+
+    bool(name: string, value: boolean): KernelDispatcher {
+        // Bool uses int binding (0 or 1)
+        const id = this._getPropertyId(name)
+        _invokers!.setIntById(this._shaderHandle, id, value ? 1 : 0)
+        return this
+    }
+
+    vec2(name: string, x: number, y: number): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setVectorById(this._shaderHandle, id, x, y, 0, 0)
+        return this
+    }
+
+    vec3(name: string, x: number, y: number, z: number): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setVectorById(this._shaderHandle, id, x, y, z, 0)
+        return this
+    }
+
+    vec4(name: string, x: number, y: number, z: number, w: number): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setVectorById(this._shaderHandle, id, x, y, z, w)
+        return this
+    }
+
+    matrix(name: string, value: Float32Array): KernelDispatcher {
+        // Matrix still uses JSON serialization (not hot-path typically)
+        const arr = Array.from(value)
+        CS.OneJS.GPU.GPUBridge.SetMatrix(this._shaderHandle, name, JSON.stringify(arr))
+        return this
+    }
+
+    texture(name: string, tex: RenderTexture): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setTextureById(this._shaderHandle, this._kernelIndex, id, tex.__handle)
+        return this
+    }
+
+    textureRW(name: string, tex: RenderTexture): KernelDispatcher {
+        const id = this._getPropertyId(name)
+        _invokers!.setTextureById(this._shaderHandle, this._kernelIndex, id, tex.__handle)
+        return this
+    }
+
+    dispatch(groupsX: number, groupsY = 1, groupsZ = 1): void {
+        _invokers!.dispatch(
+            this._shaderHandle,
+            this._kernelIndex,
+            groupsX,
+            groupsY,
+            groupsZ
+        )
+    }
+
+    dispatchAuto(texture: RenderTexture, threadGroupSize = 8): void {
+        const groupsX = Math.ceil(texture.width / threadGroupSize)
+        const groupsY = Math.ceil(texture.height / threadGroupSize)
+        this.dispatch(groupsX, groupsY, 1)
+    }
+}
+
 /**
  * ComputeShader implementation
  */
@@ -387,6 +606,10 @@ class ComputeShaderImpl implements ComputeShader {
 
     kernel(name: string): KernelBuilder {
         return new KernelBuilderImpl(this, name)
+    }
+
+    createDispatcher(kernelName: string): KernelDispatcher {
+        return new KernelDispatcherImpl(this.__handle, kernelName)
     }
 
     readback<T extends TypedArray>(bufferName: string): Promise<T> {
@@ -480,14 +703,20 @@ export const compute: ComputeModule = {
     renderTexture(options: RenderTextureOptions): RenderTexture {
         const { enableRandomWrite = true, autoResize = false } = options
 
+        // Initialize zero-alloc system early if auto-resize is requested
+        // This ensures screen dimension checks use the fast path
+        if (autoResize) {
+            initZeroAllocInvokers()
+        }
+
         // Determine initial dimensions
         let width: number
         let height: number
 
         if (autoResize) {
-            // Use screen dimensions for auto-resize textures
-            width = CS.OneJS.GPU.GPUBridge.GetScreenWidth()
-            height = CS.OneJS.GPU.GPUBridge.GetScreenHeight()
+            // Use screen dimensions for auto-resize textures (zero-alloc path now available)
+            width = _invokers!.getScreenWidth()
+            height = _invokers!.getScreenHeight()
         } else {
             // Use provided dimensions
             width = options.width ?? 0
@@ -512,10 +741,12 @@ export const compute: ComputeModule = {
     },
 
     get screenWidth(): number {
-        return CS.OneJS.GPU.GPUBridge.GetScreenWidth()
+        // Use zero-alloc path when available
+        return _invokers ? _invokers.getScreenWidth() : CS.OneJS.GPU.GPUBridge.GetScreenWidth()
     },
 
     get screenHeight(): number {
-        return CS.OneJS.GPU.GPUBridge.GetScreenHeight()
+        // Use zero-alloc path when available
+        return _invokers ? _invokers.getScreenHeight() : CS.OneJS.GPU.GPUBridge.GetScreenHeight()
     },
 }
