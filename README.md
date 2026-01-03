@@ -165,17 +165,156 @@ Flattens `:is()` and `:where()` selectors (used by Tailwind v3):
 
 ## GPU Compute
 
-```typescript
-import { compute, Platform } from "onejs-unity"
+Access Unity compute shaders from JavaScript with optional zero-allocation dispatch for performance-critical rendering.
 
-if (Platform.supportsComputeShaders) {
-    const shader = compute("MyComputeShader")
-    const kernel = shader.kernel("CSMain")
-        .buffer("inputBuffer", inputData)
-        .buffer("outputBuffer", outputBuffer)
-    kernel.dispatch(groupsX, groupsY, groupsZ)
+### Basic Usage
+
+```typescript
+import { compute, useComputeShader, useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
+
+function BackgroundEffect({ shaderGlobal }) {
+    const shader = useComputeShader(shaderGlobal, "MyEffect")
+    const texture = useComputeTexture({ autoResize: true })
+
+    useAnimationFrame(() => {
+        if (!shader || !texture) return
+        shader.kernel("CSMain")
+            .float("_Time", performance.now() / 1000)
+            .vec2("_Resolution", [texture.width, texture.height])
+            .textureRW("_Result", texture)
+            .dispatchAuto(texture)
+    })
+
+    return <View style={{ backgroundImage: texture }} />
 }
 ```
+
+### Zero-Allocation Dispatch
+
+For performance-critical code, use `createDispatcher()` to eliminate per-frame allocations:
+
+```typescript
+import { useMemo } from "react"
+import { useComputeShader, useComputeTexture, useAnimationFrame, KernelDispatcher } from "onejs-unity/gpu"
+
+function ZeroAllocEffect({ shaderGlobal }) {
+    const shader = useComputeShader(shaderGlobal)
+    const texture = useComputeTexture({ autoResize: true })
+
+    // Create dispatcher once - caches property IDs
+    const dispatch = useMemo<KernelDispatcher | null>(
+        () => shader?.createDispatcher("CSMain") ?? null,
+        [shader]
+    )
+
+    useAnimationFrame(() => {
+        if (!dispatch || !texture) return
+
+        // Zero allocations per frame!
+        dispatch
+            .float("_Time", performance.now() / 1000)
+            .vec2("_Resolution", texture.width, texture.height)  // No array allocation
+            .textureRW("_Result", texture)
+            .dispatchAuto(texture)
+    })
+
+    return <View style={{ backgroundImage: texture }} />
+}
+```
+
+### API Reference
+
+| Method | Description |
+|--------|-------------|
+| `shader.kernel(name)` | Fluent builder (allocates) |
+| `shader.createDispatcher(name)` | Zero-alloc dispatcher (cache and reuse) |
+| `compute.renderTexture(options)` | Create render texture |
+| `compute.buffer(options)` | Create compute buffer |
+
+## Zero-Allocation Interop
+
+For custom C# method calls in performance-critical code, use the `za` module to create zero-allocation bindings.
+
+### Static Methods
+
+```typescript
+import { za } from "onejs-unity/interop"
+
+// Bind multiple methods on a class
+const Physics = za.static("UnityEngine.Physics", {
+    Raycast: 4,                              // shorthand: 4 args
+    SphereCast: { args: 5, returns: "bool" }, // with metadata
+    OverlapSphereNonAlloc: 4,
+})
+
+// Per-frame usage - zero allocations after first call!
+function update() {
+    if (Physics.Raycast(origin, direction, maxDistance, layerMask)) {
+        // hit something
+    }
+}
+```
+
+### Single Method
+
+```typescript
+import { za } from "onejs-unity/interop"
+
+const getTime = za.method("UnityEngine.Time", "get_time", 0)
+const getDeltaTime = za.method("UnityEngine.Time", "get_deltaTime", 0)
+
+function update() {
+    const t = getTime()      // zero-alloc
+    const dt = getDeltaTime() // zero-alloc
+}
+```
+
+### Pre-registered Bindings
+
+When C# pre-registers bindings and exposes their IDs:
+
+```typescript
+import { za } from "onejs-unity/interop"
+
+// C# exposes binding IDs via globals
+declare const MyBindingIds: { doSomething: number }
+
+const doSomething = za.fromId(MyBindingIds.doSomething, 3)
+doSomething(arg1, arg2, arg3) // zero-alloc
+```
+
+### Instance Methods
+
+For instance methods, create static wrappers in C#:
+
+```csharp
+// C# side - create static wrapper that takes handle as first arg
+public static class CharacterControllerExt {
+    public static void MoveStatic(int handle, float x, float y, float z) {
+        var cc = ObjectRegistry.Get<CharacterController>(handle);
+        cc.Move(new Vector3(x, y, z));
+    }
+}
+```
+
+```typescript
+// JS side
+const CharacterController = za.static("CharacterControllerExt", {
+    MoveStatic: 4,  // handle + x, y, z
+})
+
+CharacterController.MoveStatic(ccHandle, velocity.x, velocity.y, velocity.z)
+```
+
+### How It Works
+
+| API | First Call | Subsequent Calls |
+|-----|-----------|------------------|
+| `CS.Type.Method()` | Reflection lookup | Reflection (allocates) |
+| `za.static/method` | Registers binding | Direct invoke (zero-alloc) |
+| `za.fromId` | None | Direct invoke (zero-alloc) |
+
+The `za` module uses `__zaInvokeN` native functions that pass primitives directly to C# without boxing or array allocation.
 
 ## Peer Dependencies
 
