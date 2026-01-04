@@ -2,9 +2,10 @@
  * React hooks for input handling
  */
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import type { Keyboard, Mouse, Gamepad, Touch, Vector2, InputAction } from "./types"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import type { Keyboard, Mouse, Gamepad, Touch, Vector2, InputAction, InputReader, InputReaderBuilder } from "./types"
 import { input } from "./input"
+import { createReader } from "./reader"
 
 // Type declarations for QuickJS environment
 declare const requestAnimationFrame: (callback: () => void) => number
@@ -508,6 +509,64 @@ export function useInput(): InputState {
     const touch = useTouch()
 
     return { keyboard, mouse, gamepad, touch }
+}
+
+// ============ Zero-Alloc InputReader Hook ============
+
+/**
+ * Hook that creates a zero-allocation InputReader and auto-ticks it each frame.
+ *
+ * Use this for performance-critical game loops where you want to avoid
+ * allocations from polling input state. The reader is built once using the
+ * provided builder callback, and tick() is called automatically each frame.
+ *
+ * @param build - Callback that configures the reader using the fluent builder API
+ * @returns The InputReader instance (call down(), pressed(), float(), vec2() to read values)
+ *
+ * @example
+ * ```tsx
+ * function Game() {
+ *     const reader = useInputReader(b => b
+ *         .keyAxis2D("move", {
+ *             up: ["W", "UpArrow"],
+ *             down: ["S", "DownArrow"],
+ *             left: ["A", "LeftArrow"],
+ *             right: ["D", "RightArrow"],
+ *         })
+ *         .mouseButton("fire", "left")
+ *         .mouseVec2("look", "delta")
+ *         .gamepadVec2("gamepadMove", "leftStick")
+ *     )
+ *
+ *     useAnimationFrame(() => {
+ *         const move = reader.vec2("move")      // Same cached object each frame
+ *         const look = reader.vec2("look")
+ *         player.move(move.x, move.y)
+ *         player.rotate(look.x, look.y)
+ *         if (reader.down("fire")) player.shoot()
+ *     })
+ * }
+ * ```
+ */
+export function useInputReader(
+    build: (builder: InputReaderBuilder) => InputReaderBuilder
+): InputReader {
+    // Build reader once on mount
+    const reader = useMemo(() => {
+        return build(createReader()).build()
+    }, [])
+
+    // Auto-tick each frame
+    useAnimationFrame(() => {
+        reader.tick()
+    })
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => reader.dispose()
+    }, [reader])
+
+    return reader
 }
 
 // ============ InputAction Hooks ============

@@ -13,6 +13,8 @@ import type {
     GamepadVec2Property,
     GamepadFloatProperty,
     Vector2,
+    KeyAxis2DConfig,
+    ReaderKeyBinding,
 } from "./types"
 
 // Get InputBridge lazily to avoid issues during module load
@@ -120,11 +122,31 @@ function resolveGamepadButtonId(buttonName: string): number {
     return __zaInvoke1(_bindingIds!.getGamepadButtonId, buttonName) as number
 }
 
+/**
+ * Resolve a key binding (single key or array) to an array of key IDs.
+ */
+function resolveKeyBinding(binding: ReaderKeyBinding): number[] {
+    if (typeof binding === "string") {
+        return [resolveKeyId(binding)]
+    }
+    return binding.map(resolveKeyId)
+}
+
+/**
+ * Check if any key in an array of key IDs is down.
+ */
+function isAnyKeyDown(keyIds: number[], inv: typeof _invokers): boolean {
+    for (const id of keyIds) {
+        if (inv!.getKeyDownById(id)) return true
+    }
+    return false
+}
+
 // ============ Binding Types ============
 
 type BoolBindingType = "keyDown" | "keyPressed" | "keyReleased" | "mouseButton" | "gamepadButton"
 type FloatBindingType = "keyAxis" | "mouseFloat" | "gamepadFloat"
-type Vec2BindingType = "mouseVec2" | "gamepadVec2"
+type Vec2BindingType = "mouseVec2" | "gamepadVec2" | "keyAxis2D"
 
 interface BoolBinding {
     type: BoolBindingType
@@ -159,6 +181,11 @@ interface Vec2Binding {
     // Gamepad vec2
     gamepadProperty?: GamepadVec2Property
     gamepadIndex?: number
+    // Key axis 2D - arrays of key IDs for each direction
+    upKeyIds?: number[]
+    downKeyIds?: number[]
+    leftKeyIds?: number[]
+    rightKeyIds?: number[]
 }
 
 // ============ InputReader Implementation ============
@@ -287,6 +314,16 @@ class InputReaderImpl implements InputReader {
                     }
                     break
                 }
+                case "keyAxis2D": {
+                    let x = 0, y = 0
+                    if (isAnyKeyDown(binding.rightKeyIds!, inv)) x += 1
+                    if (isAnyKeyDown(binding.leftKeyIds!, inv)) x -= 1
+                    if (isAnyKeyDown(binding.upKeyIds!, inv)) y += 1
+                    if (isAnyKeyDown(binding.downKeyIds!, inv)) y -= 1
+                    binding.value.x = x
+                    binding.value.y = y
+                    break
+                }
             }
         }
     }
@@ -364,6 +401,18 @@ class InputReaderBuilderImpl implements InputReaderBuilder {
             value: 0,
             negativeKeyId: resolveKeyId(config.negative),
             positiveKeyId: resolveKeyId(config.positive),
+        })
+        return this
+    }
+
+    keyAxis2D(name: string, config: KeyAxis2DConfig): InputReaderBuilder {
+        this._vec2Bindings.set(name, {
+            type: "keyAxis2D",
+            value: { x: 0, y: 0 },  // Pre-allocated!
+            upKeyIds: resolveKeyBinding(config.up),
+            downKeyIds: resolveKeyBinding(config.down),
+            leftKeyIds: resolveKeyBinding(config.left),
+            rightKeyIds: resolveKeyBinding(config.right),
         })
         return this
     }

@@ -312,6 +312,138 @@ function Game() {
 | `useAction(path, actions)` | InputAction state |
 | `useActionValue<T>(path, actions)` | InputAction value |
 | `useActionCallback(path, event, cb, actions)` | InputAction event callback |
+| `useInputReader(build)` | Zero-alloc InputReader with auto-tick |
+
+## Zero-Allocation Input Reader
+
+For performance-critical game loops, use `InputReader` to avoid per-frame allocations. All Vector2 objects are pre-allocated and reused, and key/button names are resolved to integer IDs at build time.
+
+### Using the Hook (Recommended)
+
+```typescript
+import { useInputReader } from "onejs-unity/input"
+import { useAnimationFrame } from "onejs-unity/gpu"
+
+function Game() {
+    // Reader is built once, auto-ticks each frame, auto-disposes on unmount
+    const reader = useInputReader(b => b
+        // keyAxis2D: 4 directions → vec2, supports multiple keys per direction
+        .keyAxis2D("move", {
+            up: ["W", "UpArrow"],
+            down: ["S", "DownArrow"],
+            left: ["A", "LeftArrow"],
+            right: ["D", "RightArrow"],
+        })
+        // Mouse bindings
+        .mouseButton("fire", "left")
+        .mouseVec2("look", "delta")
+        .mouseFloat("zoom", "scrollY")
+        // Gamepad bindings
+        .gamepadVec2("gamepadMove", "leftStick")
+        .gamepadVec2("gamepadLook", "rightStick")
+    )
+
+    useAnimationFrame(() => {
+        // All vec2() calls return the SAME cached object each frame
+        const move = reader.vec2("move")
+        const look = reader.vec2("look")
+
+        player.move(move.x, move.y)
+        player.rotate(look.x, look.y)
+
+        if (reader.down("fire")) {
+            player.shoot()
+        }
+    })
+}
+```
+
+### Manual Reader Creation
+
+```typescript
+import { input, createReader } from "onejs-unity/input"
+
+// Build once at init
+const reader = createReader()
+    .key("jump", "Space")
+    .keyPressed("interact", "E")
+    .keyAxis("horizontal", { negative: "A", positive: "D" })
+    .keyAxis2D("move", {
+        up: ["W", "UpArrow"],
+        down: ["S", "DownArrow"],
+        left: ["A", "LeftArrow"],
+        right: ["D", "RightArrow"],
+    })
+    .mouseButton("fire", "left")
+    .mouseVec2("look", "delta")
+    .mouseFloat("zoom", "scrollY")
+    .gamepadButton("gamepadJump", "South")
+    .gamepadVec2("gamepadMove", "leftStick")
+    .gamepadFloat("leftTrigger", "leftTrigger")
+    .build()
+
+// In game loop - call tick() once per frame
+function update() {
+    reader.tick()  // Updates all bindings
+
+    // Read cached values (zero allocations!)
+    if (reader.down("jump")) { ... }
+    if (reader.pressed("interact")) { ... }
+    const h = reader.float("horizontal")
+    const move = reader.vec2("move")  // Same object each frame!
+}
+
+// Cleanup
+reader.dispose()
+```
+
+### InputReader Builder Methods
+
+| Method | Description |
+|--------|-------------|
+| `key(name, key)` | Key held state (isKeyDown) |
+| `keyPressed(name, key)` | Key pressed this frame |
+| `keyReleased(name, key)` | Key released this frame |
+| `keyAxis(name, {negative, positive})` | Two keys → float (-1, 0, or 1) |
+| `keyAxis2D(name, {up, down, left, right})` | Four keys → vec2, multi-key support |
+| `mouseButton(name, button)` | Mouse button ("left", "right", "middle", "forward", "back") |
+| `mouseVec2(name, property)` | Mouse vec2 ("position", "delta", "scroll") |
+| `mouseFloat(name, property)` | Mouse float ("scrollX", "scrollY", "positionX", etc.) |
+| `gamepadButton(name, button, index?)` | Gamepad button |
+| `gamepadVec2(name, property, index?)` | Gamepad vec2 ("leftStick", "rightStick") |
+| `gamepadFloat(name, property, index?)` | Gamepad float ("leftTrigger", "rightTrigger", etc.) |
+
+### InputReader Methods
+
+| Method | Description |
+|--------|-------------|
+| `tick()` | Update all bindings (call once per frame) |
+| `down(name)` | Get key/button held state |
+| `pressed(name)` | Get key pressed this frame |
+| `released(name)` | Get key released this frame |
+| `float(name)` | Get float value |
+| `vec2(name)` | Get Vector2 value (cached object) |
+| `dispose()` | Release resources |
+
+### Disabling Pointer Events
+
+When using InputReader for mouse input, you can disable UI Toolkit's PointerMoveEvent forwarding to eliminate ~0.6KB/frame GC allocation:
+
+```typescript
+import { input, useInputReader } from "onejs-unity/input"
+
+// Disable pointer move events at module load
+input.setPointerMoveEventsEnabled(false)
+
+function Game() {
+    const reader = useInputReader(b => b
+        .mouseVec2("look", "delta")  // Use InputReader instead of React events
+    )
+    // ...
+}
+```
+
+Note: This only disables `onPointerMove` handlers. `onPointerEnter`, `onPointerLeave`, `onClick`, etc. still work.
 
 ## Manual Polling (Alternative)
 

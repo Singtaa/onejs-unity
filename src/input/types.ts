@@ -349,6 +349,17 @@ export type GamepadVec2Property = "leftStick" | "rightStick"
 /** Gamepad property for float bindings */
 export type GamepadFloatProperty = "leftTrigger" | "rightTrigger" | "leftStickX" | "leftStickY" | "rightStickX" | "rightStickY"
 
+/** Key binding - single key or array of keys (any match = true) */
+export type ReaderKeyBinding = string | string[]
+
+/** Configuration for keyAxis2D - 4 directional keys to vec2 */
+export interface KeyAxis2DConfig {
+    up: ReaderKeyBinding
+    down: ReaderKeyBinding
+    left: ReaderKeyBinding
+    right: ReaderKeyBinding
+}
+
 /**
  * Fluent builder for creating an InputReader.
  * Chain binding methods and call build() to create the reader.
@@ -365,6 +376,9 @@ export interface InputReaderBuilder {
 
     /** Bind a keyboard axis from two keys (-1, 0, or 1) */
     keyAxis(name: string, config: { negative: string; positive: string }): InputReaderBuilder
+
+    /** Bind a 2D keyboard axis from 4 directional keys (returns vec2) */
+    keyAxis2D(name: string, config: KeyAxis2DConfig): InputReaderBuilder
 
     /** Bind a mouse button */
     mouseButton(name: string, button: MouseButtonType): InputReaderBuilder

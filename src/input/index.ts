@@ -46,6 +46,9 @@ export {
     useAction,
     useActionValue,
     useActionCallback,
+
+    // Zero-alloc reader hook
+    useInputReader,
 } from "./hooks"
 
 // Hook state types
@@ -90,6 +93,8 @@ export type {
     MouseButtonType,
     GamepadVec2Property,
     GamepadFloatProperty,
+    KeyAxis2DConfig,
+    ReaderKeyBinding,
 
     // Main module type
     InputModule,
