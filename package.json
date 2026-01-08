@@ -9,6 +9,9 @@
     "./assets": "./src/assets/index.ts",
     "./gpu": "./src/gpu/index.ts",
     "./input": "./src/input/index.ts",
+    "./interop": "./src/interop/index.ts",
+    "./proc": "./src/proc/index.ts",
+    "./proc/noise": "./src/proc/noise/index.ts",
     "./esbuild": "./src/esbuild/index.mjs",
     "./postcss": "./src/postcss/index.mjs"
   },
@@ -26,6 +29,10 @@
     "gpu",
     "compute-shader",
     "input-system",
+    "procedural-generation",
+    "noise",
+    "perlin",
+    "simplex",
     "game-development"
   ],
   "repository": {
