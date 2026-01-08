@@ -12,6 +12,8 @@
     "./interop": "./src/interop/index.ts",
     "./proc": "./src/proc/index.ts",
     "./proc/noise": "./src/proc/noise/index.ts",
+    "./proc/geometry": "./src/proc/geometry/index.ts",
+    "./proc/texture": "./src/proc/texture/index.ts",
     "./esbuild": "./src/esbuild/index.mjs",
     "./postcss": "./src/postcss/index.mjs"
   },
@@ -33,6 +35,13 @@
     "noise",
     "perlin",
     "simplex",
+    "mesh",
+    "geometry",
+    "texture",
+    "voronoi",
+    "marble",
+    "wood",
+    "pattern",
     "game-development"
   ],
   "repository": {
