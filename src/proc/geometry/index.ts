@@ -73,17 +73,20 @@ import {
     torus,
     quad,
     fromData,
-    material,
-    registerMaterial,
-    cleanup
+    ProceduralMesh,
+    MeshObject,
+    // Pure generators (for advanced use)
+    generateCube,
+    generateSphere,
+    generatePlane,
+    generateCylinder,
+    generateCone,
+    generateTorus,
+    generateQuad
 } from "./primitives"
-import { builder, combine } from "./builder"
+import { builder, combine, MeshBuilder } from "./builder"
 import type {
-    Mesh,
-    MeshInstance,
-    Material,
     MeshData,
-    MeshBuilder,
     CubeOptions,
     SphereOptions,
     CylinderOptions,
@@ -95,11 +98,7 @@ import type {
 
 // Re-export types
 export type {
-    Mesh,
-    MeshInstance,
-    Material,
     MeshData,
-    MeshBuilder,
     CubeOptions,
     SphereOptions,
     CylinderOptions,
@@ -109,7 +108,11 @@ export type {
     QuadOptions
 }
 
-// Re-export functions
+// Re-export classes
+export { ProceduralMesh, MeshObject }
+export type { MeshBuilder }
+
+// Re-export factory functions
 export {
     cube,
     sphere,
@@ -119,17 +122,62 @@ export {
     torus,
     quad,
     fromData,
-    material,
-    registerMaterial,
-    cleanup,
     builder,
     combine
+}
+
+// Re-export pure generators for advanced use (no Unity dependency)
+export {
+    generateCube,
+    generateSphere,
+    generatePlane,
+    generateCylinder,
+    generateCone,
+    generateTorus,
+    generateQuad
 }
 
 /**
  * Unified mesh API.
  *
  * Provides access to all mesh operations through a single namespace.
+ *
+ * @example Creating primitives
+ * ```typescript
+ * import { mesh } from "onejs-unity/proc"
+ *
+ * // Create and instantiate a sphere
+ * mesh.sphere({ radius: 1 })
+ *     .instantiate("MySphere")
+ *     .setPosition(0, 2, 0)
+ *     .setColor("#ff5500")
+ *
+ * // Create a high-poly plane for terrain
+ * const terrain = mesh.plane({ width: 100, height: 100, segmentsX: 64, segmentsZ: 64 })
+ * const data = terrain.data
+ * // Modify vertices with noise...
+ * terrain.setData(data).recalculateNormals()
+ * terrain.instantiate("Terrain")
+ * ```
+ *
+ * @example Custom geometry with builder
+ * ```typescript
+ * const pyramid = mesh.builder()
+ *     .vertex(0, 1, 0).uv(0.5, 1)      // Apex
+ *     .vertex(-1, 0, -1).uv(0, 0)      // Base corners
+ *     .vertex(1, 0, -1).uv(1, 0)
+ *     .vertex(1, 0, 1).uv(1, 1)
+ *     .vertex(-1, 0, 1).uv(0, 1)
+ *     .triangle(0, 2, 1)               // Front face
+ *     .triangle(0, 3, 2)               // Right face
+ *     .triangle(0, 4, 3)               // Back face
+ *     .triangle(0, 1, 4)               // Left face
+ *     .quad(1, 2, 3, 4)                // Base
+ *     .build()
+ *
+ * pyramid.recalculateNormals()
+ * pyramid.instantiate("Pyramid")
+ * ```
  */
 export const mesh = {
     // Primitives
@@ -146,10 +194,14 @@ export const mesh = {
     builder,
     combine,
 
-    // Materials
-    material,
-    registerMaterial,
-
-    // Cleanup
-    cleanup
+    // Pure generators (no Unity dependency - for data manipulation)
+    generators: {
+        cube: generateCube,
+        sphere: generateSphere,
+        plane: generatePlane,
+        cylinder: generateCylinder,
+        cone: generateCone,
+        torus: generateTorus,
+        quad: generateQuad
+    }
 }

@@ -19,8 +19,8 @@ import {
     plane,
     torus,
     quad,
-    material as createMaterial,
-    cleanup
+    ProceduralMesh,
+    MeshObject
 } from "./geometry"
 import type {
     NoiseSource2D,
@@ -30,9 +30,6 @@ import type {
     FBMConfig,
     NoiseType,
     GPUNoiseOptions,
-    Mesh,
-    MeshInstance,
-    Material,
     MeshData,
     CubeOptions,
     SphereOptions,
@@ -40,7 +37,8 @@ import type {
     ConeOptions,
     PlaneOptions,
     TorusOptions,
-    QuadOptions
+    QuadOptions,
+    Color
 } from "./types"
 
 // =============================================================================
@@ -437,7 +435,7 @@ export type UseMeshOptions =
  * Handles creation and cleanup automatically.
  *
  * @param options - Mesh configuration
- * @returns The managed Mesh, or null if not ready
+ * @returns The managed ProceduralMesh, or null if not ready
  *
  * @example Primitive mesh
  * ```tsx
@@ -464,14 +462,14 @@ export type UseMeshOptions =
  * }
  * ```
  */
-export function useMesh(options: UseMeshOptions): Mesh | null {
-    const [meshHandle, setMeshHandle] = useState<Mesh | null>(null)
+export function useMesh(options: UseMeshOptions): ProceduralMesh | null {
+    const [meshHandle, setMeshHandle] = useState<ProceduralMesh | null>(null)
 
     // Serialize options for dependency comparison
     const optionsKey = JSON.stringify(options)
 
     useEffect(() => {
-        let newMesh: Mesh
+        let newMesh: ProceduralMesh
 
         try {
             switch (options.type) {
@@ -541,9 +539,19 @@ export interface UseMeshInstanceOptions {
     scale?: { x: number; y: number; z: number }
 
     /**
-     * Material to apply.
+     * Color to apply (hex string or Color object).
      */
-    material?: Material
+    color?: string | Color
+
+    /**
+     * Unity Material to apply.
+     */
+    material?: unknown
+
+    /**
+     * Shader to use.
+     */
+    shader?: string
 }
 
 /**
@@ -553,7 +561,7 @@ export interface UseMeshInstanceOptions {
  *
  * @param meshHandle - The mesh to instantiate
  * @param options - Instance configuration
- * @returns The managed MeshInstance, or null if not ready
+ * @returns The managed MeshObject, or null if not ready
  *
  * @example Basic instance
  * ```tsx
@@ -566,24 +574,23 @@ export interface UseMeshInstanceOptions {
  * }
  * ```
  *
- * @example With material
+ * @example With color
  * ```tsx
  * function ColoredCube() {
  *     const cubeMesh = useMesh({ type: "cube", size: 1 })
- *     const mat = useMaterial({ color: "#ff5500" })
  *     const instance = useMeshInstance(cubeMesh, {
  *         name: "RedCube",
- *         material: mat
+ *         color: "#ff5500"
  *     })
  * }
  * ```
  */
 export function useMeshInstance(
-    meshHandle: Mesh | null,
+    meshHandle: ProceduralMesh | null,
     options: UseMeshInstanceOptions = {}
-): MeshInstance | null {
-    const { name, position, rotation, scale, material } = options
-    const [instance, setInstance] = useState<MeshInstance | null>(null)
+): MeshObject | null {
+    const { name, position, rotation, scale, color, material, shader } = options
+    const [instance, setInstance] = useState<MeshObject | null>(null)
 
     useEffect(() => {
         if (!meshHandle) return
@@ -600,8 +607,14 @@ export function useMeshInstance(
             if (scale) {
                 newInstance.setScale(scale.x, scale.y, scale.z)
             }
+            if (shader) {
+                newInstance.useShader(shader)
+            }
             if (material) {
                 newInstance.setMaterial(material)
+            }
+            if (color) {
+                newInstance.setColor(color)
             }
 
             setInstance(newInstance)
@@ -612,13 +625,15 @@ export function useMeshInstance(
         } catch (err) {
             console.error("Failed to create mesh instance:", err)
         }
-    }, [meshHandle, name, position?.x, position?.y, position?.z, rotation?.x, rotation?.y, rotation?.z, scale?.x, scale?.y, scale?.z, material])
+    }, [meshHandle, name, position?.x, position?.y, position?.z, rotation?.x, rotation?.y, rotation?.z, scale?.x, scale?.y, scale?.z, color, material, shader])
 
     return instance
 }
 
 /**
  * Options for useMaterial hook.
+ *
+ * @deprecated Use MeshObject's setColor/useShader/setMaterial methods directly
  */
 export interface UseMaterialOptions {
     /**
@@ -630,7 +645,7 @@ export interface UseMaterialOptions {
     /**
      * Material color (hex string or Color object).
      */
-    color?: string | { r: number; g: number; b: number; a: number }
+    color?: string | Color
 
     /**
      * Float properties to set.
@@ -638,60 +653,76 @@ export interface UseMaterialOptions {
     floats?: Record<string, number>
 }
 
+declare const CS: any
+
 /**
- * Hook that creates and manages a material.
+ * Hook that creates and manages a Unity Material.
  *
  * @param options - Material configuration
- * @returns The managed Material, or null if not ready
+ * @returns The Unity Material, or null if not ready
  *
  * @example Simple colored material
  * ```tsx
  * function RedObject() {
- *     const mat = useMaterial({ color: "#ff0000" })
+ *     const mat = useMaterial({ shader: "Standard", color: "#ff0000" })
  *     const mesh = useMesh({ type: "cube" })
  *     const instance = useMeshInstance(mesh, { material: mat })
  * }
  * ```
  *
- * @example Material with properties
+ * @example Using MeshObject directly (preferred)
  * ```tsx
- * function ShinyMetal() {
- *     const mat = useMaterial({
- *         shader: "Standard",
- *         color: "#888888",
- *         floats: {
- *             _Metallic: 0.9,
- *             _Smoothness: 0.8
- *         }
- *     })
+ * function ColoredCube() {
+ *     const mesh = useMesh({ type: "cube" })
+ *     // Color is applied directly without needing useMaterial
+ *     const instance = useMeshInstance(mesh, { color: "#ff0000" })
  * }
  * ```
  */
-export function useMaterial(options: UseMaterialOptions = {}): Material | null {
+export function useMaterial(options: UseMaterialOptions = {}): unknown | null {
     const { shader = "Standard", color, floats } = options
-    const [mat, setMat] = useState<Material | null>(null)
+    const [mat, setMat] = useState<unknown | null>(null)
 
     // Serialize for dependency comparison
     const floatsKey = floats ? JSON.stringify(floats) : ""
 
     useEffect(() => {
         try {
-            const newMat = createMaterial(shader)
+            const shaderObj = CS.UnityEngine.Shader.Find(shader)
+            if (!shaderObj) {
+                console.warn(`Shader not found: ${shader}`)
+                return
+            }
+
+            const newMat = CS.UnityEngine.Material.ctor(shaderObj)
 
             if (color) {
-                newMat.setColor(color)
+                let r: number, g: number, b: number, a: number
+                if (typeof color === "string") {
+                    const hex = color.replace("#", "")
+                    r = parseInt(hex.slice(0, 2), 16) / 255
+                    g = parseInt(hex.slice(2, 4), 16) / 255
+                    b = parseInt(hex.slice(4, 6), 16) / 255
+                    a = hex.length > 6 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
+                } else {
+                    r = color.r
+                    g = color.g
+                    b = color.b
+                    a = color.a ?? 1
+                }
+                newMat.color = CS.UnityEngine.Color.ctor(r, g, b, a)
             }
 
             if (floats) {
                 for (const [name, value] of Object.entries(floats)) {
-                    newMat.setFloat(name, value)
+                    newMat.SetFloat(name, value)
                 }
             }
 
             setMat(newMat)
 
             return () => {
-                newMat.dispose()
+                CS.UnityEngine.Object.Destroy(newMat)
             }
         } catch (err) {
             console.error("Failed to create material:", err)
@@ -723,24 +754,52 @@ export function useMeshFactory() {
 }
 
 /**
- * Hook that cleans up all procedural mesh resources on unmount.
+ * Hook that tracks created meshes and cleans them up on unmount.
  *
- * Use this at the root of your proc-heavy components.
+ * Use this at the root of your proc-heavy components to track
+ * meshes that should be cleaned up together.
+ *
+ * @returns Object with track/untrack functions for manual resource management
  *
  * @example
  * ```tsx
  * function ProceduralScene() {
- *     useProcCleanup()
+ *     const { track } = useProcCleanup()
  *
- *     // Create lots of procedural meshes...
- *     // All will be cleaned up when component unmounts
+ *     useEffect(() => {
+ *         const sphere = mesh.sphere({ radius: 1 })
+ *         const obj = sphere.instantiate("MySphere")
+ *         track(sphere) // Will be disposed when component unmounts
+ *         track(obj)
+ *     }, [])
  * }
  * ```
  */
-export function useProcCleanup(): void {
+export function useProcCleanup(): {
+    track: (resource: { dispose: () => void }) => void
+    untrack: (resource: { dispose: () => void }) => void
+} {
+    const resourcesRef = useRef<Set<{ dispose: () => void }>>(new Set())
+
     useEffect(() => {
         return () => {
-            cleanup()
+            for (const resource of resourcesRef.current) {
+                try {
+                    resource.dispose()
+                } catch (err) {
+                    console.error("Failed to dispose resource:", err)
+                }
+            }
+            resourcesRef.current.clear()
         }
     }, [])
+
+    return {
+        track: (resource: { dispose: () => void }) => {
+            resourcesRef.current.add(resource)
+        },
+        untrack: (resource: { dispose: () => void }) => {
+            resourcesRef.current.delete(resource)
+        }
+    }
 }

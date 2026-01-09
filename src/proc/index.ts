@@ -42,8 +42,10 @@
  * import { mesh } from "onejs-unity/proc"
  *
  * // Create and instantiate primitives
- * const sphere = mesh.sphere({ radius: 1 })
- * sphere.instantiate("MySphere").setPosition(0, 2, 0)
+ * mesh.sphere({ radius: 1 })
+ *     .instantiate("MySphere")
+ *     .setPosition(0, 2, 0)
+ *     .setColor("#ff5500")
  *
  * // Custom geometry with builder
  * const pyramid = mesh.builder()
@@ -53,9 +55,9 @@
  *     .triangle(0, 1, 2)
  *     .build()
  *
- * // Apply material
- * const mat = mesh.material().setColor("#ff5500")
- * pyramid.instantiate().setMaterial(mat)
+ * pyramid.instantiate("Pyramid")
+ *     .setColor("#ff5500")
+ *     .useShader("Standard")
  * ```
  */
 
@@ -81,7 +83,7 @@ export {
 // Geometry Module
 // =============================================================================
 
-export { mesh } from "./geometry"
+export { mesh, ProceduralMesh, MeshObject } from "./geometry"
 export {
     cube,
     sphere,
@@ -93,9 +95,14 @@ export {
     fromData,
     builder,
     combine,
-    material,
-    registerMaterial,
-    cleanup
+    // Pure generators (for advanced use - no Unity dependency)
+    generateCube,
+    generateSphere,
+    generatePlane,
+    generateCylinder,
+    generateCone,
+    generateTorus,
+    generateQuad
 } from "./geometry"
 
 // =============================================================================
@@ -103,9 +110,11 @@ export {
 // =============================================================================
 
 export {
+    // Noise hooks
     useNoise,
     useNoise3D,
     useNoiseTexture,
+    // Mesh hooks
     useMesh,
     useMeshInstance,
     useMaterial,
@@ -183,13 +192,12 @@ export type {
     PlaneOptions,
     TorusOptions,
     QuadOptions,
-    Mesh,
-    MeshInstance,
-    Material,
-    MeshBuilder,
 
     // Texture types
     TexturePatternType,
     TextureOptions,
     GPUTextureOptions
 } from "./types"
+
+// Re-export MeshBuilder interface from builder
+export type { MeshBuilder } from "./geometry"

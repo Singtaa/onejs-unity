@@ -6,8 +6,28 @@
  * @module onejs-unity/proc/geometry
  */
 
-import type { Mesh, MeshData, MeshBuilder } from "../types"
-import { fromData } from "./primitives"
+import type { MeshData } from "../types"
+import { ProceduralMesh, fromData } from "./primitives"
+
+/**
+ * Fluent mesh builder interface.
+ */
+export interface MeshBuilder {
+    /** Add a vertex and return its index */
+    vertex(x: number, y: number, z: number): number
+    /** Set normal for last vertex */
+    normal(x: number, y: number, z: number): MeshBuilder
+    /** Set UV for last vertex */
+    uv(u: number, v: number): MeshBuilder
+    /** Set color for last vertex */
+    color(r: number, g: number, b: number, a?: number): MeshBuilder
+    /** Add a triangle */
+    triangle(a: number, b: number, c: number): MeshBuilder
+    /** Add a quad (two triangles) */
+    quad(a: number, b: number, c: number, d: number): MeshBuilder
+    /** Build the mesh */
+    build(): ProceduralMesh
+}
 
 /**
  * MeshBuilder implementation.
@@ -122,9 +142,9 @@ class MeshBuilderImpl implements MeshBuilder {
     }
 
     /**
-     * Build the mesh and return a Mesh handle.
+     * Build the mesh and return a ProceduralMesh.
      */
-    build(): Mesh {
+    build(): ProceduralMesh {
         const data: MeshData = {
             vertices: new Float32Array(this._vertices),
             normals: new Float32Array(this._normals),
@@ -152,7 +172,7 @@ class MeshBuilderImpl implements MeshBuilder {
  *     .build()
  * ```
  *
- * @example Colored cube face
+ * @example Colored quad
  * ```typescript
  * const face = mesh.builder()
  *     .vertex(-1, -1, 0).color(1, 0, 0)  // Red
@@ -170,8 +190,8 @@ export function builder(): MeshBuilder {
 /**
  * Combine multiple meshes into one.
  *
- * @param meshes - Array of meshes to combine
- * @returns A new combined mesh
+ * @param meshes - Array of ProceduralMesh to combine
+ * @returns A new combined ProceduralMesh
  *
  * @example
  * ```typescript
@@ -181,7 +201,7 @@ export function builder(): MeshBuilder {
  * ])
  * ```
  */
-export function combine(meshes: Mesh[]): Mesh {
+export function combine(meshes: ProceduralMesh[]): ProceduralMesh {
     if (meshes.length === 0) {
         throw new Error("Cannot combine empty mesh array")
     }
@@ -191,7 +211,7 @@ export function combine(meshes: Mesh[]): Mesh {
     }
 
     // Get all mesh data
-    const allData = meshes.map(m => m.getData())
+    const allData = meshes.map(m => m.data)
 
     // Calculate total sizes
     let totalVertices = 0
