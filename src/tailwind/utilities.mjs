@@ -15,6 +15,10 @@ import {
     borderWidth,
     opacity,
     zIndex,
+    transitionDuration,
+    rotate,
+    scale,
+    letterSpacing,
 } from "./config.mjs"
 
 // ============================================================================
@@ -139,16 +143,23 @@ export const staticUtilities = {
     "text-right": { "-unity-text-align": "middle-right" },
     "text-justify": { "-unity-text-align": "middle-left" }, // USS doesn't support justify
 
-    // Vertical text alignment
+    // Vertical text alignment (uses USS naming: upper/middle/lower)
     "align-top": { "-unity-text-align": "upper-center" },
     "align-middle": { "-unity-text-align": "middle-center" },
     "align-bottom": { "-unity-text-align": "lower-center" },
+    // Spec aliases
+    "align-upper": { "-unity-text-align": "upper-center" },
+    "align-lower": { "-unity-text-align": "lower-center" },
 
     // Font style
     "italic": { "-unity-font-style": "italic" },
     "not-italic": { "-unity-font-style": "normal" },
+    "font-normal": { "-unity-font-style": "normal" },
+    "font-bold": { "-unity-font-style": "bold" },
+    "font-italic": { "-unity-font-style": "italic" },
+    "font-bold-italic": { "-unity-font-style": "bold-and-italic" },
 
-    // Text transform
+    // Text transform (Note: USS may not support all text-transform values)
     "uppercase": { "text-transform": "uppercase" }, // Note: USS may not support this
     "lowercase": { "text-transform": "lowercase" },
     "capitalize": { "text-transform": "capitalize" },
@@ -429,6 +440,138 @@ export const positionUtilities = {
     ),
 }
 
+// Flex basis utilities
+export const flexBasisUtilities = {
+    "basis-auto": { "flex-basis": "auto" },
+    "basis-0": { "flex-basis": "0" },
+    ...Object.fromEntries(
+        Object.entries(spacing).filter(([k]) => k !== "0").map(([key, value]) => [`basis-${key}`, { "flex-basis": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`basis-${key}`, { "flex-basis": value }])
+    ),
+}
+
+// Inset utilities (all sides, x-axis, y-axis)
+export const insetUtilities = {
+    ...Object.fromEntries(
+        Object.entries(spacing).filter(([k]) => k !== "0").map(([key, value]) => [
+            `inset-${key}`, { "top": value, "right": value, "bottom": value, "left": value }
+        ])
+    ),
+    ...Object.fromEntries(
+        Object.entries(spacing).filter(([k]) => k !== "0").map(([key, value]) => [
+            `inset-x-${key}`, { "left": value, "right": value }
+        ])
+    ),
+    ...Object.fromEntries(
+        Object.entries(spacing).filter(([k]) => k !== "0").map(([key, value]) => [
+            `inset-y-${key}`, { "top": value, "bottom": value }
+        ])
+    ),
+}
+
+// Border side color utilities
+export const borderSideColorUtilities = {
+    ...Object.fromEntries(
+        Object.entries(colors).map(([key, value]) => [`border-t-${key}`, { "border-top-color": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(colors).map(([key, value]) => [`border-r-${key}`, { "border-right-color": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(colors).map(([key, value]) => [`border-b-${key}`, { "border-bottom-color": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(colors).map(([key, value]) => [`border-l-${key}`, { "border-left-color": value }])
+    ),
+}
+
+// Transform utilities
+export const transformUtilities = {
+    // Rotate
+    ...Object.fromEntries(
+        Object.entries(rotate).map(([key, value]) => [`rotate-${key}`, { "rotate": value }])
+    ),
+    // Negative rotate
+    ...Object.fromEntries(
+        Object.entries(rotate).filter(([k]) => k !== "0").map(([key, value]) => [`-rotate-${key}`, { "rotate": `-${value.replace("deg", "")}deg` }])
+    ),
+    // Scale (uniform)
+    ...Object.fromEntries(
+        Object.entries(scale).map(([key, value]) => [`scale-${key}`, { "scale": `${value} ${value}` }])
+    ),
+    // Scale X
+    ...Object.fromEntries(
+        Object.entries(scale).map(([key, value]) => [`scale-x-${key}`, { "scale": `${value} 1` }])
+    ),
+    // Scale Y
+    ...Object.fromEntries(
+        Object.entries(scale).map(([key, value]) => [`scale-y-${key}`, { "scale": `1 ${value}` }])
+    ),
+    // Translate X (using spacing values)
+    ...Object.fromEntries(
+        Object.entries(spacing).map(([key, value]) => [`translate-x-${key}`, { "translate": `${value} 0` }])
+    ),
+    // Translate Y (using spacing values)
+    ...Object.fromEntries(
+        Object.entries(spacing).map(([key, value]) => [`translate-y-${key}`, { "translate": `0 ${value}` }])
+    ),
+    // Negative translate
+    ...Object.fromEntries(
+        Object.entries(spacing).filter(([k]) => k !== "0" && k !== "px").map(([key, value]) => [`-translate-x-${key}`, { "translate": `-${value} 0` }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(spacing).filter(([k]) => k !== "0" && k !== "px").map(([key, value]) => [`-translate-y-${key}`, { "translate": `0 -${value}` }])
+    ),
+    // Transform origin
+    "origin-center": { "transform-origin": "center" },
+    "origin-top": { "transform-origin": "top" },
+    "origin-top-right": { "transform-origin": "top right" },
+    "origin-right": { "transform-origin": "right" },
+    "origin-bottom-right": { "transform-origin": "bottom right" },
+    "origin-bottom": { "transform-origin": "bottom" },
+    "origin-bottom-left": { "transform-origin": "bottom left" },
+    "origin-left": { "transform-origin": "left" },
+    "origin-top-left": { "transform-origin": "top left" },
+}
+
+// Transition utilities
+export const transitionUtilities = {
+    // Base transitions
+    "transition": { "transition-property": "all", "transition-duration": "150ms", "transition-timing-function": "ease" },
+    "transition-none": { "transition-property": "none" },
+    "transition-all": { "transition-property": "all", "transition-duration": "150ms", "transition-timing-function": "ease" },
+    "transition-colors": { "transition-property": "background-color, border-color, color", "transition-duration": "150ms", "transition-timing-function": "ease" },
+    "transition-opacity": { "transition-property": "opacity", "transition-duration": "150ms", "transition-timing-function": "ease" },
+    "transition-transform": { "transition-property": "rotate, scale, translate", "transition-duration": "150ms", "transition-timing-function": "ease" },
+    // Duration
+    ...Object.fromEntries(
+        Object.entries(transitionDuration).map(([key, value]) => [`duration-${key}`, { "transition-duration": value }])
+    ),
+    // Timing functions
+    "ease-linear": { "transition-timing-function": "linear" },
+    "ease-in": { "transition-timing-function": "ease-in" },
+    "ease-out": { "transition-timing-function": "ease-out" },
+    "ease-in-out": { "transition-timing-function": "ease-in-out" },
+    // Delay
+    ...Object.fromEntries(
+        Object.entries(transitionDuration).map(([key, value]) => [`delay-${key}`, { "transition-delay": value }])
+    ),
+}
+
+// Aspect ratio utilities (Note: USS aspect-ratio support may be limited)
+export const aspectRatioUtilities = {
+    "aspect-auto": { "aspect-ratio": "auto" },
+    "aspect-square": { "aspect-ratio": "1 / 1" },
+    "aspect-video": { "aspect-ratio": "16 / 9" },
+}
+
+// Letter spacing (tracking)
+export const letterSpacingUtilities = Object.fromEntries(
+    Object.entries(letterSpacing).map(([key, value]) => [`tracking-${key}`, { "letter-spacing": value }])
+)
+
 // ============================================================================
 // Combine all utilities
 // ============================================================================
@@ -452,6 +595,13 @@ export const allUtilities = {
     ...opacityUtilities,
     ...zIndexUtilities,
     ...positionUtilities,
+    ...flexBasisUtilities,
+    ...insetUtilities,
+    ...borderSideColorUtilities,
+    ...transformUtilities,
+    ...transitionUtilities,
+    ...aspectRatioUtilities,
+    ...letterSpacingUtilities,
 }
 
 export default allUtilities

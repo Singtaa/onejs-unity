@@ -80,8 +80,8 @@ const config = {
         // Transform ES6 imports from C# namespaces
         importTransformPlugin(),
 
-        // Tailwind CSS → USS transformation
-        tailwindPlugin({ tailwindConfig: "./tailwind.config.js" }),
+        // Tailwind utility classes → USS transformation
+        tailwindPlugin({ content: ["./**/*.{tsx,ts,jsx,js}"] }),
 
         // CSS Modules for .module.uss files
         ussModulesPlugin({ generateTypes: true }),
@@ -137,16 +137,19 @@ import "onejs:tailwind"
 
 **Features:**
 - JIT-style generation - only includes classes actually used in your source files
-- Full Tailwind color palette (slate, gray, red, blue, etc.)
+- Full Tailwind color palette (slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose)
 - Spacing scale (p-4, m-2, gap-4, etc.)
-- Flexbox utilities (flex, justify-center, items-center, etc.)
-- Typography (text-xl, font-bold, text-center, etc.)
-- Borders (border, rounded-lg, border-gray-500, etc.)
+- Flexbox utilities (flex, justify-center, items-center, flex-1, basis-1/2, etc.)
+- Typography (text-xl, font-bold, text-center, tracking-wide, etc.)
+- Borders (border, rounded-lg, border-gray-500, border-t-blue-500, etc.)
+- Transforms (rotate-45, scale-105, translate-x-4, origin-center, etc.)
+- Transitions (transition, duration-300, ease-in-out, delay-100, etc.)
 - Responsive breakpoints (sm:, md:, lg:, xl:, 2xl:)
-- Hover/focus variants (hover:bg-blue-700, etc.)
+- Hover/focus/active/disabled variants
+- Arbitrary values (w-[200], bg-[#ff5733], p-[15], etc.)
 
 **Transformations:**
-- Escapes special characters (`:` → `_c_`, `/` → `_s_`, etc.)
+- Escapes special characters (`:` → `_c_`, `/` → `_s_`, `[` → `_lb_`, etc.)
 - Converts responsive prefixes to ancestor selectors (`.sm .sm_c_p-4`)
 - Uses px values directly (no rem conversion needed)
 

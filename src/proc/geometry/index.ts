@@ -84,6 +84,7 @@ import {
     generateTorus,
     generateQuad
 } from "./primitives"
+import type { MaterialOptions } from "./primitives"
 import { builder, combine, MeshBuilder } from "./builder"
 import type {
     MeshData,
@@ -110,7 +111,7 @@ export type {
 
 // Re-export classes
 export { ProceduralMesh, MeshObject }
-export type { MeshBuilder }
+export type { MeshBuilder, MaterialOptions }
 
 // Re-export factory functions
 export {

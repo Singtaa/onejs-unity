@@ -239,6 +239,86 @@ function generateDeclarations(declarations) {
 }
 
 /**
+ * Parse arbitrary value from a class name like w-[200] or bg-[#ff5733]
+ * Returns { property, value } or null if not an arbitrary value
+ */
+function parseArbitraryValue(className) {
+    const match = className.match(/^(-?)([a-z]+(?:-[a-z]+)?)-\[([^\]]+)\]$/)
+    if (!match) return null
+
+    const [, negative, prefix, rawValue] = match
+    let value = rawValue
+
+    // Handle percentage
+    if (value.endsWith("%")) {
+        // Keep as-is
+    }
+    // Handle hex colors
+    else if (value.startsWith("#")) {
+        // Keep as-is
+    }
+    // Handle plain numbers (default to px)
+    else if (/^-?\d+(\.\d+)?$/.test(value)) {
+        value = `${negative}${value}px`
+    }
+
+    // Map prefix to CSS property
+    const propertyMap = {
+        "w": "width",
+        "h": "height",
+        "min-w": "min-width",
+        "min-h": "min-height",
+        "max-w": "max-width",
+        "max-h": "max-height",
+        "p": ["padding-top", "padding-right", "padding-bottom", "padding-left"],
+        "px": ["padding-left", "padding-right"],
+        "py": ["padding-top", "padding-bottom"],
+        "pt": "padding-top",
+        "pr": "padding-right",
+        "pb": "padding-bottom",
+        "pl": "padding-left",
+        "m": ["margin-top", "margin-right", "margin-bottom", "margin-left"],
+        "mx": ["margin-left", "margin-right"],
+        "my": ["margin-top", "margin-bottom"],
+        "mt": "margin-top",
+        "mr": "margin-right",
+        "mb": "margin-bottom",
+        "ml": "margin-left",
+        "top": "top",
+        "right": "right",
+        "bottom": "bottom",
+        "left": "left",
+        "gap": "gap",
+        "rounded": "border-radius",
+        "border": "border-width",
+        "text": value.startsWith("#") ? "color" : "font-size",
+        "bg": "background-color",
+        "opacity": "opacity",
+        "rotate": "rotate",
+        "scale": "scale",
+        "translate-x": "translate",
+        "translate-y": "translate",
+    }
+
+    const property = propertyMap[prefix]
+    if (!property) return null
+
+    // Handle translate specially
+    if (prefix === "translate-x") {
+        value = `${value} 0`
+    } else if (prefix === "translate-y") {
+        value = `0 ${value}`
+    }
+
+    // Handle multi-property values
+    if (Array.isArray(property)) {
+        return Object.fromEntries(property.map(p => [p, value]))
+    }
+
+    return { [property]: value }
+}
+
+/**
  * Generate USS for a set of class names
  */
 export function generateUSS(classNames, options = {}) {
@@ -256,7 +336,13 @@ export function generateUSS(classNames, options = {}) {
         const { base, variant, breakpoint } = parseClassName(className)
 
         // Look up the base utility
-        const declarations = allUtilities[base]
+        let declarations = allUtilities[base]
+
+        // If not found, try to parse as arbitrary value
+        if (!declarations) {
+            declarations = parseArbitraryValue(base)
+        }
+
         if (!declarations) {
             // Unknown utility class, skip
             continue

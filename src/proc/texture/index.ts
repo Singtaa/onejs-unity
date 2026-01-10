@@ -46,7 +46,12 @@ import {
     generateCheckerboard,
     generateGradient,
     colorMaps,
-    createTexture
+    createTexture,
+    ProceduralTexture,
+    checker,
+    gradient,
+    solid,
+    fromData
 } from "./generators"
 import { gpuTexture, registerPatternShader } from "./gpu"
 import type {
@@ -57,7 +62,13 @@ import type {
     CheckerboardTextureOptions,
     GradientTextureOptions,
     ColorMap,
-    RGBA
+    RGBA,
+    FilterMode,
+    WrapMode,
+    CheckerOptions,
+    SimpleGradientOptions,
+    SolidOptions,
+    FromDataOptions
 } from "./generators"
 import type { GPUPatternOptions } from "./gpu"
 
@@ -71,8 +82,17 @@ export type {
     GradientTextureOptions,
     ColorMap,
     RGBA,
-    GPUPatternOptions
+    GPUPatternOptions,
+    FilterMode,
+    WrapMode,
+    CheckerOptions,
+    SimpleGradientOptions,
+    SolidOptions,
+    FromDataOptions
 }
+
+// Re-export ProceduralTexture class
+export { ProceduralTexture } from "./generators"
 
 // Re-export generators
 export {
@@ -83,7 +103,11 @@ export {
     generateCheckerboard,
     generateGradient,
     colorMaps,
-    createTexture
+    createTexture,
+    checker,
+    gradient,
+    solid,
+    fromData
 } from "./generators"
 
 // Re-export GPU
@@ -93,10 +117,81 @@ export { gpuTexture, registerPatternShader } from "./gpu"
  * Unified texture generation API.
  *
  * Provides access to all texture generators through a single namespace.
+ *
+ * @example Fluent API (recommended)
+ * ```typescript
+ * import { texture } from "onejs-unity/proc"
+ *
+ * // Create checker texture for tiling
+ * const checkerTex = texture.checker({ colors: ["#e5e5e5", "#333"] })
+ *
+ * // Create gradient
+ * const gradientTex = texture.gradient({
+ *     colors: ["#ff0000", "#0000ff"],
+ *     direction: "horizontal"
+ * })
+ *
+ * // Use with mesh.material()
+ * mesh.plane({ width: 100, height: 100 })
+ *     .instantiate("Ground")
+ *     .material({ texture: checkerTex, tiling: 10 })
+ * ```
  */
 export const texture = {
     // =========================================================================
-    // CPU Generators
+    // Fluent Factory Functions (return ProceduralTexture)
+    // =========================================================================
+
+    /**
+     * Create a checkerboard texture.
+     *
+     * Creates a minimal 2x2 checker pattern by default for efficient tiling.
+     *
+     * @example
+     * ```typescript
+     * const tex = texture.checker({ colors: ["#e5e5e5", "#333333"] })
+     * meshObject.material({ texture: tex, tiling: 10 })
+     * ```
+     */
+    checker,
+
+    /**
+     * Create a gradient texture.
+     *
+     * @example
+     * ```typescript
+     * const tex = texture.gradient({
+     *     colors: ["#ff0000", "#0000ff"],
+     *     direction: "radial"
+     * })
+     * ```
+     */
+    gradient,
+
+    /**
+     * Create a solid color texture.
+     *
+     * @example
+     * ```typescript
+     * const tex = texture.solid({ color: "#ff5500" })
+     * ```
+     */
+    solid,
+
+    /**
+     * Create a ProceduralTexture from raw pixel data.
+     *
+     * @example
+     * ```typescript
+     * const data = new Uint8ClampedArray(256 * 256 * 4)
+     * // ... fill data ...
+     * const tex = texture.fromData({ data, width: 256, height: 256 })
+     * ```
+     */
+    fromData,
+
+    // =========================================================================
+    // Raw CPU Generators (return Uint8ClampedArray)
     // =========================================================================
 
     /**
@@ -140,12 +235,12 @@ export const texture = {
     checkerboard: generateCheckerboard,
 
     /**
-     * Generate a gradient texture (CPU).
+     * Generate a raw gradient (CPU).
      *
      * @param options - Gradient texture options
      * @returns RGBA pixel data
      */
-    gradient: generateGradient,
+    rawGradient: generateGradient,
 
     /**
      * Built-in color maps for noise-to-color conversion.

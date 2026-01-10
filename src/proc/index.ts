@@ -92,7 +92,7 @@ export {
     plane,
     torus,
     quad,
-    fromData,
+    fromData as meshFromData,  // Renamed to avoid conflict with texture.fromData
     builder,
     combine,
     // Pure generators (for advanced use - no Unity dependency)
@@ -104,6 +104,8 @@ export {
     generateTorus,
     generateQuad
 } from "./geometry"
+
+export type { MaterialOptions } from "./geometry"
 
 // =============================================================================
 // React Hooks
@@ -136,7 +138,7 @@ export type {
 // Texture Module
 // =============================================================================
 
-export { texture } from "./texture"
+export { texture, ProceduralTexture } from "./texture"
 export {
     generateNoise,
     generateVoronoi,
@@ -146,7 +148,12 @@ export {
     generateGradient,
     colorMaps,
     gpuTexture,
-    registerPatternShader
+    registerPatternShader,
+    // Fluent texture factories
+    checker,
+    gradient,
+    solid,
+    fromData as textureFromData  // Renamed to avoid confusion with mesh fromData
 } from "./texture"
 
 export type {
@@ -158,7 +165,14 @@ export type {
     GradientTextureOptions,
     ColorMap,
     RGBA,
-    GPUPatternOptions
+    GPUPatternOptions,
+    // New types
+    FilterMode,
+    WrapMode,
+    CheckerOptions,
+    SimpleGradientOptions,
+    SolidOptions,
+    FromDataOptions
 } from "./texture"
 
 // =============================================================================

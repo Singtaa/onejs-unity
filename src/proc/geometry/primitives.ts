@@ -19,6 +19,7 @@ import type {
     Vector3,
     Color
 } from "../types"
+import type { ProceduralTexture } from "../texture/generators"
 
 // =============================================================================
 // Pure JS Mesh Data Generators
@@ -569,6 +570,39 @@ export function generateQuad(options: QuadOptions = {}): MeshData {
 
 declare const CS: any
 
+// =============================================================================
+// Material Options
+// =============================================================================
+
+/**
+ * Options for configuring a material on a mesh.
+ *
+ * @example
+ * ```typescript
+ * meshObject.material({
+ *     texture: texture.checker({ colors: ["#e5e5e5", "#333"] }),
+ *     tiling: 10,
+ *     smoothness: 0.3
+ * })
+ * ```
+ */
+export interface MaterialOptions {
+    /** Procedural texture to apply */
+    texture?: ProceduralTexture
+    /** Texture tiling - number for uniform, [x, y] for separate */
+    tiling?: number | [number, number]
+    /** Texture offset */
+    offset?: [number, number]
+    /** Base color (hex string) */
+    color?: string
+    /** Metallic value 0-1 (default: 0) */
+    metallic?: number
+    /** Smoothness value 0-1 (default: 0.5) */
+    smoothness?: number
+    /** Shader name: "Lit", "Standard", "Unlit", or custom path */
+    shader?: string
+}
+
 /**
  * A procedural mesh that wraps Unity's Mesh object.
  * Mesh data is generated in JS and passed to Unity.
@@ -606,7 +640,7 @@ export class ProceduralMesh {
     }
 
     private _createUnityMesh(): any {
-        const mesh = CS.UnityEngine.Mesh.ctor()
+        const mesh = new CS.UnityEngine.Mesh()
         this._applyDataToMesh(mesh)
         return mesh
     }
@@ -614,37 +648,34 @@ export class ProceduralMesh {
     private _applyDataToMesh(mesh: any): void {
         const { vertices, normals, uvs, indices } = this._data
 
-        // Convert to Unity arrays
+        // Convert to JS arrays with object literals (new array marshaling)
         const vertCount = vertices.length / 3
-        const unityVerts = CS.UnityEngine.Vector3["[]"].ctor(vertCount)
-        const unityNormals = normals ? CS.UnityEngine.Vector3["[]"].ctor(vertCount) : null
-        const unityUVs = uvs ? CS.UnityEngine.Vector2["[]"].ctor(vertCount) : null
+        const unityVerts: any[] = []
+        const unityNormals: any[] = []
+        const unityUVs: any[] = []
 
         for (let i = 0; i < vertCount; i++) {
             const vi = i * 3
-            unityVerts[i] = CS.UnityEngine.Vector3.ctor(vertices[vi], vertices[vi + 1], vertices[vi + 2])
+            unityVerts.push({ x: vertices[vi], y: vertices[vi + 1], z: vertices[vi + 2] })
 
-            if (normals && unityNormals) {
-                unityNormals[i] = CS.UnityEngine.Vector3.ctor(normals[vi], normals[vi + 1], normals[vi + 2])
+            if (normals) {
+                unityNormals.push({ x: normals[vi], y: normals[vi + 1], z: normals[vi + 2] })
             }
 
-            if (uvs && unityUVs) {
+            if (uvs) {
                 const ui = i * 2
-                unityUVs[i] = CS.UnityEngine.Vector2.ctor(uvs[ui], uvs[ui + 1])
+                unityUVs.push({ x: uvs[ui], y: uvs[ui + 1] })
             }
         }
 
-        // Convert indices
-        const unityIndices = CS.System.Int32["[]"].ctor(indices.length)
-        for (let i = 0; i < indices.length; i++) {
-            unityIndices[i] = indices[i]
-        }
+        // Convert indices to Int32Array for triangles
+        const unityIndices = new Int32Array(indices)
 
-        // Apply to mesh
-        mesh.vertices = unityVerts
-        if (unityNormals) mesh.normals = unityNormals
-        if (unityUVs) mesh.uv = unityUVs
-        mesh.triangles = unityIndices
+        // Apply to mesh using new array marshaling (JS arrays auto-convert to C# arrays)
+        ;(mesh as any).vertices = unityVerts
+        if (normals) (mesh as any).normals = unityNormals
+        if (uvs) (mesh as any).uv = unityUVs
+        ;(mesh as any).triangles = unityIndices
 
         mesh.RecalculateBounds()
     }
@@ -683,7 +714,7 @@ export class ProceduralMesh {
      * Returns a MeshObject for further manipulation.
      */
     instantiate(name = "ProceduralMesh"): MeshObject {
-        const go = CS.UnityEngine.GameObject.ctor(name)
+        const go = new CS.UnityEngine.GameObject(name)
 
         // Add MeshFilter
         const meshFilter = go.AddComponent(CS.UnityEngine.MeshFilter)
@@ -691,7 +722,7 @@ export class ProceduralMesh {
 
         // Add MeshRenderer with default material
         const meshRenderer = go.AddComponent(CS.UnityEngine.MeshRenderer)
-        meshRenderer.material = CS.UnityEngine.Material.ctor(
+        meshRenderer.material = new CS.UnityEngine.Material(
             CS.UnityEngine.Shader.Find("Standard")
         )
 
@@ -741,19 +772,19 @@ export class MeshObject {
 
     /** Set world position */
     setPosition(x: number, y: number, z: number): this {
-        this._transform.position = CS.UnityEngine.Vector3.ctor(x, y, z)
+        this._transform.position = new CS.UnityEngine.Vector3(x, y, z)
         return this
     }
 
     /** Set euler rotation in degrees */
     setRotation(x: number, y: number, z: number): this {
-        this._transform.eulerAngles = CS.UnityEngine.Vector3.ctor(x, y, z)
+        this._transform.eulerAngles = new CS.UnityEngine.Vector3(x, y, z)
         return this
     }
 
     /** Set scale */
     setScale(x: number, y: number, z: number): this {
-        this._transform.localScale = CS.UnityEngine.Vector3.ctor(x, y, z)
+        this._transform.localScale = new CS.UnityEngine.Vector3(x, y, z)
         return this
     }
 
@@ -777,7 +808,7 @@ export class MeshObject {
             b = color.b
             a = color.a ?? 1
         }
-        this._renderer.material.color = CS.UnityEngine.Color.ctor(r, g, b, a)
+        this._renderer.material.color = new CS.UnityEngine.Color(r, g, b, a)
         return this
     }
 
@@ -791,8 +822,89 @@ export class MeshObject {
     useShader(shaderName: string): this {
         const shader = CS.UnityEngine.Shader.Find(shaderName)
         if (shader) {
-            this._renderer.material = CS.UnityEngine.Material.ctor(shader)
+            this._renderer.material = new CS.UnityEngine.Material(shader)
         }
+        return this
+    }
+
+    /**
+     * Configure material with texture, tiling, and PBR properties.
+     *
+     * @example
+     * ```typescript
+     * import { mesh, texture } from "onejs-unity/proc"
+     *
+     * mesh.plane({ width: 100, height: 100 })
+     *     .instantiate("Ground")
+     *     .material({
+     *         texture: texture.checker({ colors: ["#e5e5e5", "#333"] }),
+     *         tiling: 10,
+     *         smoothness: 0.3
+     *     })
+     * ```
+     */
+    material(options: MaterialOptions): this {
+        const {
+            texture,
+            tiling,
+            offset,
+            color,
+            metallic,
+            smoothness,
+            shader
+        } = options
+
+        // Determine shader - prefer URP Lit, fallback to Standard
+        // Note: Using Standard shader properties (mainTexture, mainTextureScale) for compatibility
+        const shaderName = shader === "Lit" ? "Universal Render Pipeline/Lit"
+            : shader === "Standard" ? "Standard"
+            : shader === "Unlit" ? "Unlit/Texture"
+            : shader || "Universal Render Pipeline/Lit"
+
+        let shaderObj = CS.UnityEngine.Shader.Find(shaderName)
+        if (!shaderObj) {
+            shaderObj = CS.UnityEngine.Shader.Find("Standard")
+        }
+
+        const mat = new CS.UnityEngine.Material(shaderObj)
+
+        // Apply texture using mainTexture (maps to _MainTex, works with Standard shader)
+        if (texture) {
+            mat.mainTexture = texture.getUnityTexture()
+        }
+
+        // Apply tiling
+        if (tiling !== undefined) {
+            const [tx, ty] = typeof tiling === "number" ? [tiling, tiling] : tiling
+            mat.mainTextureScale = new CS.UnityEngine.Vector2(tx, ty)
+        }
+
+        // Apply offset
+        if (offset) {
+            mat.mainTextureOffset = new CS.UnityEngine.Vector2(offset[0], offset[1])
+        }
+
+        // Apply color
+        if (color) {
+            const hex = color.replace("#", "")
+            const r = parseInt(hex.slice(0, 2), 16) / 255
+            const g = parseInt(hex.slice(2, 4), 16) / 255
+            const b = parseInt(hex.slice(4, 6), 16) / 255
+            const a = hex.length > 6 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
+            mat.color = new CS.UnityEngine.Color(r, g, b, a)
+        }
+
+        // Apply metallic
+        if (metallic !== undefined) {
+            mat.SetFloat("_Metallic", metallic)
+        }
+
+        // Apply smoothness (Standard shader uses _Glossiness)
+        if (smoothness !== undefined) {
+            mat.SetFloat("_Glossiness", smoothness)
+        }
+
+        this._renderer.material = mat
         return this
     }
 

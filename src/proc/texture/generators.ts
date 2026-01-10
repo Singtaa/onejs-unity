@@ -476,3 +476,305 @@ export function createTexture(
     // For now, return the data for the caller to handle
     return { data, width, height }
 }
+
+// =============================================================================
+// ProceduralTexture Class
+// =============================================================================
+
+declare const CS: any
+
+/**
+ * Filter mode for textures.
+ */
+export type FilterMode = "point" | "bilinear" | "trilinear"
+
+/**
+ * Wrap mode for textures.
+ */
+export type WrapMode = "repeat" | "clamp"
+
+/**
+ * A procedural texture that wraps Unity's Texture2D.
+ *
+ * Provides a fluent API for texture configuration and lazy Unity texture creation.
+ *
+ * @example
+ * ```typescript
+ * const tex = texture.checker({ colors: ["#fff", "#333"] })
+ *     .filter("point")
+ *     .wrap("repeat")
+ *
+ * // Use in material
+ * meshObject.material({ texture: tex, tiling: 10 })
+ * ```
+ */
+export class ProceduralTexture {
+    private _texture: any = null
+    private _filterMode: FilterMode = "point"
+    private _wrapMode: WrapMode = "repeat"
+    private _width: number
+    private _height: number
+    private _data: Uint8ClampedArray
+
+    constructor(data: Uint8ClampedArray, width: number, height: number) {
+        this._data = data
+        this._width = width
+        this._height = height
+    }
+
+    /** Get texture width */
+    get width(): number {
+        return this._width
+    }
+
+    /** Get texture height */
+    get height(): number {
+        return this._height
+    }
+
+    /**
+     * Set texture filter mode.
+     * @param mode - "point" for pixelated, "bilinear" for smooth, "trilinear" for smooth with mipmaps
+     */
+    filter(mode: FilterMode): this {
+        this._filterMode = mode
+        if (this._texture) {
+            const filterEnum = mode === "point" ? 0 : mode === "bilinear" ? 1 : 2
+            this._texture.filterMode = filterEnum
+        }
+        return this
+    }
+
+    /**
+     * Set texture wrap mode.
+     * @param mode - "repeat" for tiling, "clamp" for edge clamping
+     */
+    wrap(mode: WrapMode): this {
+        this._wrapMode = mode
+        if (this._texture) {
+            const wrapEnum = mode === "repeat" ? 0 : 1
+            this._texture.wrapMode = wrapEnum
+        }
+        return this
+    }
+
+    /**
+     * Get the underlying Unity Texture2D.
+     * Creates the texture on first access (lazy initialization).
+     */
+    getUnityTexture(): any {
+        if (!this._texture) {
+            this._texture = this._createUnityTexture()
+        }
+        return this._texture
+    }
+
+    private _createUnityTexture(): any {
+        // Create Texture2D with RGBA32 format
+        const tex = new CS.UnityEngine.Texture2D(
+            this._width,
+            this._height,
+            CS.UnityEngine.TextureFormat.RGBA32,
+            false  // No mipmaps for procedural textures
+        )
+
+        // Set filter mode
+        const filterEnum = this._filterMode === "point" ? 0 : this._filterMode === "bilinear" ? 1 : 2
+        tex.filterMode = filterEnum
+
+        // Set wrap mode
+        const wrapEnum = this._wrapMode === "repeat" ? 0 : 1
+        tex.wrapMode = wrapEnum
+
+        // Convert pixel data to Unity Color array
+        const colors: any[] = []
+        for (let i = 0; i < this._data.length; i += 4) {
+            colors.push({
+                r: this._data[i] / 255,
+                g: this._data[i + 1] / 255,
+                b: this._data[i + 2] / 255,
+                a: this._data[i + 3] / 255
+            })
+        }
+
+        // Set pixels using array marshaling
+        ;(tex as any).SetPixels(colors)
+        tex.Apply()
+
+        return tex
+    }
+
+    /**
+     * Dispose Unity resources.
+     * Call when the texture is no longer needed.
+     */
+    dispose(): void {
+        if (this._texture) {
+            CS.UnityEngine.Object.Destroy(this._texture)
+            this._texture = null
+        }
+    }
+}
+
+// =============================================================================
+// Convenience Texture Factories
+// =============================================================================
+
+/**
+ * Parse a color from hex string or RGBA tuple.
+ */
+function parseColor(color: string | RGBA): RGBA {
+    if (Array.isArray(color)) return color
+
+    const hex = color.replace("#", "")
+    const r = parseInt(hex.slice(0, 2), 16) / 255
+    const g = parseInt(hex.slice(2, 4), 16) / 255
+    const b = parseInt(hex.slice(4, 6), 16) / 255
+    const a = hex.length > 6 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
+
+    return [r, g, b, a]
+}
+
+/**
+ * Options for checker texture.
+ */
+export interface CheckerOptions {
+    /** Two colors as hex strings or RGBA tuples */
+    colors: [string | RGBA, string | RGBA]
+    /** Texture size in pixels (default: 2 for minimal 2x2) */
+    size?: number
+}
+
+/**
+ * Create a checkerboard texture.
+ *
+ * Creates a minimal 2x2 checker pattern by default, which tiles efficiently.
+ *
+ * @example
+ * ```typescript
+ * const tex = checker({ colors: ["#e5e5e5", "#333333"] })
+ * meshObject.material({ texture: tex, tiling: 10 })
+ * ```
+ */
+export function checker(options: CheckerOptions): ProceduralTexture {
+    const { colors, size = 2 } = options
+    const color1 = parseColor(colors[0])
+    const color2 = parseColor(colors[1])
+
+    // For a proper checker, each pixel should be its own cell
+    // A 2x2 texture with cellsX=2, cellsY=2 gives the classic checker pattern
+    const data = generateCheckerboard({
+        width: size,
+        height: size,
+        cellsX: size,
+        cellsY: size,
+        color1,
+        color2
+    })
+
+    return new ProceduralTexture(data, size, size)
+        .filter("point")
+        .wrap("repeat")
+}
+
+/**
+ * Options for gradient texture.
+ */
+export interface SimpleGradientOptions {
+    /** Two colors as hex strings or RGBA tuples */
+    colors: [string | RGBA, string | RGBA]
+    /** Gradient direction (default: "horizontal") */
+    direction?: "horizontal" | "vertical" | "diagonal" | "radial"
+    /** Texture size in pixels (default: 256) */
+    size?: number
+}
+
+/**
+ * Create a gradient texture.
+ *
+ * @example
+ * ```typescript
+ * const tex = gradient({
+ *     colors: ["#ff0000", "#0000ff"],
+ *     direction: "horizontal"
+ * })
+ * ```
+ */
+export function gradient(options: SimpleGradientOptions): ProceduralTexture {
+    const { colors, direction = "horizontal", size = 256 } = options
+    const startColor = parseColor(colors[0])
+    const endColor = parseColor(colors[1])
+
+    const data = generateGradient({
+        width: size,
+        height: size,
+        direction,
+        startColor,
+        endColor
+    })
+
+    return new ProceduralTexture(data, size, size)
+        .filter("bilinear")
+        .wrap("clamp")
+}
+
+/**
+ * Options for solid color texture.
+ */
+export interface SolidOptions {
+    /** Color as hex string or RGBA tuple */
+    color: string | RGBA
+    /** Texture size in pixels (default: 1) */
+    size?: number
+}
+
+/**
+ * Create a solid color texture.
+ *
+ * @example
+ * ```typescript
+ * const tex = solid({ color: "#ff5500" })
+ * ```
+ */
+export function solid(options: SolidOptions): ProceduralTexture {
+    const { color, size = 1 } = options
+    const rgba = parseColor(color)
+
+    const data = new Uint8ClampedArray(size * size * 4)
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = rgba[0] * 255
+        data[i + 1] = rgba[1] * 255
+        data[i + 2] = rgba[2] * 255
+        data[i + 3] = rgba[3] * 255
+    }
+
+    return new ProceduralTexture(data, size, size)
+        .filter("point")
+        .wrap("repeat")
+}
+
+/**
+ * Options for creating texture from raw data.
+ */
+export interface FromDataOptions {
+    /** RGBA pixel data */
+    data: Uint8ClampedArray
+    /** Texture width */
+    width: number
+    /** Texture height */
+    height: number
+}
+
+/**
+ * Create a ProceduralTexture from raw pixel data.
+ *
+ * @example
+ * ```typescript
+ * const customData = new Uint8ClampedArray(256 * 256 * 4)
+ * // ... fill data ...
+ * const tex = fromData({ data: customData, width: 256, height: 256 })
+ * ```
+ */
+export function fromData(options: FromDataOptions): ProceduralTexture {
+    return new ProceduralTexture(options.data, options.width, options.height)
+}

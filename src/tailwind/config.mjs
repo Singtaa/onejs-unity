@@ -120,6 +120,19 @@ export const colors = {
     "neutral-900": "#171717",
     "neutral-950": "#0a0a0a",
 
+    // Stone
+    "stone-50": "#fafaf9",
+    "stone-100": "#f5f5f4",
+    "stone-200": "#e7e5e4",
+    "stone-300": "#d6d3d1",
+    "stone-400": "#a8a29e",
+    "stone-500": "#78716c",
+    "stone-600": "#57534e",
+    "stone-700": "#44403c",
+    "stone-800": "#292524",
+    "stone-900": "#1c1917",
+    "stone-950": "#0c0a09",
+
     // Red
     "red-50": "#fef2f2",
     "red-100": "#fee2e2",
@@ -428,7 +441,7 @@ export const breakpoints = {
     "2xl": 1536,
 }
 
-// Z-index scale
+// Z-index scale (Note: USS may have limited z-index support)
 export const zIndex = {
     "0": "0",
     "10": "10",
@@ -436,6 +449,56 @@ export const zIndex = {
     "30": "30",
     "40": "40",
     "50": "50",
+}
+
+// Transition durations (in milliseconds)
+export const transitionDuration = {
+    "0": "0ms",
+    "75": "75ms",
+    "100": "100ms",
+    "150": "150ms",
+    "200": "200ms",
+    "300": "300ms",
+    "500": "500ms",
+    "700": "700ms",
+    "1000": "1000ms",
+}
+
+// Rotation values (in degrees)
+export const rotate = {
+    "0": "0deg",
+    "1": "1deg",
+    "2": "2deg",
+    "3": "3deg",
+    "6": "6deg",
+    "12": "12deg",
+    "45": "45deg",
+    "90": "90deg",
+    "180": "180deg",
+}
+
+// Scale values (as decimal multipliers)
+export const scale = {
+    "0": "0",
+    "50": "0.5",
+    "75": "0.75",
+    "90": "0.9",
+    "95": "0.95",
+    "100": "1",
+    "105": "1.05",
+    "110": "1.1",
+    "125": "1.25",
+    "150": "1.5",
+}
+
+// Letter spacing (tracking)
+export const letterSpacing = {
+    "tighter": "-0.05em",
+    "tight": "-0.025em",
+    "normal": "0em",
+    "wide": "0.025em",
+    "wider": "0.05em",
+    "widest": "0.1em",
 }
 
 export default {
@@ -449,4 +512,8 @@ export default {
     opacity,
     breakpoints,
     zIndex,
+    transitionDuration,
+    rotate,
+    scale,
+    letterSpacing,
 }
