@@ -73,10 +73,13 @@ During Unity builds, these are copied flat to `StreamingAssets/onejs/assets/@my-
 ### esbuild Plugins
 
 ```javascript
-import { ussModulesPlugin, tailwindPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
+import { importTransformPlugin, ussModulesPlugin, tailwindPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
 
 const config = {
     plugins: [
+        // Transform ES6 imports from C# namespaces
+        importTransformPlugin(),
+
         // Tailwind CSS → USS transformation
         tailwindPlugin({ tailwindConfig: "./tailwind.config.js" }),
 
@@ -89,17 +92,63 @@ const config = {
 }
 ```
 
+#### `importTransformPlugin(options)`
+
+Transforms ES6 imports from C# namespaces (modules starting with uppercase) into `CS.*` references at build time.
+
+```typescript
+// Input (your source code)
+import { Texture2D, Material, Shader } from "UnityEngine"
+import { List, Dictionary } from "System.Collections.Generic"
+
+// Output (after transform)
+const { Texture2D, Material, Shader } = CS.UnityEngine
+const { List, Dictionary } = CS.System.Collections.Generic
+```
+
+This allows you to write idiomatic ES6 imports instead of manual destructuring:
+
+```typescript
+// Before (manual destructuring)
+declare const CS: any
+const { GameObject, Mesh, Vector3 } = CS.UnityEngine
+
+// After (ES6 imports with transform)
+import { GameObject, Mesh, Vector3 } from "UnityEngine"
+```
+
+**Options:**
+- `filter` - Custom function `(moduleName: string) => boolean` to control which modules are transformed. Default: transforms modules starting with uppercase letter.
+
 #### `tailwindPlugin(options)`
 
-Compiles Tailwind CSS to USS-compatible output and embeds it in the JS bundle.
+Built-in Tailwind-like utility class generator for USS. **No external `tailwindcss` dependency required.**
 
-- `tailwindConfig` - Path to tailwind.config.js (default: `"./tailwind.config.js"`)
+```tsx
+// In your code, just add this import to activate
+import "onejs:tailwind"
 
-Transformations:
+// Then use Tailwind classes as usual
+<View className="p-4 bg-gray-900 hover:bg-gray-800 sm:p-6" />
+```
+
+**Options:**
+- `content` - Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`)
+
+**Features:**
+- JIT-style generation - only includes classes actually used in your source files
+- Full Tailwind color palette (slate, gray, red, blue, etc.)
+- Spacing scale (p-4, m-2, gap-4, etc.)
+- Flexbox utilities (flex, justify-center, items-center, etc.)
+- Typography (text-xl, font-bold, text-center, etc.)
+- Borders (border, rounded-lg, border-gray-500, etc.)
+- Responsive breakpoints (sm:, md:, lg:, xl:, 2xl:)
+- Hover/focus variants (hover:bg-blue-700, etc.)
+
+**Transformations:**
 - Escapes special characters (`:` → `_c_`, `/` → `_s_`, etc.)
-- Converts media queries to breakpoint class prefixes
-- Converts `rem` to `px`
-- Converts modern color syntax to `rgba()`
+- Converts responsive prefixes to ancestor selectors (`.sm .sm_c_p-4`)
+- Uses px values directly (no rem conversion needed)
 
 #### `ussModulesPlugin(options)`
 
@@ -365,8 +414,10 @@ The `za` module uses `__zaInvokeN` native functions that pass primitives directl
 When using the build plugins:
 
 ```bash
-npm install -D esbuild postcss tailwindcss
+npm install -D esbuild
 ```
+
+Note: `tailwindcss` and `postcss` are **not required** - OneJS includes a built-in Tailwind utility generator.
 
 ## License
 
