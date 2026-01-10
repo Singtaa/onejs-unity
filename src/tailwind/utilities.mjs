@@ -202,20 +202,20 @@ export const staticUtilities = {
     "invisible": { "visibility": "hidden" },
 
     // Border styles
-    "border-solid": { "border-style": "solid" }, // Note: USS may not use this
+    // NOTE: USS does not have border-style property - borders are always solid
     "border-none": { "border-width": "0" },
 
     // Background
     "bg-transparent": { "background-color": "transparent" },
-    "bg-current": { "background-color": "currentColor" },
+    // NOTE: USS does not support currentColor - use explicit colors instead
 
     // Text colors
     "text-transparent": { "color": "transparent" },
-    "text-current": { "color": "currentColor" },
+    // NOTE: USS does not support currentColor - use explicit colors instead
 
     // Border colors
     "border-transparent": { "border-color": "transparent" },
-    "border-current": { "border-color": "currentColor" },
+    // NOTE: USS does not support currentColor - use explicit colors instead
 }
 
 // ============================================================================
@@ -415,6 +415,8 @@ export const opacityUtilities = Object.fromEntries(
 )
 
 // Z-index utilities
+// NOTE: USS does NOT support z-index property - element order is determined by hierarchy position
+// These utilities are intentionally omitted from allUtilities
 export const zIndexUtilities = Object.fromEntries(
     Object.entries(zIndex).map(([key, value]) => [`z-${key}`, { "z-index": value }])
 )
@@ -601,7 +603,7 @@ export const allUtilities = {
     ...borderRadiusUtilities,
     ...borderWidthUtilities,
     ...opacityUtilities,
-    ...zIndexUtilities,
+    // NOTE: zIndexUtilities intentionally omitted - USS doesn't support z-index
     ...positionUtilities,
     ...flexBasisUtilities,
     ...insetUtilities,
