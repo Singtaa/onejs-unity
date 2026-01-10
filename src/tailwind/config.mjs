@@ -492,13 +492,15 @@ export const scale = {
 }
 
 // Letter spacing (tracking)
+// NOTE: USS does not support em units, so we use px approximations
+// (based on 16px base font size: -0.05em ≈ -0.8px, etc.)
 export const letterSpacing = {
-    "tighter": "-0.05em",
-    "tight": "-0.025em",
-    "normal": "0em",
-    "wide": "0.025em",
-    "wider": "0.05em",
-    "widest": "0.1em",
+    "tighter": "-0.8px",
+    "tight": "-0.4px",
+    "normal": "0",
+    "wide": "0.4px",
+    "wider": "0.8px",
+    "widest": "1.6px",
 }
 
 export default {

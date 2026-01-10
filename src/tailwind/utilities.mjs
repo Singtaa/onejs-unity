@@ -159,11 +159,9 @@ export const staticUtilities = {
     "font-italic": { "-unity-font-style": "italic" },
     "font-bold-italic": { "-unity-font-style": "bold-and-italic" },
 
-    // Text transform (Note: USS may not support all text-transform values)
-    "uppercase": { "text-transform": "uppercase" }, // Note: USS may not support this
-    "lowercase": { "text-transform": "lowercase" },
-    "capitalize": { "text-transform": "capitalize" },
-    "normal-case": { "text-transform": "none" },
+    // Text transform - NOT SUPPORTED in USS
+    // Use rich text tags (<uppercase>, <lowercase>) or C# string methods instead
+    // These utilities are intentionally omitted
 
     // White space
     "whitespace-normal": { "white-space": "normal" },
@@ -325,13 +323,21 @@ export const fontSizeUtilities = Object.fromEntries(
 )
 
 // Font weight utilities
-export const fontWeightUtilities = Object.fromEntries(
-    Object.entries(fontWeight).map(([key, value]) => [`font-${key}`, { "-unity-font-style": value === "700" ? "bold" : "normal" }])
-)
-// Also add direct font-weight for USS
-Object.entries(fontWeight).forEach(([key, value]) => {
-    fontWeightUtilities[`font-${key}`] = { "font-weight": value }
-})
+// NOTE: USS only supports -unity-font-style with values: normal, bold, italic, bold-and-italic
+// Standard CSS font-weight (100-900) is NOT supported in USS
+// We map font-bold to -unity-font-style: bold, others to normal
+export const fontWeightUtilities = {
+    // Only bold has a meaningful mapping in USS
+    "font-thin": { "-unity-font-style": "normal" },
+    "font-extralight": { "-unity-font-style": "normal" },
+    "font-light": { "-unity-font-style": "normal" },
+    "font-normal": { "-unity-font-style": "normal" },
+    "font-medium": { "-unity-font-style": "normal" },
+    "font-semibold": { "-unity-font-style": "bold" },
+    "font-bold": { "-unity-font-style": "bold" },
+    "font-extrabold": { "-unity-font-style": "bold" },
+    "font-black": { "-unity-font-style": "bold" },
+}
 
 // Border radius utilities
 export const borderRadiusUtilities = {

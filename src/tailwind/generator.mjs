@@ -288,7 +288,7 @@ function parseArbitraryValue(className) {
         "right": "right",
         "bottom": "bottom",
         "left": "left",
-        "gap": "gap",
+        // NOTE: "gap" is NOT supported in USS - use margins on children instead
         "rounded": "border-radius",
         "border": "border-width",
         "text": value.startsWith("#") ? "color" : "font-size",
