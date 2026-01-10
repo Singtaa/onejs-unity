@@ -138,7 +138,7 @@ import "onejs:tailwind"
 **Features:**
 - JIT-style generation - only includes classes actually used in your source files
 - Full Tailwind color palette (slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose)
-- Spacing scale (p-4, m-2, gap-4, etc.)
+- Spacing scale (p-4, m-2, mt-4, etc.)
 - Flexbox utilities (flex, justify-center, items-center, flex-1, basis-1/2, etc.)
 - Typography (text-xl, font-bold, text-center, tracking-wide, etc.)
 - Borders (border, rounded-lg, border-gray-500, border-t-blue-500, etc.)

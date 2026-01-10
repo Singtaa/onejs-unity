@@ -262,10 +262,12 @@ export const marginUtilities = {
     "ml-auto": { "margin-left": "auto" },
 }
 
-// Gap utilities (for flex containers)
+// Gap utilities - NOTE: USS does NOT support the gap property!
+// These are kept for API compatibility but will have no effect.
+// Use margin/padding on child elements instead.
 export const gapUtilities = {
-    ...spacingUtilities("gap", ["gap"]),
-    // Note: USS might not support row-gap/column-gap separately
+    // Intentionally empty - gap is not supported in USS
+    // Users should use margins on children as a workaround
 }
 
 // Width utilities
