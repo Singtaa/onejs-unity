@@ -148,6 +148,14 @@ import "onejs:tailwind"
 - Hover/focus/active/disabled variants
 - Arbitrary values (w-[200], bg-[#ff5733], p-[15], etc.)
 
+**USS Limitations:**
+- No `gap` property - use margins on children instead
+- No `z-index` - element order determined by hierarchy position
+- No numeric `font-weight` (100-900) - only `font-normal`/`font-bold` via `-unity-font-style`
+- No `text-transform` - use rich text tags or C# string methods
+- No `currentColor` - use explicit color values
+- `letter-spacing` uses px values (USS doesn't support em/rem)
+
 **Transformations:**
 - Escapes special characters (`:` → `_c_`, `/` → `_s_`, `[` → `_lb_`, etc.)
 - Converts responsive prefixes to ancestor selectors (`.sm .sm_c_p-4`)
