@@ -68,6 +68,8 @@
  * @module
  */
 
+declare const CS: any
+
 // Native zero-alloc invoke functions (registered by quickjs_unity.c)
 declare const __zaInvoke0: (bindingId: number) => unknown
 declare const __zaInvoke1: (bindingId: number, a0: unknown) => unknown

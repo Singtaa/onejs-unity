@@ -9,6 +9,8 @@
 
 import type { GPUTextureOptions } from "../types"
 
+declare function require(id: string): any
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -16,7 +18,7 @@ import type { GPUTextureOptions } from "../types"
 /**
  * RenderTexture handle from gpu module.
  */
-interface RenderTexture {
+export interface RenderTexture {
     __handle: number
     width: number
     height: number
@@ -86,7 +88,7 @@ function getCompute() {
             }
         }
     }
-    return _compute
+    return _compute!
 }
 
 // =============================================================================

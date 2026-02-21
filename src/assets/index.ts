@@ -13,6 +13,10 @@
 
 declare const CS: any
 
+declare global {
+    var __workingDir: string | undefined
+}
+
 // Manifest is loaded once and cached
 let manifestCache: AssetManifest | null = null
 
