@@ -12,6 +12,10 @@
  */
 
 declare const CS: any
+declare function useExtensions(typeRef: any): void
+
+// Register ImageConversion extension methods so tex.LoadImage(bytes) works
+useExtensions(CS.UnityEngine.ImageConversion)
 
 declare global {
     var __workingDir: string | undefined
@@ -116,10 +120,13 @@ function resolveAssetPath(assetPath: string): string {
 }
 
 /**
- * Load a texture from an asset path
+ * Load an image from an asset path. Supports raster images (PNG, JPG) and SVG files.
  *
- * @param assetPath - Relative path (e.g., "@rainbow-sample/bg.png" or "images/logo.png")
- * @returns Texture2D
+ * - Raster images return a Texture2D
+ * - SVG files return a VectorImage (parsed and tessellated at runtime)
+ *
+ * @param assetPath - Relative path (e.g., "images/logo.png", "icons/star.svg")
+ * @returns Texture2D or VectorImage
  */
 export function loadImage(assetPath: string): any {
     const fullPath = resolveAssetPath(assetPath)
@@ -129,11 +136,25 @@ export function loadImage(assetPath: string): any {
         throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
     }
 
+    if (assetPath.toLowerCase().endsWith(".svg")) {
+        return _loadSVG(fullPath)
+    }
+
     const bytes = File.ReadAllBytes(fullPath)
     const tex = new CS.UnityEngine.Texture2D(2, 2)
     tex.LoadImage(bytes)
     tex.filterMode = CS.UnityEngine.FilterMode.Bilinear
     return tex
+}
+
+/**
+ * Parse an SVG file and return a VectorImage.
+ * Delegates to C# SVGUtils.LoadFromString to avoid SceneInfo struct
+ * crossing the JS interop boundary (struct serialization loses complex properties).
+ */
+function _loadSVG(fullPath: string): any {
+    const svgText = CS.System.IO.File.ReadAllText(fullPath)
+    return CS.OneJS.SVGUtils.LoadFromString(svgText)
 }
 
 /**
