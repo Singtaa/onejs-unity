@@ -168,12 +168,15 @@ export function ussModulesPlugin(options = {}) {
 
                 // Generate JavaScript module
                 const classMapJson = JSON.stringify(classMap, null, 4)
+                // Normalize to forward slashes to avoid \u being
+                // interpreted as a Unicode escape sequence on Windows
+                const safeRelativePath = relativePath.replace(/\\/g, "/")
 
-                const jsContent = `// USS Module: ${relativePath}
+                const jsContent = `// USS Module: ${safeRelativePath}
 // Auto-generated - do not edit
 
 const css = \`${escapedUss}\`
-compileStyleSheet(css, "${relativePath}")
+compileStyleSheet(css, "${safeRelativePath}")
 
 const styles = ${classMapJson}
 export default styles
