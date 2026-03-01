@@ -255,3 +255,18 @@ export function assetExists(assetPath: string): boolean {
 export function getAssetPath(assetPath: string): string {
     return resolveAssetPath(assetPath)
 }
+
+/**
+ * Load a Unity resource asynchronously from the Resources folder.
+ * This is a typed wrapper around the global `loadResourceAsync`.
+ *
+ * @param path - Resource path (relative to Resources folder, no extension)
+ * @param type - Optional C# Type to load as (e.g., CS.UnityEngine.TextAsset)
+ * @returns Promise resolving to the loaded asset or null
+ */
+export async function loadResourceAsync(path: string, type?: any): Promise<any> {
+    if (type) {
+        return await CS.OneJS.AssetLoader.LoadResourceAsync(path, type)
+    }
+    return await CS.OneJS.AssetLoader.LoadResourceAsync(path)
+}
