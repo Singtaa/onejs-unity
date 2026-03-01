@@ -61,9 +61,11 @@ function colorUtilities(prefix, property) {
     const result = {}
     for (const [colorKey, colorValue] of Object.entries(colors)) {
         result[`${prefix}-${colorKey}`] = { [property]: colorValue }
-        for (const [opacityKey, opacityValue] of Object.entries(opacity)) {
-            const opacityHex = Math.round(opacityValue * 255).toString(16).padStart(2, '0')
-            result[`${prefix}-${colorKey}/${opacityKey}`] = { [property]: `${colorValue}${opacityHex}` }
+        if (colorValue.startsWith("#")) {
+            for (const [opacityKey, opacityValue] of Object.entries(opacity)) {
+                const opacityHex = Math.round(opacityValue * 255).toString(16).padStart(2, "0")
+                result[`${prefix}-${colorKey}/${opacityKey}`] = { [property]: `${colorValue}${opacityHex}` }
+            }
         }
     }
     return result
