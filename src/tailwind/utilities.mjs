@@ -294,7 +294,13 @@ export const minMaxWidthUtilities = {
         Object.entries(spacing).map(([key, value]) => [`min-w-${key}`, { "min-width": value }])
     ),
     ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`min-w-${key}`, { "min-width": value }])
+    ),
+    ...Object.fromEntries(
         Object.entries(spacing).map(([key, value]) => [`max-w-${key}`, { "max-width": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`max-w-${key}`, { "max-width": value }])
     ),
 }
 
@@ -304,7 +310,13 @@ export const minMaxHeightUtilities = {
         Object.entries(spacing).map(([key, value]) => [`min-h-${key}`, { "min-height": value }])
     ),
     ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`min-h-${key}`, { "min-height": value }])
+    ),
+    ...Object.fromEntries(
         Object.entries(spacing).map(([key, value]) => [`max-h-${key}`, { "max-height": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`max-h-${key}`, { "max-height": value }])
     ),
 }
 
@@ -421,19 +433,31 @@ export const zIndexUtilities = Object.fromEntries(
     Object.entries(zIndex).map(([key, value]) => [`z-${key}`, { "z-index": value }])
 )
 
-// Position utilities (top, right, bottom, left with spacing values)
+// Position utilities (top, right, bottom, left with spacing and percentage values)
 export const positionUtilities = {
     ...Object.fromEntries(
         Object.entries(spacing).map(([key, value]) => [`top-${key}`, { "top": value }])
     ),
     ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`top-${key}`, { "top": value }])
+    ),
+    ...Object.fromEntries(
         Object.entries(spacing).map(([key, value]) => [`right-${key}`, { "right": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`right-${key}`, { "right": value }])
     ),
     ...Object.fromEntries(
         Object.entries(spacing).map(([key, value]) => [`bottom-${key}`, { "bottom": value }])
     ),
     ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`bottom-${key}`, { "bottom": value }])
+    ),
+    ...Object.fromEntries(
         Object.entries(spacing).map(([key, value]) => [`left-${key}`, { "left": value }])
+    ),
+    ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [`left-${key}`, { "left": value }])
     ),
     // Negative positions
     ...Object.fromEntries(
@@ -470,12 +494,27 @@ export const insetUtilities = {
         ])
     ),
     ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [
+            `inset-${key}`, { "top": value, "right": value, "bottom": value, "left": value }
+        ])
+    ),
+    ...Object.fromEntries(
         Object.entries(spacing).filter(([k]) => k !== "0").map(([key, value]) => [
             `inset-x-${key}`, { "left": value, "right": value }
         ])
     ),
     ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [
+            `inset-x-${key}`, { "left": value, "right": value }
+        ])
+    ),
+    ...Object.fromEntries(
         Object.entries(spacing).filter(([k]) => k !== "0").map(([key, value]) => [
+            `inset-y-${key}`, { "top": value, "bottom": value }
+        ])
+    ),
+    ...Object.fromEntries(
+        Object.entries(percentages).map(([key, value]) => [
             `inset-y-${key}`, { "top": value, "bottom": value }
         ])
     ),
