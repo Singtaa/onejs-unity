@@ -375,7 +375,7 @@ export function generateUSS(classNames, options = {}) {
         uss += `/* OneJS Tailwind Reset */\n* {\n    margin: 0;\n    padding: 0;\n}\n\n`
     }
 
-    uss += `/* USS variable declarations */\n:root {\n    --tw-scale-x: 1;\n    --tw-scale-y: 1;\n    --tw-translate-x: 0;\n    --tw-translate-y: 0;\n}\n\n`
+    uss += `/* USS variable declarations */\n* {\n    --tw-scale-x: 1;\n    --tw-scale-y: 1;\n    --tw-translate-x: 0;\n    --tw-translate-y: 0;\n}\n\n`
     
     uss += `/* Base utilities */\n`
     uss += rules.join("\n\n")
