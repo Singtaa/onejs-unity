@@ -660,11 +660,11 @@ export const transitionUtilities = {
     ),
 }
 
-// Aspect ratio utilities (Note: USS aspect-ratio support may be limited)
+// Aspect ratio utilities (USS expects a decimal value, not a fraction)
 export const aspectRatioUtilities = {
     "aspect-auto": { "aspect-ratio": "auto" },
-    "aspect-square": { "aspect-ratio": "1 / 1" },
-    "aspect-video": { "aspect-ratio": "16 / 9" },
+    "aspect-square": { "aspect-ratio": "1" },
+    "aspect-video": { "aspect-ratio": `${16 / 9}` },
 }
 
 // Letter spacing (tracking)

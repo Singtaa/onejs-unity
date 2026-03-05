@@ -61,7 +61,6 @@ const UNSUPPORTED_PROPERTIES = new Set([
     "will-change",
     "contain",
     "content-visibility",
-    "aspect-ratio",
     "object-fit",
     "object-position",
     "mix-blend-mode",
