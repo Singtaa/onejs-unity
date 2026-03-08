@@ -54,7 +54,8 @@ export function escapeClassName(name) {
 
 /**
  * Extract class names from a source file content
- * Handles: className="...", className={`...`}, className={clsx(...)}
+ * Handles: className="...", className={`...`}, className={expr},
+ *          className={clsx(...)}, ternaries, logical &&, etc.
  */
 export function extractClassNames(content) {
     const classNames = new Set()
@@ -68,27 +69,101 @@ export function extractClassNames(content) {
     }
 
     // Match className={`...`} (template literals)
+    // Extract static parts AND string literals inside ${...} expressions
     const templatePattern = /class(?:Name)?=\{`([^`]+)`\}/g
     while ((match = templatePattern.exec(content)) !== null) {
-        // Extract static parts, ignore ${...} expressions
+        // Extract static parts
         const staticParts = match[1].replace(/\$\{[^}]+\}/g, " ")
-        const classes = staticParts.split(/\s+/).filter(Boolean)
-        classes.forEach(c => classNames.add(c))
+        staticParts.split(/\s+/).filter(Boolean).forEach(c => classNames.add(c))
+
+        // Also extract string literals inside ${...} expressions
+        // e.g. className={`p-4 ${active ? "bg-blue-500" : "bg-gray-500"}`}
+        const exprMatches = match[1].matchAll(/\$\{([^}]+)\}/g)
+        for (const exprMatch of exprMatches) {
+            extractStringLiterals(exprMatch[1]).forEach(c => classNames.add(c))
+        }
     }
 
-    // Match className={clsx(...)} or className={cn(...)} patterns
-    // This is a simplified extraction - gets string literals inside
-    const clsxPattern = /class(?:Name)?=\{(?:clsx|cn|classnames)\(([^)]+)\)\}/g
-    while ((match = clsxPattern.exec(content)) !== null) {
-        // Extract string literals from the arguments
-        const stringLiterals = match[1].match(/["']([^"']+)["']/g) || []
-        stringLiterals.forEach(lit => {
-            const classes = lit.slice(1, -1).split(/\s+/).filter(Boolean)
-            classes.forEach(c => classNames.add(c))
-        })
+    // Match className={...} (any expression)
+    // Uses brace-depth tracking to handle nested braces correctly
+    const exprStarts = [...content.matchAll(/class(?:Name)?=\{/g)]
+    for (const exprStart of exprStarts) {
+        const startIdx = exprStart.index + exprStart[0].length
+        const expr = extractBracedExpression(content, startIdx)
+        if (expr !== null) {
+            // Skip template literals (already handled above)
+            if (expr.trimStart().startsWith("`")) continue
+            extractStringLiterals(expr).forEach(c => classNames.add(c))
+        }
     }
 
     return classNames
+}
+
+/**
+ * Extract the content of a braced expression, handling nested braces.
+ * Starts after the opening brace. Returns the content before the matching close brace.
+ */
+function extractBracedExpression(content, startIdx) {
+    let depth = 1
+    let i = startIdx
+    while (i < content.length && depth > 0) {
+        const ch = content[i]
+        if (ch === "{") depth++
+        else if (ch === "}") depth--
+        // Skip string contents
+        else if (ch === '"' || ch === "'" || ch === "`") {
+            i = skipString(content, i)
+            continue
+        }
+        i++
+    }
+    if (depth !== 0) return null
+    return content.slice(startIdx, i - 1)
+}
+
+/**
+ * Skip past a quoted string (handles escape sequences).
+ * Returns the index after the closing quote.
+ */
+function skipString(content, startIdx) {
+    const quote = content[startIdx]
+    let i = startIdx + 1
+    while (i < content.length) {
+        if (content[i] === "\\") { i += 2; continue }
+        if (content[i] === quote) return i + 1
+        // Template literal ${} nesting
+        if (quote === "`" && content[i] === "$" && content[i + 1] === "{") {
+            i += 2
+            let depth = 1
+            while (i < content.length && depth > 0) {
+                if (content[i] === "{") depth++
+                else if (content[i] === "}") depth--
+                else if (content[i] === '"' || content[i] === "'" || content[i] === "`") {
+                    i = skipString(content, i)
+                    continue
+                }
+                i++
+            }
+            continue
+        }
+        i++
+    }
+    return i
+}
+
+/**
+ * Extract all Tailwind class names from string literals within an expression.
+ * Finds all "..." and '...' strings and splits them into individual class names.
+ */
+function extractStringLiterals(expr) {
+    const classes = new Set()
+    const stringLitPattern = /["']([^"']+)["']/g
+    let match
+    while ((match = stringLitPattern.exec(expr)) !== null) {
+        match[1].split(/\s+/).filter(Boolean).forEach(c => classes.add(c))
+    }
+    return classes
 }
 
 /**
@@ -405,6 +480,13 @@ export function generateUSS(classNames, options = {}) {
  */
 export async function generateFromFiles(contentPatterns, options = {}) {
     const classNames = await scanFiles(contentPatterns)
+
+    // Merge safelist classes
+    const { safelist = [] } = options
+    for (const cls of safelist) {
+        classNames.add(cls)
+    }
+
     return generateUSS(classNames, options)
 }
 
