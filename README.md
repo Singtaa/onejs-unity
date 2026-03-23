@@ -40,8 +40,8 @@ const config = loadJson("@my-ui-kit/config.json")
 ### Asset Functions
 
 - `loadImage(path)` - Load as Texture2D
-- `loadFont(path)` - Load as Font
-- `loadFontDefinition(path)` - Load as FontDefinition (for UI Toolkit)
+- `loadFont(path)` - Load as FontAsset (SDF)
+- `loadFontDefinition(path)` - Load as FontDefinition (for UI Toolkit styling)
 - `loadText(path)` - Load as string
 - `loadJson<T>(path)` - Load and parse JSON
 - `loadBytes(path)` - Load as Uint8Array

@@ -161,7 +161,7 @@ function _loadSVG(fullPath: string): any {
  * Load a font from an asset path
  *
  * @param assetPath - Relative path to font file
- * @returns Font
+ * @returns FontAsset
  */
 export function loadFont(assetPath: string): any {
     const fullPath = resolveAssetPath(assetPath)
@@ -171,7 +171,8 @@ export function loadFont(assetPath: string): any {
         throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
     }
 
-    return new CS.UnityEngine.Font(fullPath)
+    const legacyFont = new CS.UnityEngine.Font(fullPath)
+    return CS.UnityEngine.TextCore.Text.FontAsset.CreateFontAsset(legacyFont)
 }
 
 /**
@@ -181,8 +182,8 @@ export function loadFont(assetPath: string): any {
  * @returns FontDefinition
  */
 export function loadFontDefinition(assetPath: string): any {
-    const font = loadFont(assetPath)
-    return CS.UnityEngine.UIElements.FontDefinition.FromFont(font)
+    const fontAsset = loadFont(assetPath)
+    return CS.UnityEngine.UIElements.FontDefinition.FromSDFFont(fontAsset)
 }
 
 /**
