@@ -427,10 +427,24 @@ export function generateUSS(classNames, options = {}) {
         const escapedClass = escapeClassName(className)
 
         // Build the selector
-        let selector = `.${escapedClass}`
-        if (variant) {
-            // Add pseudo-class
-            selector += `:${variant}`
+        //
+        // `group-<pseudo>:` and `peer-<pseudo>:` variants are not real pseudo-
+        // classes — they mean "apply when an ancestor (.group) or sibling
+        // (.peer) has the given state". In USS this becomes a descendant or
+        // sibling combinator, NOT a pseudo-class on the target element. Naive
+        // `${selector}:${variant}` produced e.g. `.group-focus_c_X:group-focus`
+        // which Unity's USS parser rejects with "Unknown pseudo class 'group-focus'".
+        let selector
+        if (variant && variant.startsWith("group-")) {
+            const pseudo = variant.slice("group-".length)
+            selector = `.group:${pseudo} .${escapedClass}`
+        } else if (variant && variant.startsWith("peer-")) {
+            const pseudo = variant.slice("peer-".length)
+            selector = `.peer:${pseudo} ~ .${escapedClass}`
+        } else if (variant) {
+            selector = `.${escapedClass}:${variant}`
+        } else {
+            selector = `.${escapedClass}`
         }
 
         // Generate the rule

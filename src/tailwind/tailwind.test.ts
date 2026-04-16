@@ -377,6 +377,21 @@ describe("generateUSS", () => {
         expect(uss).toContain("background-color:")
     })
 
+    it("generates USS with group-<pseudo> as ancestor selector", () => {
+        // group-focus:bg-blue-500 must expand to a descendant combinator
+        // ".group:focus .group-focus_c_bg-blue-500", NOT attach "group-focus"
+        // as a pseudo-class (which Unity USS rejects as unknown).
+        const uss = generateUSS(new Set(["group-focus:bg-blue-500"]))
+        expect(uss).toContain(".group:focus .group-focus_c_bg-blue-500")
+        expect(uss).not.toContain(":group-focus")
+    })
+
+    it("generates USS with peer-<pseudo> as sibling selector", () => {
+        const uss = generateUSS(new Set(["peer-focus:bg-blue-500"]))
+        expect(uss).toContain(".peer:focus ~ .peer-focus_c_bg-blue-500")
+        expect(uss).not.toContain(":peer-focus")
+    })
+
     it("generates USS with breakpoint ancestor selector", () => {
         const uss = generateUSS(new Set(["lg:p-8"]))
         expect(uss).toContain(".lg .lg_c_p-8")
