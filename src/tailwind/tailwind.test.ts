@@ -436,6 +436,14 @@ describe("generateUSS", () => {
         expect(uss).toMatch(/rgba\(\s*255\s*,\s*87\s*,\s*51\s*,\s*0\.97\s*\)/)
     })
 
+    it("expands * variant to a universal-child combinator", () => {
+        // `*:opacity-50` must target direct children, not the element itself.
+        // Naive `${selector}:${variant}` would emit `.escaped:*` (invalid).
+        const uss = generateUSS(new Set(["*:opacity-50"]))
+        expect(uss).toContain("._ast__c_opacity-50 > *")
+        expect(uss).not.toMatch(/\._ast__c_opacity-50:/)
+    })
+
     it("generates USS with breakpoint ancestor selector", () => {
         const uss = generateUSS(new Set(["lg:p-8"]))
         expect(uss).toContain(".lg .lg_c_p-8")

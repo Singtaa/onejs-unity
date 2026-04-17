@@ -550,6 +550,11 @@ export function generateUSS(classNames, options = {}) {
         if (variant && variant.startsWith("[") && variant.endsWith("]")) {
             const rawSelector = variant.slice(1, -1)
             selector = rawSelector.replace(/&/g, `.${escapedClass}`)
+        } else if (variant === "*") {
+            // Tailwind's `*` variant targets every direct child, not the
+            // element itself. Attaching `:*` as a pseudo-class would be
+            // invalid USS — emit a universal-child combinator instead.
+            selector = `.${escapedClass} > *`
         } else if (variant && variant.startsWith("group-")) {
             const pseudo = variant.slice("group-".length)
             selector = `.group:${pseudo} .${escapedClass}`
