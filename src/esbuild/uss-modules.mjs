@@ -41,13 +41,16 @@ function generateHash(filePath) {
  * @returns {Object} Map of original class name to scoped name
  */
 function extractClassNames(ussContent, hash) {
+    // Strip /* ... */ comments first so prose like "e.g. a frame" isn't scraped as a
+    // phantom `.g` class into the generated styles map / .d.ts.
+    const withoutComments = ussContent.replace(/\/\*[\s\S]*?\*\//g, "")
     // Match class selectors that start with a dot followed by valid CSS identifier
     // This regex captures class names but not pseudo-class names (which follow :)
     const classRegex = /\.([a-zA-Z_][\w-]*)/g
     const classMap = {}
     let match
 
-    while ((match = classRegex.exec(ussContent)) !== null) {
+    while ((match = classRegex.exec(withoutComments)) !== null) {
         const className = match[1]
 
         // Skip:
