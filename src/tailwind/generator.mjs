@@ -263,45 +263,34 @@ function matchesPattern(filePath, pattern) {
  */
 export function parseClassName(className) {
     const parts = className.split(":")
-    let base = parts[parts.length - 1]
+    const base = parts[parts.length - 1]
+    const prefixes = parts.slice(0, -1) // everything before the base utility
     let variant = null
     let breakpoint = null
 
-    // Check for breakpoint prefix
-    if (parts.length >= 2) {
-        const firstPart = parts[0]
-        if (breakpoints[firstPart] !== undefined || firstPart === "2xl") {
-            breakpoint = firstPart
-            if (parts.length === 3) {
-                variant = parts[1]
-            }
-        } else {
-            // First part is a variant (hover, focus, etc.)
-            variant = firstPart
-            if (parts.length === 3) {
-                breakpoint = parts[0]
-                variant = parts[1]
-            }
+    // Classify each prefix independently. `breakpoint` is only ever set to a known
+    // breakpoint token, so downstream `breakpointRules[breakpoint]` is always a real
+    // bucket - an unrecognized prefix (e.g. the leading "active" in
+    // "active:hover:bg-blue-500", an unsupported stacked variant) becomes the variant
+    // rather than a bogus breakpoint that would crash generation. Order-independent:
+    // both "lg:hover:..." and "hover:lg:..." resolve correctly.
+    for (const p of prefixes) {
+        if (breakpoint === null && isBreakpoint(p)) {
+            breakpoint = p
+        } else if (variant === null) {
+            variant = p
         }
-    }
-
-    // Re-parse for correct order: breakpoint:variant:base
-    if (parts.length === 3) {
-        breakpoint = parts[0]
-        variant = parts[1]
-        base = parts[2]
-    } else if (parts.length === 2) {
-        const first = parts[0]
-        if (breakpoints[first] !== undefined || first === "2xl") {
-            breakpoint = first
-            base = parts[1]
-        } else {
-            variant = first
-            base = parts[1]
-        }
+        // Extra prefixes beyond one breakpoint + one variant are ignored: OneJS's
+        // generator models a single variant, so stacked variants degrade gracefully.
     }
 
     return { base, variant, breakpoint }
+}
+
+// A prefix token is a breakpoint if it's a configured breakpoint or the built-in
+// "2xl" (which is tracked as a separate bucket, not part of the `breakpoints` map).
+function isBreakpoint(token) {
+    return breakpoints[token] !== undefined || token === "2xl"
 }
 
 /**
@@ -572,7 +561,10 @@ export function generateUSS(classNames, options = {}) {
         // Generate the rule
         const rule = `${selector} {\n${generateDeclarations(declarations)}\n}`
 
-        if (breakpoint) {
+        // parseClassName only ever yields a known breakpoint, but guard the bucket
+        // lookup anyway so an unexpected value degrades to an unscoped rule instead
+        // of throwing and failing the whole build.
+        if (breakpoint && breakpointRules[breakpoint]) {
             breakpointRules[breakpoint].push(rule)
         } else {
             rules.push(rule)

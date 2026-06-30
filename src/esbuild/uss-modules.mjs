@@ -56,14 +56,13 @@ function extractClassNames(ussContent, hash) {
         // Skip:
         // - Already scoped names (contain __)
         // - Unity built-in classes (start with unity-)
-        // - Pseudo-class parts that might leak through
+        // Note: pseudo-classes (:hover, :active, ...) follow a ":" and so are never
+        // captured by the dot-anchored regex above. Earlier code also skipped any
+        // class *starting with* a pseudo-class word, which wrongly dropped legitimate
+        // classes like .hoverCard / .activeTab / .disabled (left unscoped, missing
+        // from the .d.ts, resolving to `undefined` at runtime). Those checks are gone.
         if (!className.includes("__") &&
-            !className.startsWith("unity-") &&
-            !className.startsWith("hover") &&
-            !className.startsWith("active") &&
-            !className.startsWith("focus") &&
-            !className.startsWith("checked") &&
-            !className.startsWith("disabled")) {
+            !className.startsWith("unity-")) {
             classMap[className] = `${className}__${hash}`
         }
     }
