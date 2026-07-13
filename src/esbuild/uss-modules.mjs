@@ -16,6 +16,12 @@ import crypto from "crypto"
  *   .primary__a1b2c3 { background-color: blue; }`;
  *   compileStyleSheet(css, "components/Button.module.uss");
  *   export default { container: "container__a1b2c3", primary: "primary__a1b2c3" };
+ *
+ * `:global(...)` (standard CSS Modules syntax) opts a selector segment out of
+ * scoping: `.button:global(.focus-ring)` emits `.button__a1b2c3.focus-ring`.
+ * Use it for classes applied at runtime by shared managers (e.g. the
+ * focus-visible manager's literal `focus-ring`). Global names are not exported
+ * in the styles map / .d.ts.
  */
 
 /**
@@ -29,14 +35,41 @@ function generateHash(filePath) {
 }
 
 /**
+ * Masks `:global(...)` segments with dot-free placeholders so their classes are
+ * neither extracted nor scoped, and returns the segments for later restoration
+ * (unwrapped: `:global(.foo)` restores as `.foo`).
+ * @param {string} ussContent - Raw USS content
+ * @returns {{ masked: string, globals: string[] }}
+ */
+function maskGlobals(ussContent) {
+    const globals = []
+    //  delimiters: not word characters, so a placeholder butting up against a
+    // class name in a compound selector (`.button:global(.focus-ring)`) does not
+    // block that class's own scoping regex, and the class regex can't capture into it.
+    const masked = ussContent.replace(/:global\(([^)]*)\)/g, (_, inner) => {
+        globals.push(inner.trim())
+        return `G${globals.length - 1}`
+    })
+    return { masked, globals }
+}
+
+/**
+ * Restores masked `:global(...)` segments as their unwrapped (unscoped) content.
+ */
+function restoreGlobals(content, globals) {
+    return content.replace(/G(\d+)/g, (_, i) => globals[Number(i)])
+}
+
+/**
  * Extracts class names from USS content
  * Handles:
  * - Simple class selectors: .className
  * - Pseudo-classes: .className:hover (extracts className, not hover)
  * - Descendant selectors: .parent .child
  * - Multiple selectors: .a, .b
+ * - `:global(.name)` segments are excluded (masked before extraction)
  *
- * @param {string} ussContent - Raw USS content
+ * @param {string} ussContent - USS content with :global segments already masked
  * @param {string} hash - Hash to append to class names
  * @returns {Object} Map of original class name to scoped name
  */
@@ -151,9 +184,12 @@ export function ussModulesPlugin(options = {}) {
                 const relativePath = path.relative(process.cwd(), args.path)
                 const hash = generateHash(relativePath)
 
-                // Extract and scope class names
-                const classMap = extractClassNames(ussContent, hash)
-                const scopedUss = scopeClassNames(ussContent, classMap)
+                // Extract and scope class names. :global(...) segments are masked
+                // first so they are neither extracted nor scoped, then restored
+                // unwrapped (`.button:global(.focus-ring)` -> `.button__hash.focus-ring`).
+                const { masked, globals } = maskGlobals(ussContent)
+                const classMap = extractClassNames(masked, hash)
+                const scopedUss = restoreGlobals(scopeClassNames(masked, classMap), globals)
 
                 // Generate TypeScript declarations
                 if (generateTypes) {
