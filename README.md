@@ -40,13 +40,18 @@ const config = loadJson("@my-ui-kit/config.json")
 ### Asset Functions
 
 - `loadImage(path)` - Load as Texture2D
+- `loadImageAsync(path)` - Async `loadImage`, works on all platforms
 - `loadFont(path)` - Load as FontAsset (SDF)
 - `loadFontDefinition(path)` - Load as FontDefinition (for UI Toolkit styling)
 - `loadText(path)` - Load as string
+- `loadTextAsync(path)` - Async `loadText`, works on all platforms
 - `loadJson<T>(path)` - Load and parse JSON
+- `loadJsonAsync<T>(path)` - Async `loadJson`, works on all platforms
 - `loadBytes(path)` - Load as Uint8Array
 - `assetExists(path)` - Check if asset exists
 - `getAssetPath(path)` - Get resolved full path
+
+On Android and WebGL builds, StreamingAssets is a URL (`jar:file://...` inside the APK, `http(s)://...` on WebGL) that `System.IO.File` cannot read. The synchronous functions throw a descriptive error there; the `*Async` variants load through UnityWebRequest and work everywhere (resolving immediately where the sync path is available).
 
 ### Creating Asset Packages
 

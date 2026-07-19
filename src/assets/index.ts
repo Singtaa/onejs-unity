@@ -15,10 +15,20 @@
  *
  *   // Load package assets (prefixed with @package-name/)
  *   const tex = loadImage("@rainbow-sample/bg.png")
+ *
+ * Platform note: on Android and WebGL builds, StreamingAssets is a URL
+ * (jar:file://...apk!/assets or http://...) that synchronous file APIs cannot
+ * read. Use the async variants there - they work on every platform:
+ *
+ *   const logo = await loadImageAsync("images/logo.png")
+ *   const config = await loadJsonAsync("data/config.json")
  */
 
 declare const CS: any
 declare function useExtensions(typeRef: any): void
+// fetch is provided by QuickJSBootstrap.js (UnityWebRequest-backed) on native
+// platforms and by the browser on WebGL
+declare function fetch(url: string): Promise<{ ok: boolean; status: number; text(): Promise<string> }>
 
 // Register ImageConversion extension methods so tex.LoadImage(bytes) works
 useExtensions(CS.UnityEngine.ImageConversion)
@@ -47,6 +57,27 @@ interface AssetManifest {
  */
 function isEditor(): boolean {
     return CS.UnityEngine.Application.isEditor === true
+}
+
+/**
+ * True when a resolved path is a URL rather than a plain file path.
+ * On Android, streamingAssetsPath is jar:file://...apk!/assets; on WebGL it's
+ * http(s). System.IO.File cannot read those - they need UnityWebRequest.
+ */
+function isUrlPath(path: string): boolean {
+    return path.includes("://")
+}
+
+/**
+ * Throw a descriptive error when a sync loader is pointed at a URL path.
+ */
+function assertFileReadable(fullPath: string, assetPath: string, hint: string): void {
+    if (isUrlPath(fullPath)) {
+        throw new Error(
+            `Asset "${assetPath}" resolved to a URL (${fullPath}). StreamingAssets ` +
+            `is not file-readable on this platform (Android/WebGL). ${hint}`
+        )
+    }
 }
 
 /**
@@ -126,6 +157,10 @@ function resolveAssetPath(assetPath: string): string {
     } else {
         // Build mode - everything is in StreamingAssets/onejs/assets/
         const streamingAssets = CS.UnityEngine.Application.streamingAssetsPath
+        if (isUrlPath(streamingAssets)) {
+            // URL base (Android APK, WebGL) - join manually, Path.Combine is for file paths
+            return `${streamingAssets}/onejs/assets/${assetPath}`
+        }
         return Path.Combine(streamingAssets, "onejs", "assets", assetPath)
     }
 }
@@ -143,6 +178,7 @@ function resolveAssetPath(assetPath: string): string {
  */
 export function loadImage(assetPath: string): any {
     const fullPath = resolveAssetPath(assetPath)
+    assertFileReadable(fullPath, assetPath, "Use loadImageAsync() instead.")
 
     const File = CS.System.IO.File
     if (!File.Exists(fullPath)) {
@@ -156,6 +192,39 @@ export function loadImage(assetPath: string): any {
     const bytes = File.ReadAllBytes(fullPath)
     const tex = new CS.UnityEngine.Texture2D(2, 2)
     tex.LoadImage(bytes)
+    tex.filterMode = CS.UnityEngine.FilterMode.Bilinear
+    return tex
+}
+
+/**
+ * Load an image from an asset path, working on every platform.
+ *
+ * Same as loadImage, but resolves asynchronously via UnityWebRequest when
+ * StreamingAssets is a URL (Android APK, WebGL). On platforms where the sync
+ * path works, it is used directly and the promise resolves immediately.
+ *
+ * @param assetPath - Relative path (e.g., "images/logo.png") or absolute path
+ * @returns Promise resolving to a Texture2D or VectorImage
+ */
+export async function loadImageAsync(assetPath: string): Promise<any> {
+    const fullPath = resolveAssetPath(assetPath)
+    if (!isUrlPath(fullPath)) {
+        return loadImage(assetPath)
+    }
+
+    if (assetPath.toLowerCase().endsWith(".svg")) {
+        const res = await fetch(fullPath)
+        if (!res.ok) {
+            throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
+        }
+        const svgText = await res.text()
+        return CS.OneJS.SVGUtils.LoadFromString(svgText)
+    }
+
+    const tex = await CS.OneJS.Network.LoadTextureFromUrl(fullPath)
+    if (!tex) {
+        throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
+    }
     tex.filterMode = CS.UnityEngine.FilterMode.Bilinear
     return tex
 }
@@ -178,6 +247,8 @@ function _loadSVG(fullPath: string): any {
  */
 export function loadFont(assetPath: string): any {
     const fullPath = resolveAssetPath(assetPath)
+    assertFileReadable(fullPath, assetPath,
+        "Runtime font loading is not available here - use a font in Resources/ instead.")
 
     const File = CS.System.IO.File
     if (!File.Exists(fullPath)) {
@@ -207,6 +278,7 @@ export function loadFontDefinition(assetPath: string): any {
  */
 export function loadText(assetPath: string): string {
     const fullPath = resolveAssetPath(assetPath)
+    assertFileReadable(fullPath, assetPath, "Use loadTextAsync() or loadJsonAsync() instead.")
 
     const File = CS.System.IO.File
     if (!File.Exists(fullPath)) {
@@ -214,6 +286,28 @@ export function loadText(assetPath: string): string {
     }
 
     return File.ReadAllText(fullPath)
+}
+
+/**
+ * Load text from an asset path, working on every platform.
+ *
+ * Same as loadText, but resolves asynchronously via UnityWebRequest when
+ * StreamingAssets is a URL (Android APK, WebGL).
+ *
+ * @param assetPath - Relative path to text file
+ * @returns Promise resolving to the string content
+ */
+export async function loadTextAsync(assetPath: string): Promise<string> {
+    const fullPath = resolveAssetPath(assetPath)
+    if (!isUrlPath(fullPath)) {
+        return loadText(assetPath)
+    }
+
+    const res = await fetch(fullPath)
+    if (!res.ok) {
+        throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
+    }
+    return await res.text()
 }
 
 /**
@@ -228,6 +322,20 @@ export function loadJson<T = any>(assetPath: string): T {
 }
 
 /**
+ * Load JSON from an asset path, working on every platform.
+ *
+ * Same as loadJson, but resolves asynchronously via UnityWebRequest when
+ * StreamingAssets is a URL (Android APK, WebGL).
+ *
+ * @param assetPath - Relative path to JSON file
+ * @returns Promise resolving to the parsed JSON object
+ */
+export async function loadJsonAsync<T = any>(assetPath: string): Promise<T> {
+    const text = await loadTextAsync(assetPath)
+    return JSON.parse(text)
+}
+
+/**
  * Load raw bytes from an asset path
  *
  * @param assetPath - Relative path to file
@@ -235,6 +343,8 @@ export function loadJson<T = any>(assetPath: string): T {
  */
 export function loadBytes(assetPath: string): Uint8Array {
     const fullPath = resolveAssetPath(assetPath)
+    assertFileReadable(fullPath, assetPath,
+        "Copy the file to Application.persistentDataPath first, or load it as a Unity Resource.")
 
     const File = CS.System.IO.File
     if (!File.Exists(fullPath)) {
@@ -252,11 +362,15 @@ export function loadBytes(assetPath: string): Uint8Array {
 /**
  * Check if an asset exists
  *
+ * Note: on platforms where StreamingAssets is a URL (Android APK, WebGL) this
+ * always returns false - existence can't be checked synchronously there.
+ *
  * @param assetPath - Relative path to check
  * @returns true if asset exists
  */
 export function assetExists(assetPath: string): boolean {
     const fullPath = resolveAssetPath(assetPath)
+    if (isUrlPath(fullPath)) return false
     return CS.System.IO.File.Exists(fullPath)
 }
 
