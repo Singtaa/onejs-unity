@@ -4,7 +4,7 @@
  * Provides a way to call C# methods from JavaScript with reduced or eliminated
  * managed heap allocations, making it suitable for performance-critical code.
  *
- * @see CS.QuickJSNative for the C# side of this API
+ * @see CS.OneJS.QuickJSNative for the C# side of this API
  *
  * ## Two Binding Modes
  *
@@ -132,7 +132,7 @@ export function bind(typeName: string, methodName: string, argCount: number): Ze
 
     // Request binding from C# - this returns the binding ID
     // We use the regular CS proxy for setup (one-time allocation is OK)
-    const bindingId = CS.QuickJSNative.RegisterZeroAllocMethodBinding(typeName, methodName, argCount)
+    const bindingId = CS.OneJS.QuickJSNative.RegisterZeroAllocMethodBinding(typeName, methodName, argCount)
 
     if (bindingId <= 0) {
         throw new Error(`interop.bind: Failed to bind ${typeName}.${methodName}`)
@@ -326,7 +326,7 @@ export function zaStatic<T extends MethodSchema>(typeName: string, methods: T): 
         }
 
         // Register binding with C# (one-time cost)
-        const bindingId = CS.QuickJSNative.RegisterZeroAllocMethodBinding(typeName, methodName, argCount)
+        const bindingId = CS.OneJS.QuickJSNative.RegisterZeroAllocMethodBinding(typeName, methodName, argCount)
 
         if (bindingId <= 0) {
             throw new Error(`za.static: Failed to bind ${typeName}.${methodName}. ` +
