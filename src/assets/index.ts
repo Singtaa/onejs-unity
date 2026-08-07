@@ -200,6 +200,10 @@ export function loadImage(assetPath: string): any {
     const tex = new CS.UnityEngine.Texture2D(2, 2)
     tex.LoadImage(bytes)
     tex.filterMode = CS.UnityEngine.FilterMode.Bilinear
+    // Runtime-created textures default to wrap mode Repeat, which bleeds the
+    // opposite edge into the border under bilinear sampling - a hairline of
+    // stray pixels on any art that touches the image edge. UI wants Clamp.
+    tex.wrapMode = CS.UnityEngine.TextureWrapMode.Clamp
     return tex
 }
 
@@ -233,6 +237,7 @@ export async function loadImageAsync(assetPath: string): Promise<any> {
         throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
     }
     tex.filterMode = CS.UnityEngine.FilterMode.Bilinear
+    tex.wrapMode = CS.UnityEngine.TextureWrapMode.Clamp
     return tex
 }
 
