@@ -126,6 +126,13 @@ function loadManifest(): AssetManifest {
  * - Relative paths resolve to working directory (Editor) or StreamingAssets (Build)
  */
 function resolveAssetPath(assetPath: string): string {
+    // URLs bypass resolution entirely: prepending the assets folder would
+    // mangle them into "{workingDir}/assets/https://..." and the URL loaders
+    // downstream would never see a fetchable address.
+    if (isUrlPath(assetPath)) {
+        return assetPath
+    }
+
     const Path = CS.System.IO.Path
 
     // Absolute paths bypass asset resolution entirely
