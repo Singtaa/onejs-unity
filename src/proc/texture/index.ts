@@ -197,7 +197,7 @@ export const texture = {
     /**
      * Generate a noise texture (CPU).
      *
-     * @param options - Noise texture options
+     * @param options: Noise texture options
      * @returns RGBA pixel data as Uint8ClampedArray
      */
     noise: generateNoise,
@@ -205,7 +205,7 @@ export const texture = {
     /**
      * Generate a voronoi/cellular texture (CPU).
      *
-     * @param options - Voronoi texture options
+     * @param options: Voronoi texture options
      * @returns RGBA pixel data
      */
     voronoi: generateVoronoi,
@@ -213,7 +213,7 @@ export const texture = {
     /**
      * Generate a marble texture (CPU).
      *
-     * @param options - Marble texture options
+     * @param options: Marble texture options
      * @returns RGBA pixel data
      */
     marble: generateMarble,
@@ -221,7 +221,7 @@ export const texture = {
     /**
      * Generate a wood grain texture (CPU).
      *
-     * @param options - Wood texture options
+     * @param options: Wood texture options
      * @returns RGBA pixel data
      */
     wood: generateWood,
@@ -229,7 +229,7 @@ export const texture = {
     /**
      * Generate a checkerboard texture (CPU).
      *
-     * @param options - Checkerboard texture options
+     * @param options: Checkerboard texture options
      * @returns RGBA pixel data
      */
     checkerboard: generateCheckerboard,
@@ -237,7 +237,7 @@ export const texture = {
     /**
      * Generate a raw gradient (CPU).
      *
-     * @param options - Gradient texture options
+     * @param options: Gradient texture options
      * @returns RGBA pixel data
      */
     rawGradient: generateGradient,

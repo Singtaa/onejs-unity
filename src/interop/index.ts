@@ -31,7 +31,7 @@
  * // At init time
  * const setFloat = interop.bind("OneJS.GPU.GPUBridge", "SetFloat", 3)
  *
- * // Per-frame - uses reflection, allocates object[] for args
+ * // Per-frame: uses reflection, allocates object[] for args
  * setFloat(handle, "_Time", time)
  * ```
  *
@@ -253,7 +253,7 @@ function getArgCount(spec: MethodSpec): number {
 
 /**
  * Proxy type with methods matching the schema.
- * All methods return unknown - use type assertions at call site if needed.
+ * All methods return unknown: use type assertions at call site if needed.
  */
 export type StaticProxy<T extends MethodSchema> = {
     readonly [K in keyof T]: ZeroAllocFunc
@@ -282,7 +282,7 @@ const _proxyCache = new Map<string, StaticProxy<MethodSchema>>()
  *     SphereCast: { args: 5, returns: "bool" },  // with metadata
  * })
  *
- * // Per-frame - zero-alloc after first call
+ * // Per-frame: zero-alloc after first call
  * if (Physics.Raycast(origin, direction, maxDistance, layerMask)) {
  *     // hit something
  * }
@@ -290,7 +290,7 @@ const _proxyCache = new Map<string, StaticProxy<MethodSchema>>()
  *
  * @example For instance methods, use static wrappers in C#:
  * ```csharp
- * // C# side - create static wrapper
+ * // C# side: create static wrapper
  * public static class CharacterControllerExt {
  *     public static void MoveStatic(int handle, float x, float y, float z) {
  *         var cc = ObjectRegistry.Get<CharacterController>(handle);
@@ -364,7 +364,7 @@ export function zaStatic<T extends MethodSchema>(typeName: string, methods: T): 
  * const getTime = za.method("UnityEngine.Time", "get_time", 0)
  * const getDeltaTime = za.method("UnityEngine.Time", "get_deltaTime", 0)
  *
- * // Per-frame - zero-alloc
+ * // Per-frame: zero-alloc
  * const t = getTime()
  * const dt = getDeltaTime()
  * ```
@@ -416,7 +416,7 @@ export function zaFromId(bindingId: number, argCount: number): ZeroAllocFunc {
  * // Or bind a single method
  * const getTime = za.method("UnityEngine.Time", "get_time", 0)
  *
- * // Per-frame usage - zero allocations!
+ * // Per-frame usage: zero allocations!
  * function update() {
  *     const t = getTime()
  *     if (Physics.Raycast(origin, dir, dist, mask)) {

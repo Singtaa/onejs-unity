@@ -1,5 +1,5 @@
 /**
- * OneJS Unity - esbuild plugins
+ * OneJS Unity: esbuild plugins
  *
  * Usage:
  *   import { ussModulesPlugin, tailwindPlugin, copyAssetsPlugin, importTransformPlugin } from "onejs-unity/esbuild"

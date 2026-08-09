@@ -3,7 +3,7 @@
  *
  * By default, this plugin ONLY generates a manifest file for Editor path resolution.
  * Asset copying to StreamingAssets is handled by Unity's JSRunnerBuildProcessor during
- * actual Unity builds - this keeps StreamingAssets clean during development.
+ * actual Unity builds: this keeps StreamingAssets clean during development.
  *
  * Handles two types of assets:
  * 1. User assets from {WorkingDir}/assets/
@@ -37,7 +37,7 @@ function isDirectoryEntry(entry, parentPath) {
 
 /**
  * Find all packages with assets/@namespace/ folders
- * No package.json configuration needed - just the folder convention
+ * No package.json configuration needed: just the folder convention
  */
 function findPackageAssetNamespaces(nodeModulesPath) {
     const results = []
@@ -112,11 +112,11 @@ function findAssetNamespaces(assetsPath) {
  * By default, only generates a manifest file. Asset copying is handled by Unity's
  * build processor to keep StreamingAssets clean during development.
  *
- * @param {Object} options - Plugin options
- * @param {string} options.dest - Destination folder for manifest reference (default: "Assets/StreamingAssets/onejs/assets")
- * @param {string} options.userAssets - User assets folder (default: "assets")
- * @param {string} options.manifestPath - Manifest file path (default: ".onejs/assets-manifest.json")
- * @param {boolean} options.verbose - Log details (default: false)
+ * @param {Object} options: Plugin options
+ * @param {string} options.dest: Destination folder for manifest reference (default: "Assets/StreamingAssets/onejs/assets")
+ * @param {string} options.userAssets: User assets folder (default: "assets")
+ * @param {string} options.manifestPath: Manifest file path (default: ".onejs/assets-manifest.json")
+ * @param {boolean} options.verbose: Log details (default: false)
  */
 export function copyAssetsPlugin(options = {}) {
     const {

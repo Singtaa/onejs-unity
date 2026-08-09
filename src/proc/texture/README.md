@@ -249,7 +249,7 @@ Assets/Singtaa/OneJS/Unity/Shaders/Noise/ProceduralPatterns.compute
 
 ### Thread Groups
 
-All kernels use `[numthreads(8, 8, 1)]` - dispatch dimensions are calculated automatically.
+All kernels use `[numthreads(8, 8, 1)]`: dispatch dimensions are calculated automatically.
 
 ### Color Output
 

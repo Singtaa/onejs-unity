@@ -288,7 +288,7 @@ export interface KernelBuilder {
  *     _Result: "textureRW",
  * })
  *
- * // All IDs already resolved - zero work on first frame!
+ * // All IDs already resolved: zero work on first frame!
  * dispatch
  *     .float("_Time", time)
  *     .vec2("_Resolution", w, h)
@@ -302,7 +302,7 @@ export interface KernelDispatcher {
     int(name: string, value: number): KernelDispatcher
     bool(name: string, value: boolean): KernelDispatcher
 
-    // Vector uniforms - separate args to avoid array allocation
+    // Vector uniforms: separate args to avoid array allocation
     vec2(name: string, x: number, y: number): KernelDispatcher
     vec3(name: string, x: number, y: number, z: number): KernelDispatcher
     vec4(name: string, x: number, y: number, z: number, w: number): KernelDispatcher
@@ -360,7 +360,7 @@ export interface ComputeShader {
      *     _Resolution: "vec2",
      *     _Result: "textureRW",
      * })
-     * // All IDs pre-resolved - no lazy lookups needed
+     * // All IDs pre-resolved: no lazy lookups needed
      * dispatch
      *     .float("_Time", t)
      *     .vec2("_Resolution", w, h)

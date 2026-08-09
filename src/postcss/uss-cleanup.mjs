@@ -19,7 +19,7 @@ const UNSUPPORTED_PROPERTIES = new Set([
     "text-shadow",
     "drop-shadow",
 
-    // Transforms (partial support - keep basic ones)
+    // Transforms (partial support: keep basic ones)
     "transform-origin",
     "transform-style",
     "perspective",

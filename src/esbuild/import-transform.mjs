@@ -19,7 +19,7 @@ import fs from "fs"
  * which matches the convention for C# namespaces (UnityEngine, System, etc.)
  *
  * @param {Object} options
- * @param {(moduleName: string) => boolean} [options.filter] - Custom filter for which modules to transform
+ * @param {(moduleName: string) => boolean} [options.filter]. Custom filter for which modules to transform
  */
 export function importTransformPlugin(options = {}) {
     const { filter } = options
@@ -74,7 +74,7 @@ export function importTransformPlugin(options = {}) {
                     else if (defaultImport && namedImports) {
                         replacement = `const ${defaultImport} = ${csPath}; const {${namedImports}} = ${csPath}`
                     }
-                    // Handle: import "UnityEngine" (side-effect only - rare but valid)
+                    // Handle: import "UnityEngine" (side-effect only, rare but valid)
                     else {
                         replacement = `/* ${fullMatch} - side-effect import removed */`
                     }

@@ -195,7 +195,7 @@ export const mesh = {
     builder,
     combine,
 
-    // Pure generators (no Unity dependency - for data manipulation)
+    // Pure generators (no Unity dependency: for data manipulation)
     generators: {
         cube: generateCube,
         sphere: generateSphere,

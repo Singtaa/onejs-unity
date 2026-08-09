@@ -29,15 +29,15 @@ declare const __zaInvoke0: (bindingId: number) => unknown
 declare const __zaInvoke1: (bindingId: number, a0: unknown) => unknown
 declare const __zaInvoke2: (bindingId: number, a0: unknown, a1: unknown) => unknown
 
-// Cached binding IDs - for resolving key/button names to IDs at build time
+// Cached binding IDs: for resolving key/button names to IDs at build time
 let _bindingIds: {
     getKeyId: number
     getGamepadButtonId: number
 } | null = null
 
-// Cached invokers - created once on first use
+// Cached invokers: created once on first use
 let _invokers: {
-    // Keyboard - ID-based (zero-alloc hot path)
+    // Keyboard: ID-based (zero-alloc hot path)
     getKeyDownById: (keyId: number) => boolean
     getKeyPressedById: (keyId: number) => boolean
     getKeyReleasedById: (keyId: number) => boolean
@@ -49,7 +49,7 @@ let _invokers: {
     getMouseDeltaY: () => number
     getScrollX: () => number
     getScrollY: () => number
-    // Gamepad - ID-based (zero-alloc hot path)
+    // Gamepad: ID-based (zero-alloc hot path)
     getGamepadButtonDownById: (index: number, buttonId: number) => boolean
     getLeftStickX: (index: number) => number
     getLeftStickY: (index: number) => number
@@ -77,7 +77,7 @@ function initZeroAllocInvokers(): void {
     // Create invokers using the native __zaInvokeN functions
     // All hot-path methods use integer IDs instead of strings
     _invokers = {
-        // Keyboard - ID-based (1 arg: keyId)
+        // Keyboard: ID-based (1 arg: keyId)
         getKeyDownById: (keyId) => __zaInvoke1(ids.getKeyDownById, keyId) as boolean,
         getKeyPressedById: (keyId) => __zaInvoke1(ids.getKeyPressedById, keyId) as boolean,
         getKeyReleasedById: (keyId) => __zaInvoke1(ids.getKeyReleasedById, keyId) as boolean,
@@ -91,7 +91,7 @@ function initZeroAllocInvokers(): void {
         getScrollX: () => __zaInvoke0(ids.getScrollX) as number,
         getScrollY: () => __zaInvoke0(ids.getScrollY) as number,
 
-        // Gamepad - ID-based (2 args: index, buttonId)
+        // Gamepad: ID-based (2 args: index, buttonId)
         getGamepadButtonDownById: (index, buttonId) => __zaInvoke2(ids.getGamepadButtonDownById, index, buttonId) as boolean,
         getLeftStickX: (index) => __zaInvoke1(ids.getLeftStickX, index) as number,
         getLeftStickY: (index) => __zaInvoke1(ids.getLeftStickY, index) as number,
@@ -151,11 +151,11 @@ type Vec2BindingType = "mouseVec2" | "gamepadVec2" | "keyAxis2D"
 interface BoolBinding {
     type: BoolBindingType
     value: boolean
-    // Key bindings - use integer ID for zero-alloc
+    // Key bindings: use integer ID for zero-alloc
     keyId?: number
     // Mouse button
     button?: MouseButtonType
-    // Gamepad - use integer ID for zero-alloc
+    // Gamepad: use integer ID for zero-alloc
     gamepadButtonId?: number
     gamepadIndex?: number
 }
@@ -163,7 +163,7 @@ interface BoolBinding {
 interface FloatBinding {
     type: FloatBindingType
     value: number
-    // Key axis - use integer IDs for zero-alloc
+    // Key axis: use integer IDs for zero-alloc
     negativeKeyId?: number
     positiveKeyId?: number
     // Mouse float
@@ -181,7 +181,7 @@ interface Vec2Binding {
     // Gamepad vec2
     gamepadProperty?: GamepadVec2Property
     gamepadIndex?: number
-    // Key axis 2D - arrays of key IDs for each direction
+    // Key axis 2D: arrays of key IDs for each direction
     upKeyIds?: number[]
     downKeyIds?: number[]
     leftKeyIds?: number[]
@@ -280,7 +280,7 @@ class InputReaderImpl implements InputReader {
             }
         }
 
-        // Update vec2 bindings (update in place - no allocation!)
+        // Update vec2 bindings (update in place: no allocation!)
         for (const binding of this._vec2Bindings.values()) {
             switch (binding.type) {
                 case "mouseVec2": {
@@ -347,7 +347,7 @@ class InputReaderImpl implements InputReader {
     vec2(name: string): Vector2 {
         const binding = this._vec2Bindings.get(name)
         if (!binding) {
-            // Return a dummy object - shouldn't happen if used correctly
+            // Return a dummy object: shouldn't happen if used correctly
             return { x: 0, y: 0 }
         }
         return binding.value  // Returns the SAME object each time!

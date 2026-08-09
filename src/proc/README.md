@@ -1,6 +1,6 @@
 # Procedural Generation Module
 
-`onejs-unity/proc` - Procedural noise, geometry, and textures for OneJS.
+`onejs-unity/proc`: Procedural noise, geometry, and textures for OneJS.
 
 ## Overview
 
@@ -198,10 +198,10 @@ proc/
 
 ## Submodule Documentation
 
-- [Noise Module](./noise/README.md) - Detailed noise documentation
-- [Geometry Module](./geometry/README.md) - Mesh creation and manipulation
-- [Texture Module](./texture/README.md) - Procedural patterns
-- [Hooks Reference](./HOOKS.md) - React hooks documentation
+- [Noise Module](./noise/README.md): Detailed noise documentation
+- [Geometry Module](./geometry/README.md): Mesh creation and manipulation
+- [Texture Module](./texture/README.md): Procedural patterns
+- [Hooks Reference](./HOOKS.md): React hooks documentation
 
 ## Unity Integration
 

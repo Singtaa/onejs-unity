@@ -446,7 +446,7 @@ describe("generateUSS", () => {
 
     it("supports arbitrary transition-duration / delay values", () => {
         // `duration-[1.5s]` and `delay-[500ms]` must map to
-        // `transition-duration` / `transition-delay` - not be skipped as
+        // `transition-duration` / `transition-delay`, not be skipped as
         // unknown utilities. Users supply the time unit explicitly.
         const uss = generateUSS(
             new Set(["duration-[1.5s]", "delay-[500ms]"]),

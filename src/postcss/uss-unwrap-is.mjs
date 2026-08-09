@@ -46,7 +46,7 @@ function parseIsContents(contents) {
  * Returns array of expanded selectors
  */
 function expandIsOnce(selector) {
-    // Match :is(...) - need to handle nested parens
+    // Match :is(...), need to handle nested parens
     const isMatch = selector.match(/:is\(/)
     if (!isMatch) return [selector]
 

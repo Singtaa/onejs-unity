@@ -165,7 +165,7 @@ export const staticUtilities = {
     "font-italic": { "-unity-font-style": "italic" },
     "font-bold-italic": { "-unity-font-style": "bold-and-italic" },
 
-    // Text transform - NOT SUPPORTED in USS
+    // Text transform: NOT SUPPORTED in USS
     // Use rich text tags (<uppercase>, <lowercase>) or C# string methods instead
     // These utilities are intentionally omitted
 
@@ -208,20 +208,20 @@ export const staticUtilities = {
     "invisible": { "visibility": "hidden" },
 
     // Border styles
-    // NOTE: USS does not have border-style property - borders are always solid
+    // NOTE: USS does not have border-style property, borders are always solid
     "border-none": { "border-width": "0" },
 
     // Background
     "bg-transparent": { "background-color": "transparent" },
-    // NOTE: USS does not support currentColor - use explicit colors instead
+    // NOTE: USS does not support currentColor, use explicit colors instead
 
     // Text colors
     "text-transparent": { "color": "transparent" },
-    // NOTE: USS does not support currentColor - use explicit colors instead
+    // NOTE: USS does not support currentColor, use explicit colors instead
 
     // Border colors
     "border-transparent": { "border-color": "transparent" },
-    // NOTE: USS does not support currentColor - use explicit colors instead
+    // NOTE: USS does not support currentColor, use explicit colors instead
 }
 
 // ============================================================================
@@ -266,11 +266,11 @@ export const marginUtilities = {
     "ml-auto": { "margin-left": "auto" },
 }
 
-// Gap utilities - NOTE: USS does NOT support the gap property!
+// Gap utilities: NOTE: USS does NOT support the gap property!
 // These are kept for API compatibility but will have no effect.
 // Use margin/padding on child elements instead.
 export const gapUtilities = {
-    // Intentionally empty - gap is not supported in USS
+    // Intentionally empty: gap is not supported in USS
     // Users should use margins on children as a workaround
 }
 
@@ -433,7 +433,7 @@ export const opacityUtilities = Object.fromEntries(
 )
 
 // Z-index utilities
-// NOTE: USS does NOT support z-index property - element order is determined by hierarchy position
+// NOTE: USS does NOT support z-index property, element order is determined by hierarchy position
 // These utilities are intentionally omitted from allUtilities
 export const zIndexUtilities = Object.fromEntries(
     Object.entries(zIndex).map(([key, value]) => [`z-${key}`, { "z-index": value }])
@@ -693,7 +693,7 @@ export const allUtilities = {
     ...borderRadiusUtilities,
     ...borderWidthUtilities,
     ...opacityUtilities,
-    // NOTE: zIndexUtilities intentionally omitted - USS doesn't support z-index
+    // NOTE: zIndexUtilities intentionally omitted. USS doesn't support z-index
     ...positionUtilities,
     ...flexBasisUtilities,
     ...insetUtilities,

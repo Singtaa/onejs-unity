@@ -95,7 +95,7 @@ export {
     fromData as meshFromData,  // Renamed to avoid conflict with texture.fromData
     builder,
     combine,
-    // Pure generators (for advanced use - no Unity dependency)
+    // Pure generators (for advanced use: no Unity dependency)
     generateCube,
     generateSphere,
     generatePlane,

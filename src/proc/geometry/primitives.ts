@@ -1,5 +1,5 @@
 /**
- * Procedural mesh primitives - Pure JS implementation.
+ * Procedural mesh primitives: Pure JS implementation.
  *
  * All mesh data is generated in JavaScript, then passed to Unity's Mesh API.
  * No custom C# bridge required.
@@ -399,7 +399,7 @@ export function generateCone(options: ConeOptions = {}): MeshData {
         vertices[vi++] = -hy
         vertices[vi++] = nz * radius
 
-        // Cone normal - points outward and up
+        // Cone normal: points outward and up
         const len = Math.sqrt(1 + slope * slope)
         normals[ni++] = nx / len
         normals[ni++] = slope / len
@@ -565,7 +565,7 @@ export function generateQuad(options: QuadOptions = {}): MeshData {
 }
 
 // =============================================================================
-// Unity Integration - ProceduralMesh class
+// Unity Integration: ProceduralMesh class
 // =============================================================================
 
 declare const CS: any
@@ -854,7 +854,7 @@ export class MeshObject {
             shader
         } = options
 
-        // Determine shader - prefer URP Lit, fallback to Standard
+        // Determine shader: prefer URP Lit, fallback to Standard
         // Note: Using Standard shader properties (mainTexture, mainTextureScale) for compatibility
         const shaderName = shader === "Lit" ? "Universal Render Pipeline/Lit"
             : shader === "Standard" ? "Standard"
@@ -918,7 +918,7 @@ export class MeshObject {
 }
 
 // =============================================================================
-// Public API - Factory Functions
+// Public API: Factory Functions
 // =============================================================================
 
 /**

@@ -16,8 +16,8 @@ import { generateFromFiles } from "../tailwind/generator.mjs"
  * Create the Tailwind esbuild plugin
  *
  * @param {Object} options
- * @param {string[]} options.content - Content patterns to scan for classes
- * @param {string[]} [options.safelist] - Class names to always include (for dynamic/variable classes)
+ * @param {string[]} options.content: Content patterns to scan for classes
+ * @param {string[]} [options.safelist]: Class names to always include (for dynamic/variable classes)
  */
 export function tailwindPlugin(options = {}) {
     const {
@@ -54,7 +54,7 @@ export function tailwindPlugin(options = {}) {
 
                     // Generate JavaScript module that embeds USS and compiles at runtime
                     const jsContent = `// OneJS Tailwind USS
-// Auto-generated from source files - do not edit
+// Auto-generated from source files: do not edit
 
 const css = \`${escapedUss}\`
 compileStyleSheet(css, "tailwind.uss")

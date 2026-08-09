@@ -190,7 +190,7 @@ export function builder(): MeshBuilder {
 /**
  * Combine multiple meshes into one.
  *
- * @param meshes - Array of ProceduralMesh to combine
+ * @param meshes: Array of ProceduralMesh to combine
  * @returns A new combined ProceduralMesh
  *
  * @example

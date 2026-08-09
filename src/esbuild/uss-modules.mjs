@@ -26,7 +26,7 @@ import crypto from "crypto"
 
 /**
  * Generates a short hash from file path for class scoping
- * @param {string} filePath - Path to the module file
+ * @param {string} filePath: Path to the module file
  * @returns {string} 6-character hash
  */
 function generateHash(filePath) {
@@ -38,7 +38,7 @@ function generateHash(filePath) {
  * Masks `:global(...)` segments with dot-free placeholders so their classes are
  * neither extracted nor scoped, and returns the segments for later restoration
  * (unwrapped: `:global(.foo)` restores as `.foo`).
- * @param {string} ussContent - Raw USS content
+ * @param {string} ussContent: Raw USS content
  * @returns {{ masked: string, globals: string[] }}
  */
 function maskGlobals(ussContent) {
@@ -69,8 +69,8 @@ function restoreGlobals(content, globals) {
  * - Multiple selectors: .a, .b
  * - `:global(.name)` segments are excluded (masked before extraction)
  *
- * @param {string} ussContent - USS content with :global segments already masked
- * @param {string} hash - Hash to append to class names
+ * @param {string} ussContent: USS content with :global segments already masked
+ * @param {string} hash: Hash to append to class names
  * @returns {Object} Map of original class name to scoped name
  */
 function extractClassNames(ussContent, hash) {
@@ -105,8 +105,8 @@ function extractClassNames(ussContent, hash) {
 
 /**
  * Replaces class names in USS content with scoped versions
- * @param {string} ussContent - Raw USS content
- * @param {Object} classMap - Map of original to scoped names
+ * @param {string} ussContent: Raw USS content
+ * @param {Object} classMap: Map of original to scoped names
  * @returns {string} USS content with scoped class names
  */
 function scopeClassNames(ussContent, classMap) {
@@ -119,7 +119,7 @@ function scopeClassNames(ussContent, classMap) {
     for (const className of sortedNames) {
         // Match .className but:
         // - Not followed by __ (already scoped)
-        // - Not followed by - (part of longer name like button-primary)
+        // - Not followed by: (part of longer name like button-primary)
         // - Must be followed by word boundary, space, comma, colon, or bracket
         const regex = new RegExp(
             `\\.${escapeRegex(className)}(?![-_a-zA-Z0-9])(?!__)`,
@@ -140,7 +140,7 @@ function escapeRegex(str) {
 
 /**
  * Generates TypeScript declaration file content
- * @param {Object} classMap - Map of class names
+ * @param {Object} classMap: Map of class names
  * @returns {string} TypeScript .d.ts content
  */
 function generateDts(classMap) {
@@ -158,8 +158,8 @@ export default styles
 
 /**
  * Creates the esbuild plugin for USS Modules
- * @param {Object} options - Plugin options
- * @param {boolean} options.generateTypes - Whether to generate .d.ts files (default: true)
+ * @param {Object} options: Plugin options
+ * @param {boolean} options.generateTypes: Whether to generate .d.ts files (default: true)
  * @returns {Object} esbuild plugin
  */
 export function ussModulesPlugin(options = {}) {
@@ -211,7 +211,7 @@ export function ussModulesPlugin(options = {}) {
                 const safeRelativePath = relativePath.replace(/\\/g, "/")
 
                 const jsContent = `// USS Module: ${safeRelativePath}
-// Auto-generated - do not edit
+// Auto-generated: do not edit
 
 const css = \`${escapedUss}\`
 compileStyleSheet(css, "${safeRelativePath}")

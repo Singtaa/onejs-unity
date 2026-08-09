@@ -322,7 +322,7 @@ export interface GamepadState {
 /**
  * Hook that provides gamepad state, updated every frame.
  *
- * @param index - Gamepad index (default: 0)
+ * @param index: Gamepad index (default: 0)
  *
  * @example
  * ```tsx
@@ -520,7 +520,7 @@ export function useInput(): InputState {
  * allocations from polling input state. The reader is built once using the
  * provided builder callback, and tick() is called automatically each frame.
  *
- * @param build - Callback that configures the reader using the fluent builder API
+ * @param build: Callback that configures the reader using the fluent builder API
  * @returns The InputReader instance (call down(), pressed(), float(), vec2() to read values)
  *
  * @example
@@ -585,8 +585,8 @@ export interface ActionState {
 /**
  * Hook for InputAction state.
  *
- * @param actionPath - Path to the action (e.g., "Player/Jump")
- * @param actions - InputActions instance from input.loadActions()
+ * @param actionPath: Path to the action (e.g., "Player/Jump")
+ * @param actions: InputActions instance from input.loadActions()
  *
  * @example
  * ```tsx

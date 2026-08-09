@@ -182,7 +182,7 @@ export const colorMaps = {
 /**
  * Generate a noise texture.
  *
- * @param options - Noise texture options
+ * @param options: Noise texture options
  * @returns RGBA pixel data as Uint8ClampedArray
  *
  * @example
@@ -246,7 +246,7 @@ export function generateNoise(options: NoiseTextureOptions): Uint8ClampedArray {
 /**
  * Generate a voronoi/cellular texture.
  *
- * @param options - Voronoi texture options
+ * @param options: Voronoi texture options
  * @returns RGBA pixel data
  */
 export function generateVoronoi(options: VoronoiTextureOptions): Uint8ClampedArray {
@@ -284,7 +284,7 @@ export function generateVoronoi(options: VoronoiTextureOptions): Uint8ClampedArr
 /**
  * Generate a marble texture.
  *
- * @param options - Marble texture options
+ * @param options: Marble texture options
  * @returns RGBA pixel data
  */
 export function generateMarble(options: MarbleTextureOptions): Uint8ClampedArray {
@@ -329,7 +329,7 @@ export function generateMarble(options: MarbleTextureOptions): Uint8ClampedArray
 /**
  * Generate a wood grain texture.
  *
- * @param options - Wood texture options
+ * @param options: Wood texture options
  * @returns RGBA pixel data
  */
 export function generateWood(options: WoodTextureOptions): Uint8ClampedArray {
@@ -375,7 +375,7 @@ export function generateWood(options: WoodTextureOptions): Uint8ClampedArray {
 /**
  * Generate a checkerboard texture.
  *
- * @param options - Checkerboard texture options
+ * @param options: Checkerboard texture options
  * @returns RGBA pixel data
  */
 export function generateCheckerboard(options: CheckerboardTextureOptions): Uint8ClampedArray {
@@ -411,7 +411,7 @@ export function generateCheckerboard(options: CheckerboardTextureOptions): Uint8
 /**
  * Generate a gradient texture.
  *
- * @param options - Gradient texture options
+ * @param options: Gradient texture options
  * @returns RGBA pixel data
  */
 export function generateGradient(options: GradientTextureOptions): Uint8ClampedArray {
@@ -462,9 +462,9 @@ export function generateGradient(options: GradientTextureOptions): Uint8ClampedA
 /**
  * Create a CPU texture from pixel data.
  *
- * @param data - RGBA pixel data
- * @param width - Texture width
- * @param height - Texture height
+ * @param data: RGBA pixel data
+ * @param width: Texture width
+ * @param height: Texture height
  * @returns Texture handle (platform-dependent)
  */
 export function createTexture(
@@ -534,7 +534,7 @@ export class ProceduralTexture {
 
     /**
      * Set texture filter mode.
-     * @param mode - "point" for pixelated, "bilinear" for smooth, "trilinear" for smooth with mipmaps
+     * @param mode: "point" for pixelated, "bilinear" for smooth, "trilinear" for smooth with mipmaps
      */
     filter(mode: FilterMode): this {
         this._filterMode = mode
@@ -547,7 +547,7 @@ export class ProceduralTexture {
 
     /**
      * Set texture wrap mode.
-     * @param mode - "repeat" for tiling, "clamp" for edge clamping
+     * @param mode: "repeat" for tiling, "clamp" for edge clamping
      */
     wrap(mode: WrapMode): this {
         this._wrapMode = mode

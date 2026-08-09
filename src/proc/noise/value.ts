@@ -68,7 +68,7 @@ function generatePermutation(seed: number): Uint8Array {
 }
 
 /**
- * Smoothstep interpolation: 3t^2 - 2t^3
+ * Smoothstep interpolation: 3t^2, 2t^3
  */
 function smoothstep(t: number): number {
     return t * t * (3 - 2 * t)
@@ -305,7 +305,7 @@ function wrapSource3D(fn: (x: number, y: number, z: number) => number): NoiseSou
  * Value noise interpolates between random values at grid points.
  * Faster than gradient noise but with more visible grid artifacts.
  *
- * @param config - Noise configuration
+ * @param config: Noise configuration
  * @returns A NoiseSource2D that produces values in [0, 1]
  *
  * @example
@@ -329,7 +329,7 @@ export function value2D(config: NoiseConfig = {}): NoiseSource2D {
 /**
  * Create a 3D value noise source.
  *
- * @param config - Noise configuration
+ * @param config: Noise configuration
  * @returns A NoiseSource3D that produces values in [0, 1]
  *
  * @example

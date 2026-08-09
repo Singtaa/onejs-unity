@@ -93,7 +93,7 @@ export const noise = {
      * Classic gradient noise by Ken Perlin. Produces smooth, natural-looking
      * noise with values in the range [-1, 1].
      *
-     * @param config - Optional seed and frequency configuration
+     * @param config: Optional seed and frequency configuration
      * @returns A composable 2D noise source
      *
      * @example
@@ -110,7 +110,7 @@ export const noise = {
     /**
      * Create a 3D Perlin noise source.
      *
-     * @param config - Optional seed and frequency configuration
+     * @param config: Optional seed and frequency configuration
      * @returns A composable 3D noise source
      *
      * @example
@@ -133,7 +133,7 @@ export const noise = {
      * Improved gradient noise that's faster than Perlin with fewer
      * directional artifacts. Values in range [-1, 1].
      *
-     * @param config - Optional seed and frequency configuration
+     * @param config: Optional seed and frequency configuration
      * @returns A composable 2D noise source
      *
      * @example
@@ -149,7 +149,7 @@ export const noise = {
     /**
      * Create a 3D Simplex noise source.
      *
-     * @param config - Optional seed and frequency configuration
+     * @param config: Optional seed and frequency configuration
      * @returns A composable 3D noise source
      */
     simplex3D,
@@ -165,7 +165,7 @@ export const noise = {
      * Faster than gradient noise but with more visible grid artifacts.
      * Values in range [0, 1].
      *
-     * @param config - Optional seed and frequency configuration
+     * @param config: Optional seed and frequency configuration
      * @returns A composable 2D noise source
      *
      * @example
@@ -179,7 +179,7 @@ export const noise = {
     /**
      * Create a 3D Value noise source.
      *
-     * @param config - Optional seed and frequency configuration
+     * @param config: Optional seed and frequency configuration
      * @returns A composable 3D noise source
      */
     value3D,
@@ -194,7 +194,7 @@ export const noise = {
      * Creates cell-like patterns based on distance to randomly distributed
      * feature points. Great for organic textures like stone, cells, caustics.
      *
-     * @param config - Worley noise configuration
+     * @param config: Worley noise configuration
      * @returns A composable 2D noise source
      *
      * @example
@@ -214,7 +214,7 @@ export const noise = {
     /**
      * Create a 3D Worley (Cellular/Voronoi) noise source.
      *
-     * @param config - Worley noise configuration
+     * @param config: Worley noise configuration
      * @returns A composable 3D noise source
      */
     worley3D,
@@ -228,8 +228,8 @@ export const noise = {
      *
      * Useful when the noise type is determined at runtime.
      *
-     * @param type - The noise type
-     * @param config - Optional configuration
+     * @param type: The noise type
+     * @param config: Optional configuration
      * @returns A 2D noise source of the specified type
      *
      * @example
@@ -256,8 +256,8 @@ export const noise = {
     /**
      * Create a 3D noise source by type name.
      *
-     * @param type - The noise type
-     * @param config - Optional configuration
+     * @param type: The noise type
+     * @param config: Optional configuration
      * @returns A 3D noise source of the specified type
      */
     create3D(type: NoiseType, config?: NoiseConfig | WorleyConfig): NoiseSource3D {
@@ -280,11 +280,11 @@ export const noise = {
      *
      * Efficient batch sampling for generating noise textures or heightmaps.
      *
-     * @param output - Array to fill (length should be width * height)
-     * @param width - Grid width
-     * @param height - Grid height
-     * @param source - Noise source to sample from
-     * @param options - Sampling options
+     * @param output: Array to fill (length should be width * height)
+     * @param width: Grid width
+     * @param height: Grid height
+     * @param source: Noise source to sample from
+     * @param options: Sampling options
      *
      * @example
      * ```typescript
@@ -331,12 +331,12 @@ export const noise = {
     /**
      * Fill a Float32Array with 3D noise values (2D grid at specific z).
      *
-     * @param output - Array to fill
-     * @param width - Grid width
-     * @param height - Grid height
-     * @param source - 3D noise source to sample from
-     * @param z - Z coordinate (useful for animation)
-     * @param options - Sampling options
+     * @param output: Array to fill
+     * @param width: Grid width
+     * @param height: Grid height
+     * @param source: 3D noise source to sample from
+     * @param z: Z coordinate (useful for animation)
+     * @param options: Sampling options
      */
     fill3D(
         output: Float32Array,
@@ -371,7 +371,7 @@ export const noise = {
     /**
      * Remap noise value from [-1, 1] to [0, 1].
      *
-     * @param value - Noise value in [-1, 1]
+     * @param value: Noise value in [-1, 1]
      * @returns Value in [0, 1]
      */
     normalize(value: number): number {
@@ -381,7 +381,7 @@ export const noise = {
     /**
      * Apply ridge transform for sharp mountain ridges.
      *
-     * @param value - Noise value in [-1, 1]
+     * @param value: Noise value in [-1, 1]
      * @returns Ridged value in [0, 1]
      */
     ridge(value: number): number {
@@ -391,7 +391,7 @@ export const noise = {
     /**
      * Apply billowed/abs transform for cloud-like shapes.
      *
-     * @param value - Noise value in [-1, 1]
+     * @param value: Noise value in [-1, 1]
      * @returns Billowed value in [0, 1]
      */
     billow(value: number): number {

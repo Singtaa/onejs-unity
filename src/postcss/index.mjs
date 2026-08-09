@@ -1,5 +1,5 @@
 /**
- * OneJS Unity - PostCSS plugins for USS transformation
+ * OneJS Unity: PostCSS plugins for USS transformation
  *
  * Usage:
  *   import { ussTransform, ussCleanup, ussUnwrapIs } from "onejs-unity/postcss"

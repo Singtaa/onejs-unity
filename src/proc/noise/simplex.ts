@@ -394,7 +394,7 @@ function wrapSource3D(fn: (x: number, y: number, z: number) => number): NoiseSou
  *
  * Simplex noise is faster than Perlin noise and has fewer directional artifacts.
  *
- * @param config - Noise configuration
+ * @param config: Noise configuration
  * @returns A NoiseSource2D that produces values in [-1, 1]
  *
  * @example
@@ -418,7 +418,7 @@ export function simplex2D(config: NoiseConfig = {}): NoiseSource2D {
 /**
  * Create a 3D Simplex noise source.
  *
- * @param config - Noise configuration
+ * @param config: Noise configuration
  * @returns A NoiseSource3D that produces values in [-1, 1]
  *
  * @example

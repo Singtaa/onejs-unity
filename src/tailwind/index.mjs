@@ -1,8 +1,8 @@
 /**
- * OneJS Tailwind - Lightweight utility class generator for USS
+ * OneJS Tailwind: Lightweight utility class generator for USS
  *
  * A Tailwind-like utility class system designed specifically for Unity Style Sheets.
- * No external dependencies - generates USS directly from utility definitions.
+ * No external dependencies: generates USS directly from utility definitions.
  *
  * Usage:
  *   import { generateUSS, generateFromFiles } from "onejs-unity/tailwind"

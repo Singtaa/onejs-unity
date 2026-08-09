@@ -6,11 +6,11 @@ Procedural mesh generation for OneJS with fluent APIs for creating and manipulat
 
 The geometry module provides:
 
-- **Primitive Meshes** - One-liner creation of cubes, spheres, cylinders, etc.
-- **MeshBuilder** - Fluent API for custom geometry construction
-- **Materials** - Simple material creation and assignment
-- **Mesh Operations** - Clone, combine, modify vertex data
-- **Handle-Based** - C# objects managed via integer handles
+- **Primitive Meshes**: One-liner creation of cubes, spheres, cylinders, etc.
+- **MeshBuilder**: Fluent API for custom geometry construction
+- **Materials**: Simple material creation and assignment
+- **Mesh Operations**: Clone, combine, modify vertex data
+- **Handle-Based**: C# objects managed via integer handles
 
 ## Quick Start
 
@@ -523,8 +523,8 @@ Assets/Singtaa/OneJS/Unity/Proc/MeshBridge.cs
 ```
 
 The bridge manages:
-- **Mesh handles** - `_meshes` dictionary
-- **Instance handles** - `_instances` dictionary (GameObjects)
-- **Material handles** - `_materials` dictionary
+- **Mesh handles**: `_meshes` dictionary
+- **Instance handles**: `_instances` dictionary (GameObjects)
+- **Material handles**: `_materials` dictionary
 
 All operations go through static methods on `MeshBridge` that manage the handle tables.

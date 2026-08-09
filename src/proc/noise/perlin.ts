@@ -74,7 +74,7 @@ function generatePermutation(seed: number): Uint8Array {
 }
 
 /**
- * Improved smoothstep (quintic curve): 6t^5 - 15t^4 + 10t^3
+ * Improved smoothstep (quintic curve): 6t^5, 15t^4 + 10t^3
  * Has zero first and second derivatives at t=0 and t=1.
  */
 function fade(t: number): number {
@@ -464,7 +464,7 @@ class PerlinNoiseSource3D implements NoiseSource3D {
 /**
  * Create a 2D Perlin noise source.
  *
- * @param config - Noise configuration
+ * @param config: Noise configuration
  * @returns A NoiseSource2D that produces values in [-1, 1]
  *
  * @example
@@ -487,7 +487,7 @@ export function perlin2D(config: NoiseConfig = {}): NoiseSource2D {
 /**
  * Create a 3D Perlin noise source.
  *
- * @param config - Noise configuration
+ * @param config: Noise configuration
  * @returns A NoiseSource3D that produces values in [-1, 1]
  *
  * @example

@@ -1,5 +1,5 @@
 /**
- * Input module - provides ergonomic access to Unity's Input System
+ * Input module: provides ergonomic access to Unity's Input System
  *
  * @example
  * import { input } from "onejs-unity/input"

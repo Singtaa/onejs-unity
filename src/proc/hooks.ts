@@ -81,7 +81,7 @@ export interface UseNoiseOptions extends NoiseConfig {
  *
  * The noise source is memoized and only recreated when options change.
  *
- * @param options - Noise configuration options
+ * @param options: Noise configuration options
  * @returns A 2D noise source ready for sampling
  *
  * @example Basic Perlin noise
@@ -169,7 +169,7 @@ export function useNoise(options: UseNoiseOptions = {}): NoiseSource2D {
 /**
  * Hook that creates a 3D noise source.
  *
- * @param options - Noise configuration options
+ * @param options: Noise configuration options
  * @returns A 3D noise source ready for sampling
  *
  * @example Animated noise
@@ -285,7 +285,7 @@ export interface UseNoiseTextureResult {
  *
  * Handles shader loading, dispatching, and animation timing.
  *
- * @param options - Noise texture options
+ * @param options: Noise texture options
  * @returns Control object for noise texture generation
  *
  * @example Static noise texture
@@ -434,7 +434,7 @@ export type UseMeshOptions =
  *
  * Handles creation and cleanup automatically.
  *
- * @param options - Mesh configuration
+ * @param options: Mesh configuration
  * @returns The managed ProceduralMesh, or null if not ready
  *
  * @example Primitive mesh
@@ -559,8 +559,8 @@ export interface UseMeshInstanceOptions {
  *
  * Instantiates a mesh as a GameObject and handles cleanup.
  *
- * @param meshHandle - The mesh to instantiate
- * @param options - Instance configuration
+ * @param meshHandle: The mesh to instantiate
+ * @param options: Instance configuration
  * @returns The managed MeshObject, or null if not ready
  *
  * @example Basic instance
@@ -658,7 +658,7 @@ declare const CS: any
 /**
  * Hook that creates and manages a Unity Material.
  *
- * @param options - Material configuration
+ * @param options: Material configuration
  * @returns The Unity Material, or null if not ready
  *
  * @example Simple colored material

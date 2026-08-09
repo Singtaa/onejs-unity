@@ -341,7 +341,7 @@ class KernelBuilderImpl implements KernelBuilder {
     }
 
     bufferReadOnly(name: string, data: TypedArray | ComputeBuffer): KernelBuilder {
-        // Same as buffer for now - the readonly distinction is in the HLSL declaration
+        // Same as buffer for now: the readonly distinction is in the HLSL declaration
         return this.buffer(name, data)
     }
 
@@ -351,7 +351,7 @@ class KernelBuilderImpl implements KernelBuilder {
     }
 
     textureRW(name: string, tex: RenderTexture): KernelBuilder {
-        // Same binding for RW textures - the RW distinction is in the HLSL declaration
+        // Same binding for RW textures: the RW distinction is in the HLSL declaration
         CS.OneJS.GPU.GPUBridge.SetTexture(this._shader.__handle, this._kernelIndex, name, tex.__handle)
         return this
     }
@@ -411,7 +411,7 @@ declare const __zaInvoke4: (bindingId: number, a0: unknown, a1: unknown, a2: unk
 declare const __zaInvoke5: (bindingId: number, a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown) => unknown
 declare const __zaInvoke6: (bindingId: number, a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown) => unknown
 
-// Cached invokers - created once on first use
+// Cached invokers: created once on first use
 let _invokers: {
     dispatch: (sh: number, ki: number, gx: number, gy: number, gz: number) => void
     propertyToId: (name: string) => number
@@ -464,7 +464,7 @@ function initZeroAllocInvokers(): void {
 }
 
 /**
- * KernelDispatcher implementation - zero-allocation per-frame dispatch.
+ * KernelDispatcher implementation: zero-allocation per-frame dispatch.
  *
  * Uses pre-registered C# bindings and cached property IDs to achieve
  * zero managed allocations per frame. All string->int conversions happen
@@ -475,7 +475,7 @@ function initZeroAllocInvokers(): void {
  * // Create once at init
  * const dispatch = shader.createDispatcher("CSMain")
  *
- * // Per-frame - zero allocations!
+ * // Per-frame: zero allocations!
  * dispatch
  *     .float("_Time", time)
  *     .vec2("_Resolution", width, height)
@@ -516,7 +516,7 @@ class KernelDispatcherImpl implements KernelDispatcher {
     private _getPropertyId(name: string): number {
         let id = this._propertyIdCache.get(name)
         if (id === undefined) {
-            // Not in cache - resolve now (only happens without schema or for unlisted props)
+            // Not in cache: resolve now (only happens without schema or for unlisted props)
             id = _invokers!.propertyToId(name)
             this._propertyIdCache.set(name, id)
         }

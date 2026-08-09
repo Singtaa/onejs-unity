@@ -315,7 +315,7 @@ describe("Worley Noise", () => {
             // (may occasionally be same by chance, so just test one pair)
             const e = euclidean.sample(x, y)
             const m = manhattan.sample(x, y)
-            // Relaxed check - just verify they're numbers
+            // Relaxed check: just verify they're numbers
             expect(isNaN(e)).toBe(false)
             expect(isNaN(m)).toBe(false)
         })

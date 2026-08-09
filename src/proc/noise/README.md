@@ -14,10 +14,10 @@ The noise module provides classic noise algorithms used in procedural generation
 | **Worley** | Cell/distance-based patterns [0, 1] | Stone, cells, caustics, voronoi |
 
 All noise types support:
-- **FBM (Fractal Brownian Motion)** - Layer multiple octaves for detail
-- **Turbulence** - Absolute value FBM for fire/smoke effects
-- **Seeding** - Reproducible results with seed values
-- **Frequency scaling** - Control noise scale
+- **FBM (Fractal Brownian Motion)**: Layer multiple octaves for detail
+- **Turbulence**: Absolute value FBM for fire/smoke effects
+- **Seeding**: Reproducible results with seed values
+- **Frequency scaling**: Control noise scale
 
 ## Quick Start
 
@@ -58,7 +58,7 @@ const animated = perlin3d.sample(x, y, time * 0.5)
 
 ### Simplex Noise
 
-Improved gradient noise - faster computation with fewer directional artifacts.
+Improved gradient noise: faster computation with fewer directional artifacts.
 
 ```typescript
 const simplex = noise.simplex2D({ frequency: 0.05 })
@@ -110,7 +110,7 @@ const mountains = noise.perlin2D().fbm({
 
 ### Turbulence
 
-Absolute value FBM - creates more chaotic, billowy patterns:
+Absolute value FBM: creates more chaotic, billowy patterns:
 
 ```typescript
 const smoke = noise.perlin2D().turbulence({
@@ -224,7 +224,7 @@ Assets/Singtaa/OneJS/Unity/Shaders/Noise/
 
 ### Thread Group Size
 
-All kernels use `[numthreads(8, 8, 1)]` - the dispatcher automatically calculates dispatch dimensions.
+All kernels use `[numthreads(8, 8, 1)]`: the dispatcher automatically calculates dispatch dimensions.
 
 ### Output Modes
 

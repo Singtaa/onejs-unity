@@ -1,5 +1,5 @@
 /**
- * Main input module - provides unified access to all input devices
+ * Main input module: provides unified access to all input devices
  */
 
 import type {
@@ -69,7 +69,7 @@ class InputActionImpl implements InputAction {
     }
 
     value<T extends number | Vector2>(): T {
-        // Try to determine type from context (simplified - assume Vector2 for now if not number)
+        // Try to determine type from context (simplified: assume Vector2 for now if not number)
         // In practice, user knows the type based on the action definition
         const x = getInputBridge().GetActionValueVector2X(this._handle)
         const y = getInputBridge().GetActionValueVector2Y(this._handle)
@@ -195,7 +195,7 @@ class InputActionsImpl implements InputActions {
     }
 
     enable(): void {
-        // Enable all maps - iterate known maps
+        // Enable all maps: iterate known maps
         for (const map of this._maps.values()) {
             map.enable()
         }

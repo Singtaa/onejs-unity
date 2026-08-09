@@ -344,7 +344,7 @@ function wrapSource3D(fn: (x: number, y: number, z: number) => number): NoiseSou
  * Worley noise creates cell-like patterns based on distance to randomly
  * distributed feature points. Great for organic textures.
  *
- * @param config - Worley noise configuration
+ * @param config: Worley noise configuration
  * @returns A NoiseSource2D that produces distance-based values
  *
  * @example
@@ -353,7 +353,7 @@ function wrapSource3D(fn: (x: number, y: number, z: number) => number): NoiseSou
  * const cells = worley2D({ frequency: 5 })
  * const dist = cells.sample(x, y)
  *
- * // Stone-like texture (f2 - f1 creates edges)
+ * // Stone-like texture (f2: f1 creates edges)
  * const stone = worley2D({
  *     frequency: 3,
  *     returnType: "f2-f1"
@@ -380,7 +380,7 @@ export function worley2D(config: WorleyConfig = {}): NoiseSource2D {
 /**
  * Create a 3D Worley (Cellular/Voronoi) noise source.
  *
- * @param config - Worley noise configuration
+ * @param config: Worley noise configuration
  * @returns A NoiseSource3D that produces distance-based values
  *
  * @example

@@ -5,7 +5,7 @@
  * that make sense for USS (Unity Style Sheets).
  */
 
-// Spacing scale (in pixels) - used for margin, padding, gap, width, height, etc.
+// Spacing scale (in pixels): used for margin, padding, gap, width, height, etc.
 export const spacing = {
     "0": "0",
     "px": "1px",
@@ -61,7 +61,7 @@ export const percentages = {
     "full": "100%",
 }
 
-// Colors - Tailwind's default palette
+// Colors: Tailwind's default palette
 export const colors = {
     // Basics
     "transparent": "transparent",
