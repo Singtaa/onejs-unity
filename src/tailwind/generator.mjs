@@ -526,7 +526,7 @@ export function generateUSS(classNames, options = {}) {
         // Build the selector
         //
         // `group-<pseudo>:` and `peer-<pseudo>:` variants are not real pseudo-
-        // classes — they mean "apply when an ancestor (.group) or sibling
+        // classes - they mean "apply when an ancestor (.group) or sibling
         // (.peer) has the given state". In USS this becomes a descendant or
         // sibling combinator, NOT a pseudo-class on the target element. Naive
         // `${selector}:${variant}` produced e.g. `.group-focus_c_X:group-focus`
@@ -544,7 +544,7 @@ export function generateUSS(classNames, options = {}) {
         } else if (variant === "*") {
             // Tailwind's `*` variant targets every direct child, not the
             // element itself. Attaching `:*` as a pseudo-class would be
-            // invalid USS — emit a universal-child combinator instead.
+            // invalid USS - emit a universal-child combinator instead.
             selector = `.${escapedClass} > *`
         } else if (variant && variant.startsWith("group-")) {
             const pseudo = variant.slice("group-".length)
