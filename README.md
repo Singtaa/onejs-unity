@@ -10,9 +10,9 @@ npm install onejs-unity
 
 ## Features
 
-- **Asset Loading** - Load images, fonts, and data from disk with Editor/Build path resolution
-- **Build Plugins** - esbuild and PostCSS plugins for USS transformation
-- **GPU Compute** - Access Unity compute shaders from JavaScript
+- **Asset Loading**: Load images, fonts, and data from disk with Editor/Build path resolution
+- **Build Plugins**: esbuild and PostCSS plugins for USS transformation
+- **GPU Compute**: Access Unity compute shaders from JavaScript
 
 ## Asset Loading
 
@@ -39,17 +39,17 @@ const config = loadJson("@my-ui-kit/config.json")
 
 ### Asset Functions
 
-- `loadImage(path)` - Load as Texture2D
-- `loadImageAsync(path)` - Async `loadImage`, works on all platforms
-- `loadFont(path)` - Load as FontAsset (SDF)
-- `loadFontDefinition(path)` - Load as FontDefinition (for UI Toolkit styling)
-- `loadText(path)` - Load as string
-- `loadTextAsync(path)` - Async `loadText`, works on all platforms
-- `loadJson<T>(path)` - Load and parse JSON
-- `loadJsonAsync<T>(path)` - Async `loadJson`, works on all platforms
-- `loadBytes(path)` - Load as Uint8Array
-- `assetExists(path)` - Check if asset exists
-- `getAssetPath(path)` - Get resolved full path
+- `loadImage(path)`: Load as Texture2D
+- `loadImageAsync(path)`: Async `loadImage`, works on all platforms
+- `loadFont(path)`: Load as FontAsset (SDF)
+- `loadFontDefinition(path)`: Load as FontDefinition (for UI Toolkit styling)
+- `loadText(path)`: Load as string
+- `loadTextAsync(path)`: Async `loadText`, works on all platforms
+- `loadJson<T>(path)`: Load and parse JSON
+- `loadJsonAsync<T>(path)`: Async `loadJson`, works on all platforms
+- `loadBytes(path)`: Load as Uint8Array
+- `assetExists(path)`: Check if asset exists
+- `getAssetPath(path)`: Get resolved full path
 
 On Android and WebGL builds, StreamingAssets is a URL (`jar:file://...` inside the APK, `http(s)://...` on WebGL) that `System.IO.File` cannot read. The synchronous functions throw a descriptive error there; the `*Async` variants load through UnityWebRequest and work everywhere (resolving immediately where the sync path is available).
 
@@ -123,7 +123,7 @@ import { GameObject, Mesh, Vector3 } from "UnityEngine"
 ```
 
 **Options:**
-- `filter` - Custom function `(moduleName: string) => boolean` to control which modules are transformed. Default: transforms modules starting with uppercase letter.
+- `filter`: Custom function `(moduleName: string) => boolean` to control which modules are transformed. Default: transforms modules starting with uppercase letter.
 
 #### `tailwindPlugin(options)`
 
@@ -138,10 +138,10 @@ import "onejs:tailwind"
 ```
 
 **Options:**
-- `content` - Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`)
+- `content`: Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`)
 
 **Features:**
-- JIT-style generation - only includes classes actually used in your source files
+- JIT-style generation: only includes classes actually used in your source files
 - Full Tailwind color palette (slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose)
 - Spacing scale (p-4, m-2, mt-4, etc.)
 - Flexbox utilities (flex, justify-center, items-center, flex-1, basis-1/2, etc.)
@@ -154,11 +154,11 @@ import "onejs:tailwind"
 - Arbitrary values (w-[200], bg-[#ff5733], p-[15], etc.)
 
 **USS Limitations:**
-- No `gap` property - use margins on children instead
-- No `z-index` - element order determined by hierarchy position
-- No numeric `font-weight` (100-900) - only `font-normal`/`font-bold` via `-unity-font-style`
-- No `text-transform` - use rich text tags or C# string methods
-- No `currentColor` - use explicit color values
+- No `gap` property: use margins on children instead
+- No `z-index`: element order determined by hierarchy position
+- No numeric `font-weight` (100-900): only `font-normal`/`font-bold` via `-unity-font-style`
+- No `text-transform`: use rich text tags or C# string methods
+- No `currentColor`: use explicit color values
 - `letter-spacing` uses px values (USS doesn't support em/rem)
 
 **Transformations:**
@@ -170,7 +170,7 @@ import "onejs:tailwind"
 
 Transforms `.module.uss` files into scoped CSS Modules.
 
-- `generateTypes` - Generate `.d.ts` files for type-safe imports (default: `true`)
+- `generateTypes`: Generate `.d.ts` files for type-safe imports (default: `true`)
 
 ```tsx
 import styles from "./Button.module.uss"
@@ -184,9 +184,9 @@ Generates a manifest file for Editor path resolution. **Does not copy assets** d
 
 Asset copying to `StreamingAssets` is handled by Unity's `JSRunnerBuildProcessor` during actual Unity builds. This keeps `StreamingAssets` clean during development and avoids Unity's asset import overhead.
 
-- `userAssets` - User assets folder (default: `"assets"`)
-- `manifestPath` - Manifest file path (default: `".onejs/assets-manifest.json"`)
-- `verbose` - Log details (default: `false`)
+- `userAssets`: User assets folder (default: `"assets"`)
+- `manifestPath`: Manifest file path (default: `".onejs/assets-manifest.json"`)
+- `verbose`: Log details (default: `false`)
 
 ### PostCSS Plugins
 
@@ -433,7 +433,7 @@ When using the build plugins:
 npm install -D esbuild
 ```
 
-Note: `tailwindcss` and `postcss` are **not required** - OneJS includes a built-in Tailwind utility generator.
+Note: `tailwindcss` and `postcss` are **not required**. OneJS includes a built-in Tailwind utility generator.
 
 ## License
 
