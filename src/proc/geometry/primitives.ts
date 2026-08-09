@@ -589,7 +589,7 @@ declare const CS: any
 export interface MaterialOptions {
     /** Procedural texture to apply */
     texture?: ProceduralTexture
-    /** Texture tiling - number for uniform, [x, y] for separate */
+    /** Texture tiling: number for uniform, [x, y] for separate */
     tiling?: number | [number, number]
     /** Texture offset */
     offset?: [number, number]

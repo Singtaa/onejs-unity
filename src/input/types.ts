@@ -352,7 +352,7 @@ export type GamepadFloatProperty = "leftTrigger" | "rightTrigger" | "leftStickX"
 /** Key binding - single key or array of keys (any match = true) */
 export type ReaderKeyBinding = string | string[]
 
-/** Configuration for keyAxis2D - 4 directional keys to vec2 */
+/** Configuration for keyAxis2D: 4 directional keys to vec2 */
 export interface KeyAxis2DConfig {
     up: ReaderKeyBinding
     down: ReaderKeyBinding
