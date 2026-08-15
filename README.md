@@ -78,7 +78,7 @@ During Unity builds, these are copied flat to `StreamingAssets/onejs/assets/@my-
 ### esbuild Plugins
 
 ```javascript
-import { importTransformPlugin, ussModulesPlugin, tailwindPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
+import { importTransformPlugin, ussModulesPlugin, tailwindPlugin, themesPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
 
 const config = {
     plugins: [
@@ -87,6 +87,9 @@ const config = {
 
         // Tailwind utility classes → USS transformation
         tailwindPlugin({ content: ["./**/*.{tsx,ts,jsx,js}"] }),
+
+        // Cartridge theme registration via import "onejs:themes"
+        themesPlugin(),
 
         // CSS Modules for .module.uss files
         ussModulesPlugin({ generateTypes: true }),
@@ -124,6 +127,23 @@ import { GameObject, Mesh, Vector3 } from "UnityEngine"
 
 **Options:**
 - `filter`: Custom function `(moduleName: string) => boolean` to control which modules are transformed. Default: transforms modules starting with uppercase letter.
+
+#### `themesPlugin(options)`
+
+Registers every extracted cartridge theme through one stable import, replacing the per-theme relative imports (which lint autofixes love to strip and which have no autocomplete before extraction):
+
+```tsx
+// One import registers everything extracted under @cartridges/
+import "onejs:themes"
+
+<ThemeProvider theme="kawaii">...</ThemeProvider>
+```
+
+At build time the plugin scans the working directory's `@cartridges/` folder for files matching `*Theme.ts` / `*Theme.tsx` (the naming convention every OneJS premade theme follows), emits a side-effect import for each, and logs what it registered. In watch mode a newly extracted cartridge triggers a rebuild automatically. With nothing extracted yet it emits an empty module and a console warning, not an error. Explicit relative imports keep working when you want a strict subset.
+
+**Options:**
+- `dir`: Cartridges folder relative to the working directory (default: `"@cartridges"`)
+- `pattern`: RegExp identifying a theme module by file name (default: `/Theme\.(ts|tsx)$/`)
 
 #### `tailwindPlugin(options)`
 
