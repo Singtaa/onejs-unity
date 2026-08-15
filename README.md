@@ -161,7 +161,7 @@ import "onejs:tailwind"
 - `content`: Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`)
 
 **Features:**
-- JIT-style generation: only includes classes actually used in your source files
+- JIT-style generation: only includes classes actually used in your source files. Every string literal in a scanned file is a candidate (variant maps and variables included, comment-safe), so only classes assembled at runtime (`"bg-" + color`) need `safelist`.
 - Full Tailwind color palette (slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose)
 - Spacing scale (p-4, m-2, mt-4, etc.)
 - Flexbox utilities (flex, justify-center, items-center, flex-1, basis-1/2, etc.)

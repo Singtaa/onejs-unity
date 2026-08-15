@@ -53,99 +53,116 @@ export function escapeClassName(name) {
 // ============================================================================
 
 /**
- * Extract class names from a source file content
- * Handles: className="...", className={`...`}, className={expr},
- *          className={clsx(...)}, ternaries, logical &&, etc.
+ * Extract class-name candidates from a source file.
+ *
+ * Tailwind-JIT model: every string and template literal in the file is a
+ * candidate source, not just className= attributes, so classes held in
+ * variant maps, variables, and helper arguments are all seen. Candidates
+ * that don't match a known utility are dropped later by generateUSS, so
+ * over-collection only ever adds unused rules, it never breaks styling.
+ * Classes assembled at runtime ("bg-" + color) are still invisible: use
+ * the plugin's `safelist` option for those.
+ *
+ * The scanner walks the source once, skipping // and block comments and
+ * regex literals, so quote characters inside them never shift string
+ * pairing (a `// don't` comment must not eat the classes after it).
  */
 export function extractClassNames(content) {
     const classNames = new Set()
-
-    // Match className="..." or class="..."
-    const stringPattern = /class(?:Name)?=["']([^"']+)["']/g
-    let match
-    while ((match = stringPattern.exec(content)) !== null) {
-        const classes = match[1].split(/\s+/).filter(Boolean)
-        classes.forEach(c => classNames.add(c))
-    }
-
-    // Match className={`...`} (template literals)
-    // Extract static parts AND string literals inside ${...} expressions
-    const templatePattern = /class(?:Name)?=\{`([^`]+)`\}/g
-    while ((match = templatePattern.exec(content)) !== null) {
-        // Extract static parts
-        const staticParts = match[1].replace(/\$\{[^}]+\}/g, " ")
-        staticParts.split(/\s+/).filter(Boolean).forEach(c => classNames.add(c))
-
-        // Also extract string literals inside ${...} expressions
-        // e.g. className={`p-4 ${active ? "bg-blue-500" : "bg-gray-500"}`}
-        const exprMatches = match[1].matchAll(/\$\{([^}]+)\}/g)
-        for (const exprMatch of exprMatches) {
-            extractStringLiterals(exprMatch[1]).forEach(c => classNames.add(c))
-        }
-    }
-
-    // Match className={...} (any expression)
-    // Uses brace-depth tracking to handle nested braces correctly
-    const exprStarts = [...content.matchAll(/class(?:Name)?=\{/g)]
-    for (const exprStart of exprStarts) {
-        const startIdx = exprStart.index + exprStart[0].length
-        const expr = extractBracedExpression(content, startIdx)
-        if (expr !== null) {
-            // Skip template literals (already handled above)
-            if (expr.trimStart().startsWith("`")) continue
-            extractStringLiterals(expr).forEach(c => classNames.add(c))
-        }
-    }
-
+    scanCode(content, 0, classNames, false)
     return classNames
 }
 
+// After these keywords a `/` starts a regex literal, not division, even
+// though the keyword looks like an ordinary identifier to the char scanner.
+const REGEX_PRECEDING_KEYWORDS = new Set([
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "case", "do", "else", "yield", "await",
+])
+
 /**
- * Extract the content of a braced expression, handling nested braces.
- * Starts after the opening brace. Returns the content before the matching close brace.
+ * Can a `/` at the current position start a regex literal? A regex is only
+ * valid where an expression is expected. Misclassification is line-capped
+ * either way (regex literals and normal strings cannot contain raw
+ * newlines), but JSX makes two cases worth special care: `</Tag>` (prev is
+ * `<`) and self-closing `/>` (prev is `>`, `}`, `]`, `)`, a word char, or a
+ * quote, which readers of this file mark by setting prev to `)`). The one
+ * `>` that does expect an expression is an arrow `=>`.
  */
-function extractBracedExpression(content, startIdx) {
-    let depth = 1
-    let i = startIdx
-    while (i < content.length && depth > 0) {
-        const ch = content[i]
-        if (ch === "{") depth++
-        else if (ch === "}") depth--
-        // Skip string contents
-        else if (ch === '"' || ch === "'" || ch === "`") {
-            i = skipString(content, i)
-            continue
-        }
-        i++
-    }
-    if (depth !== 0) return null
-    return content.slice(startIdx, i - 1)
+function regexAllowed(prev, prev2, lastWord) {
+    if (prev === "") return true
+    if (/[\w$]/.test(prev)) return REGEX_PRECEDING_KEYWORDS.has(lastWord)
+    if (prev === ")" || prev === "]" || prev === "}") return false
+    if (prev === ">") return prev2 === "="
+    if (prev === "<") return false
+    return true
 }
 
 /**
- * Skip past a quoted string (handles escape sequences).
- * Returns the index after the closing quote.
+ * Walk source code from `start`, adding the contents of every string and
+ * template literal to `candidates`. Skips comments and regex literals.
+ * When `stopAtBrace` is true (inside a template `${...}` expression),
+ * returns the index of the matching unnested `}`; otherwise scans to the
+ * end and returns content.length.
  */
-function skipString(content, startIdx) {
-    const quote = content[startIdx]
-    let i = startIdx + 1
+function scanCode(content, start, candidates, stopAtBrace) {
+    let i = start
+    let depth = 0
+    let prev = ""      // last significant char outside comments/strings
+    let prev2 = ""     // significant char before prev (for `=>` detection)
+    let lastWord = ""  // identifier ending at prev (for regex-vs-division)
     while (i < content.length) {
-        if (content[i] === "\\") { i += 2; continue }
-        if (content[i] === quote) return i + 1
-        // Template literal ${} nesting
-        if (quote === "`" && content[i] === "$" && content[i + 1] === "{") {
-            i += 2
-            let depth = 1
-            while (i < content.length && depth > 0) {
-                if (content[i] === "{") depth++
-                else if (content[i] === "}") depth--
-                else if (content[i] === '"' || content[i] === "'" || content[i] === "`") {
-                    i = skipString(content, i)
-                    continue
-                }
-                i++
-            }
+        const ch = content[i]
+        const next = content[i + 1]
+        if (ch === "/" && next === "/") {
+            const nl = content.indexOf("\n", i + 2)
+            i = nl === -1 ? content.length : nl + 1
             continue
+        }
+        if (ch === "/" && next === "*") {
+            const close = content.indexOf("*/", i + 2)
+            i = close === -1 ? content.length : close + 2
+            continue
+        }
+        if (ch === '"' || ch === "'") {
+            const end = readString(content, i, candidates)
+            if (end !== -1) {
+                i = end
+                prev2 = prev
+                prev = ")" // a string ends an expression, like `)`
+                continue
+            }
+            // No closing quote before the newline, so this is not a string
+            // (an apostrophe in JSX text, typically): treat as a plain char
+            // and keep scanning so later literals on the line are still seen.
+        } else if (ch === "`") {
+            i = readTemplate(content, i, candidates)
+            prev2 = prev
+            prev = ")"
+            continue
+        } else if (ch === "/" && regexAllowed(prev, prev2, lastWord)) {
+            const end = skipRegex(content, i)
+            if (end !== -1) {
+                i = end
+                prev2 = prev
+                prev = ")"
+                continue
+            }
+            // No closing `/` on this line: it was division after all.
+        }
+        if (stopAtBrace) {
+            if (ch === "{") depth++
+            else if (ch === "}") {
+                if (depth === 0) return i
+                depth--
+            }
+        }
+        if (!/\s/.test(ch)) {
+            if (/[\w$]/.test(ch)) {
+                lastWord = /[\w$]/.test(content[i - 1] || "") ? lastWord + ch : ch
+            }
+            prev2 = prev
+            prev = ch
         }
         i++
     }
@@ -153,17 +170,89 @@ function skipString(content, startIdx) {
 }
 
 /**
- * Extract all Tailwind class names from string literals within an expression.
- * Finds all "..." and '...' strings and splits them into individual class names.
+ * Read a quoted string starting at content[startIdx], adding its contents
+ * as candidates. Returns the index after the closing quote, or -1 if the
+ * line ends first (JS strings cannot span a raw newline), in which case
+ * nothing is added and the caller should treat the quote as a plain char.
  */
-function extractStringLiterals(expr) {
-    const classes = new Set()
-    const stringLitPattern = /["']([^"']+)["']/g
-    let match
-    while ((match = stringLitPattern.exec(expr)) !== null) {
-        match[1].split(/\s+/).filter(Boolean).forEach(c => classes.add(c))
+function readString(content, startIdx, candidates) {
+    const quote = content[startIdx]
+    let i = startIdx + 1
+    while (i < content.length) {
+        const ch = content[i]
+        if (ch === "\\") { i += 2; continue }
+        if (ch === "\n") return -1
+        if (ch === quote) {
+            addCandidates(content.slice(startIdx + 1, i), candidates)
+            return i + 1
+        }
+        i++
     }
-    return classes
+    return -1
+}
+
+/**
+ * Read a template literal starting at the backtick. Static parts become
+ * candidates; each ${...} expression is scanned recursively as code (its
+ * own strings, comments, and nested templates all handled).
+ * Returns the index after the closing backtick.
+ */
+function readTemplate(content, startIdx, candidates) {
+    let i = startIdx + 1
+    let staticStart = i
+    while (i < content.length) {
+        const ch = content[i]
+        if (ch === "\\") { i += 2; continue }
+        if (ch === "`") {
+            addCandidates(content.slice(staticStart, i), candidates)
+            return i + 1
+        }
+        if (ch === "$" && content[i + 1] === "{") {
+            addCandidates(content.slice(staticStart, i), candidates)
+            i = scanCode(content, i + 2, candidates, true) + 1
+            staticStart = i
+            continue
+        }
+        i++
+    }
+    addCandidates(content.slice(staticStart, i), candidates)
+    return i
+}
+
+/**
+ * Skip a regex literal starting at `/`. Returns the index after the closing
+ * `/` and its flags, or -1 if the line ends before it closes (a regex
+ * cannot contain a raw newline, so the `/` was division).
+ */
+function skipRegex(content, startIdx) {
+    let i = startIdx + 1
+    let inClass = false
+    while (i < content.length) {
+        const ch = content[i]
+        if (ch === "\\") { i += 2; continue }
+        if (ch === "\n") return -1
+        if (ch === "[") inClass = true
+        else if (ch === "]") inClass = false
+        else if (ch === "/" && !inClass) {
+            i++
+            while (i < content.length && /[a-z]/i.test(content[i])) i++
+            return i
+        }
+        i++
+    }
+    return -1
+}
+
+/**
+ * Split literal contents into candidate tokens. Quote characters count as
+ * separators alongside whitespace so that when JSX-text apostrophes pair
+ * across markup, class names quoted inside the mis-read span still surface
+ * as candidates instead of being lost.
+ */
+function addCandidates(text, candidates) {
+    for (const token of text.split(/[\s"'`]+/)) {
+        if (token) candidates.add(token)
+    }
 }
 
 /**

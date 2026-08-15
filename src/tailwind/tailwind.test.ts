@@ -199,12 +199,17 @@ describe("extractClassNames", () => {
             expect(result).toContain("bg-green-500")
         })
 
-        it("does not extract from non-className strings", () => {
+        it("collects candidates from non-className strings, filtered at generation", () => {
+            // Tailwind-JIT model: every string literal is a candidate, so
+            // classes behind variables are seen. Non-class strings are
+            // harmless: generateUSS drops candidates with no matching utility.
             const result = extractClassNames(
                 `const title = "not-a-class"; <View className="real-class" />`
             )
             expect(result).toContain("real-class")
-            expect(result).not.toContain("not-a-class")
+            expect(result).toContain("not-a-class")
+            const uss = generateUSS(result)
+            expect(uss).not.toContain("not-a-class")
         })
 
         it("handles arbitrary values in conditionals", () => {
@@ -213,6 +218,142 @@ describe("extractClassNames", () => {
             )
             expect(result).toContain("w-[200]")
             expect(result).toContain("w-[100]")
+        })
+    })
+
+    describe("classes outside className attributes (whole-file scan)", () => {
+        it("extracts from a variant map indexed by variable", () => {
+            // The reported toast regression: classes in a Record<Variant, string>
+            // reached via VARIANT_CLASSES[variant] were never scanned, so the
+            // element silently lost its background.
+            const content = `
+                const VARIANT_CLASSES = {
+                    default: "bg-gray-700 text-white",
+                    success: "bg-green-600 text-white",
+                }
+                function Row({ variant }) {
+                    return <View className={twMerge("rounded-[4px] px-[12px]", VARIANT_CLASSES[variant])} />
+                }
+            `
+            const result = extractClassNames(content)
+            expect(result).toContain("bg-gray-700")
+            expect(result).toContain("bg-green-600")
+            expect(result).toContain("text-white")
+            expect(result).toContain("rounded-[4px]")
+            expect(result).toContain("px-[12px]")
+        })
+
+        it("extracts from a standalone const passed to className", () => {
+            const content = `
+                const base = "flex items-center"
+                <Button className={base} />
+            `
+            const result = extractClassNames(content)
+            expect(result).toContain("flex")
+            expect(result).toContain("items-center")
+        })
+
+        it("extracts string args of arbitrary helper functions", () => {
+            // twMerge/cva/anything: no allowlist of helper names.
+            const result = extractClassNames(
+                `const cls = myHelper("p-4", flag && "bg-blue-500")`
+            )
+            expect(result).toContain("p-4")
+            expect(result).toContain("bg-blue-500")
+        })
+
+        it("does not emit rules for incidental code strings", () => {
+            const content = `
+                import { Texture2D } from "UnityEngine"
+                import "onejs:tailwind"
+                const url = "https://example.com/path"
+                loadStyleSheet("styles/app.uss")
+            `
+            const uss = generateUSS(extractClassNames(content))
+            expect(uss).not.toContain("example")
+            expect(uss).not.toContain("UnityEngine")
+            expect(uss).not.toContain("app_d_uss")
+        })
+    })
+
+    describe("comments and other non-string quote characters", () => {
+        it("ignores an apostrophe in a line comment inside className={...}", () => {
+            // Regression: the old scanner paired quotes across raw expression
+            // text, so one apostrophe in a comment dropped every class literal
+            // in the attribute.
+            const content = `
+                <View className={twMerge(
+                    // don't tidy this comment
+                    "bg-gray-700 text-white")} />
+            `
+            const result = extractClassNames(content)
+            expect(result).toContain("bg-gray-700")
+            expect(result).toContain("text-white")
+        })
+
+        it("ignores quotes and braces in block comments", () => {
+            const content = `
+                <View className={clsx(
+                    /* the "default" variant } */
+                    "p-4",
+                    "rounded-lg")} />
+            `
+            const result = extractClassNames(content)
+            expect(result).toContain("p-4")
+            expect(result).toContain("rounded-lg")
+        })
+
+        it("ignores an apostrophe in a comment anywhere in the file", () => {
+            const content = `
+                // this component doesn't scroll
+                <View className="p-4 bg-blue-500" />
+            `
+            const result = extractClassNames(content)
+            expect(result).toContain("p-4")
+            expect(result).toContain("bg-blue-500")
+        })
+
+        it("ignores quotes inside regex literals", () => {
+            const content = `
+                const ok = /don't"match/.test(input)
+                <View className="p-4 bg-blue-500" />
+            `
+            const result = extractClassNames(content)
+            expect(result).toContain("p-4")
+            expect(result).toContain("bg-blue-500")
+        })
+
+        it("treats division as division, not a regex start", () => {
+            const content = `
+                const half = width / 2
+                const third = total / 3
+                <View className="p-4" />
+            `
+            expect(extractClassNames(content)).toContain("p-4")
+        })
+
+        it("survives a lone apostrophe in JSX text on the same line", () => {
+            const result = extractClassNames(
+                `<Text>Don't panic</Text><View className="p-4" />`
+            )
+            expect(result).toContain("p-4")
+        })
+
+        it("survives JSX-text apostrophes pairing across a className", () => {
+            // Two apostrophes in surrounding JSX text mis-read as a string
+            // spanning the markup between them; the quoted class inside the
+            // span must still surface as a candidate.
+            const result = extractClassNames(
+                `<Text>It's</Text><View className="p-4" /><Text>don't stop</Text>`
+            )
+            expect(result).toContain("p-4")
+        })
+
+        it("still scans after a self-closing tag preceded by a brace expression", () => {
+            const result = extractClassNames(
+                `<Foo bar={x} /> <View className="p-4" />`
+            )
+            expect(result).toContain("p-4")
         })
     })
 
@@ -528,6 +669,23 @@ describe("end-to-end: source code to USS", () => {
         expect(uss).toContain(".bg-white")
         expect(uss).toContain(".text-lg")
         expect(uss).toContain(".font-bold")
+    })
+
+    it("generates USS for classes reached only through a variant map", () => {
+        // The reported bug: layout classes inline in className= survived but
+        // the background lived in a variant map and was silently dropped.
+        const content = `
+            const VARIANT_CLASSES = {
+                default: "bg-gray-700 text-white",
+                success: "bg-green-600 text-white",
+            }
+            <View className={twMerge("rounded-[4px] px-[12px]", VARIANT_CLASSES[variant])} />
+        `
+        const uss = generateUSS(extractClassNames(content))
+        expect(uss).toContain(".bg-gray-700")
+        expect(uss).toContain(".bg-green-600")
+        expect(uss).toContain(".text-white")
+        expect(uss).toContain("background-color:")
     })
 
     it("generates USS from component with responsive + conditional classes", () => {
