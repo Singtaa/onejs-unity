@@ -85,9 +85,10 @@ const REGEX_PRECEDING_KEYWORDS = new Set([
  * valid where an expression is expected. Misclassification is line-capped
  * either way (regex literals and normal strings cannot contain raw
  * newlines), but JSX makes two cases worth special care: `</Tag>` (prev is
- * `<`) and self-closing `/>` (prev is `>`, `}`, `]`, `)`, a word char, or a
- * quote, which readers of this file mark by setting prev to `)`). The one
- * `>` that does expect an expression is an arrow `=>`.
+ * `<`) and self-closing `/>` (prev is `>`, `}`, `]`, `)`, or a word char;
+ * scanCode also sets prev to `)` after any string/template/regex literal,
+ * so `bar="x" />` lands here too). The one `>` that does expect an
+ * expression is an arrow `=>`.
  */
 function regexAllowed(prev, prev2, lastWord) {
     if (prev === "") return true

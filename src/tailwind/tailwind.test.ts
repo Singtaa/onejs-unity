@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { describe, it, expect } from "vitest"
 import {
     extractClassNames,
@@ -400,6 +401,50 @@ describe("extractClassNames", () => {
                 expect(result, `missing: ${cls}`).toContain(cls)
             }
         })
+    })
+})
+
+// ============================================================================
+// Fixture corpus: a realistic component file combining every construct that
+// has broken extraction in the past. Guards against silent-drop regressions
+// that per-idiom unit tests can miss when constructs interact.
+// ============================================================================
+
+describe("kitchen-sink fixture corpus", () => {
+    const fixture = readFileSync(
+        new URL("./fixtures/kitchen-sink.tsx", import.meta.url),
+        "utf8",
+    )
+
+    const expectedClasses = [
+        // variant map (never inside a className=)
+        "bg-gray-700", "bg-green-600", "bg-red-600", "text-white",
+        // standalone const
+        "rounded-lg", "px-4",
+        // inline literals, after comments/regex/division/JSX apostrophes
+        "w-[320px]", "w-64", "text-sm", "font-bold",
+        "mt-2", "opacity-100", "opacity-50",
+        "flex", "items-center",
+        "hover:bg-blue-600", "sm:p-2",
+    ]
+
+    it("extracts every class the fixture uses", () => {
+        const result = extractClassNames(fixture)
+        for (const cls of expectedClasses) {
+            expect(result, `missing: ${cls}`).toContain(cls)
+        }
+    })
+
+    it("emits a rule for every class and none for non-class strings", () => {
+        const uss = generateUSS(extractClassNames(fixture))
+        for (const cls of expectedClasses) {
+            expect(uss, `no rule for: ${cls}`).toContain(escapeClassName(cls))
+        }
+        // Junk candidates (imports, URLs, prose) must not become rules
+        expect(uss).not.toContain("example")
+        expect(uss).not.toContain("fake-helpers")
+        expect(uss).not.toContain("onejs_c_tailwind")
+        expect(uss).not.toContain("panic")
     })
 })
 
