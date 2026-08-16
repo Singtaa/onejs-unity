@@ -36,7 +36,7 @@ describe("findThemeModules", () => {
             "@cartridges/@singtaa/inventory/inventory.tsx": "",
         })
         const { files, dirs } = findThemeModules(path.join(root, "@cartridges"))
-        const names = files.map((f) => path.basename(f))
+        const names = files.map((f: string) => path.basename(f))
         // Sorted by full path: @singtaa/* precedes local/*
         expect(names).toEqual(["kawaiiTheme.ts", "pixelTheme.ts", "myTheme.tsx"])
         expect(names).not.toContain("inventory.tsx")
