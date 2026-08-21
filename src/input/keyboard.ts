@@ -3,11 +3,8 @@
  */
 
 import type { Keyboard, Axis2DConfig, AxisConfig, KeyBinding, Vector2 } from "./types"
+import { getInputBridge } from "./backend"
 
-// Get InputBridge lazily to avoid issues during module load
-function getInputBridge() {
-    return (CS as any).OneJS.Input.InputBridge
-}
 
 /**
  * Keyboard implementation that wraps the C# InputBridge

@@ -16,11 +16,8 @@ import type {
     KeyAxis2DConfig,
     ReaderKeyBinding,
 } from "./types"
+import { getInputBridge } from "./backend"
 
-// Get InputBridge lazily to avoid issues during module load
-function getInputBridge() {
-    return (CS as any).OneJS.Input.InputBridge
-}
 
 // ============ Zero-Alloc Invoker System ============
 

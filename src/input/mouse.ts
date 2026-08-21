@@ -3,11 +3,8 @@
  */
 
 import type { Mouse, Vector2 } from "./types"
+import { getInputBridge } from "./backend"
 
-// Get InputBridge lazily to avoid issues during module load
-function getInputBridge() {
-    return (CS as any).OneJS.Input.InputBridge
-}
 
 // Cached vector objects to reduce allocations
 const _position: Vector2 = { x: 0, y: 0 }

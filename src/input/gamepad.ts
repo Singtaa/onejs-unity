@@ -3,11 +3,8 @@
  */
 
 import type { Gamepad, DPad, Vector2 } from "./types"
+import { getInputBridge } from "./backend"
 
-// Get InputBridge lazily to avoid issues during module load
-function getInputBridge() {
-    return (CS as any).OneJS.Input.InputBridge
-}
 
 // Button bit flags (matching InputBridge.cs)
 const BUTTON_SOUTH = 1

@@ -31,6 +31,35 @@ if (gp?.wasButtonPressed("South")) {
 }
 ```
 
+## Backends
+
+By default every device reads UnityEngine's InputBridge through `CS`. A host
+where `CS` is not reachable can supply the same methods itself instead of
+forking a second input API:
+
+```typescript
+import { setInputBackend, createInputBackend } from "onejs-unity/input"
+
+setInputBackend(createInputBackend({
+    GetKeyDown: (key) => held.has(key),
+    GetKeyPressed: (key) => pressedThisFrame.has(key),
+}, "my host"))
+```
+
+Anything the backend omits throws a message naming the method and the host,
+rather than failing as "undefined is not a function" inside a device module. A
+device that should read as simply absent is better implemented than omitted:
+`GetGamepadCount` returning 0 makes `input.gamepad` null, which is what a game
+expects when nothing is plugged in.
+
+`setInputBackend(null)` returns to the CS bridge.
+
+This is what OneJS Play uses. Its container evaluates game bundles with the
+runtime's globals shadowed, so `CS` is undefined there, and game code still
+calls this same API. `resolveKeyName` and `keyNameFromDomCode` are exported for
+backends fed by browser events: DOM `KeyboardEvent.code` is layout-independent,
+so WASD stays the same physical row on AZERTY.
+
 ## API Reference
 
 ### Keyboard

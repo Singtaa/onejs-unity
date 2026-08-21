@@ -31,11 +31,8 @@ import { keyboard } from "./keyboard"
 import { mouse } from "./mouse"
 import { getGamepad, getGamepads, getGamepadCount, pauseHaptics, resumeHaptics } from "./gamepad"
 import { getTouches, getTouchCount } from "./touch"
+import { getInputBridge } from "./backend"
 
-// Get InputBridge lazily to avoid issues during module load
-function getInputBridge() {
-    return (CS as any).OneJS.Input.InputBridge
-}
 
 // Phase mapping
 const PHASE_MAP: ActionPhase[] = ["disabled", "waiting", "started", "performed", "canceled"]

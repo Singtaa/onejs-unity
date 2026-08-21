@@ -3,11 +3,8 @@
  */
 
 import type { Touch, TouchPhase, Vector2 } from "./types"
+import { getInputBridge } from "./backend"
 
-// Get InputBridge lazily to avoid issues during module load
-function getInputBridge() {
-    return (CS as any).OneJS.Input.InputBridge
-}
 
 // Phase mapping
 const PHASE_MAP: TouchPhase[] = ["began", "moved", "stationary", "ended", "canceled"]
