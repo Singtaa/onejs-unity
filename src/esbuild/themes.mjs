@@ -15,7 +15,7 @@
  * keeps working and remains the way to register a strict subset.
  */
 
-import fs from "fs"
+import { getFs } from "../fs-provider.mjs"
 import path from "path"
 
 /**
@@ -29,6 +29,10 @@ import path from "path"
 export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
     const files = []
     const dirs = []
+    // Resolved outside the walk so a missing fs provider throws. Inside, the
+    // catch would swallow it as though the directory were simply absent, and a
+    // misconfigured host would silently find no themes at all.
+    const fs = getFs()
     const walk = (dir) => {
         let entries
         try {

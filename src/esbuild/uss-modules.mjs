@@ -1,4 +1,4 @@
-import fs from "fs"
+import { getFs } from "../fs-provider.mjs"
 import path from "path"
 import crypto from "crypto"
 
@@ -180,7 +180,7 @@ export function ussModulesPlugin(options = {}) {
 
             // Transform .module.uss files
             build.onLoad({ filter: /.*/, namespace: "uss-module" }, async (args) => {
-                const ussContent = await fs.promises.readFile(args.path, "utf8")
+                const ussContent = await getFs().promises.readFile(args.path, "utf8")
                 const relativePath = path.relative(process.cwd(), args.path)
                 const hash = generateHash(relativePath)
 
@@ -195,7 +195,7 @@ export function ussModulesPlugin(options = {}) {
                 if (generateTypes) {
                     const dtsPath = args.path + ".d.ts"
                     const dtsContent = generateDts(classMap)
-                    await fs.promises.writeFile(dtsPath, dtsContent)
+                    await getFs().promises.writeFile(dtsPath, dtsContent)
                 }
 
                 // Escape USS for JavaScript string

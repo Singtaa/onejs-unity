@@ -1,4 +1,4 @@
-import fs from "fs"
+import { getFs } from "../fs-provider.mjs"
 
 /**
  * esbuild plugin that transforms imports from C# namespaces to CS.* references.
@@ -37,7 +37,7 @@ export function importTransformPlugin(options = {}) {
                     return null
                 }
 
-                const source = await fs.promises.readFile(args.path, "utf8")
+                const source = await getFs().promises.readFile(args.path, "utf8")
 
                 // Check if this file has any imports that need transformation
                 // Match import statements with uppercase module names

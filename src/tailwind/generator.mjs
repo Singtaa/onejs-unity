@@ -5,7 +5,7 @@
  * and generates USS output.
  */
 
-import fs from "node:fs/promises"
+import { getFs } from "../fs-provider.mjs"
 import path from "node:path"
 import { allUtilities } from "./utilities.mjs"
 import { breakpoints } from "./config.mjs"
@@ -264,7 +264,7 @@ export async function scanFiles(patterns, cwd = process.cwd()) {
 
     // Simple glob implementation for common patterns
     async function walkDir(dir, pattern) {
-        const entries = await fs.readdir(dir, { withFileTypes: true })
+        const entries = await getFs().promises.readdir(dir, { withFileTypes: true })
 
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name)
@@ -280,7 +280,7 @@ export async function scanFiles(patterns, cwd = process.cwd()) {
                 // Check if file matches pattern
                 if (matchesPattern(relativePath, pattern)) {
                     try {
-                        const content = await fs.readFile(fullPath, "utf8")
+                        const content = await getFs().promises.readFile(fullPath, "utf8")
                         const fileClasses = extractClassNames(content)
                         fileClasses.forEach(c => classNames.add(c))
                     } catch (err) {
@@ -307,7 +307,7 @@ export async function scanFiles(patterns, cwd = process.cwd()) {
             // Direct file path
             const filePath = path.join(cwd, pattern.replace(/^\.\//, ""))
             try {
-                const content = await fs.readFile(filePath, "utf8")
+                const content = await getFs().promises.readFile(filePath, "utf8")
                 const fileClasses = extractClassNames(content)
                 fileClasses.forEach(c => classNames.add(c))
             } catch (err) {

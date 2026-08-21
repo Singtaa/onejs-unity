@@ -15,7 +15,7 @@
  * During Unity build, assets are copied FLAT to StreamingAssets/onejs/assets/@my-package/images/bg.png
  */
 
-import fs from "node:fs"
+import { getFs } from "../fs-provider.mjs"
 import path from "node:path"
 
 /**
@@ -26,7 +26,7 @@ function isDirectoryEntry(entry, parentPath) {
     if (entry.isSymbolicLink()) {
         try {
             const fullPath = path.join(parentPath, entry.name)
-            const stat = fs.statSync(fullPath)
+            const stat = getFs().statSync(fullPath)
             return stat.isDirectory()
         } catch {
             return false
@@ -42,9 +42,9 @@ function isDirectoryEntry(entry, parentPath) {
 function findPackageAssetNamespaces(nodeModulesPath) {
     const results = []
 
-    if (!fs.existsSync(nodeModulesPath)) return results
+    if (!getFs().existsSync(nodeModulesPath)) return results
 
-    const entries = fs.readdirSync(nodeModulesPath, { withFileTypes: true })
+    const entries = getFs().readdirSync(nodeModulesPath, { withFileTypes: true })
 
     for (const entry of entries) {
         if (!isDirectoryEntry(entry, nodeModulesPath)) continue
@@ -53,7 +53,7 @@ function findPackageAssetNamespaces(nodeModulesPath) {
 
         // Handle scoped packages (@scope/name)
         if (entry.name.startsWith("@")) {
-            const scopedEntries = fs.readdirSync(entryPath, { withFileTypes: true })
+            const scopedEntries = getFs().readdirSync(entryPath, { withFileTypes: true })
             for (const scopedEntry of scopedEntries) {
                 if (!isDirectoryEntry(scopedEntry, entryPath)) continue
 
@@ -75,7 +75,7 @@ function findPackageAssetNamespaces(nodeModulesPath) {
  */
 function scanPackageAssets(pkgPath, pkgName, results) {
     const assetsPath = path.join(pkgPath, "assets")
-    if (!fs.existsSync(assetsPath)) return
+    if (!getFs().existsSync(assetsPath)) return
 
     const namespaces = findAssetNamespaces(assetsPath)
     for (const ns of namespaces) {
@@ -93,9 +93,9 @@ function scanPackageAssets(pkgPath, pkgName, results) {
 function findAssetNamespaces(assetsPath) {
     const namespaces = []
 
-    if (!fs.existsSync(assetsPath)) return namespaces
+    if (!getFs().existsSync(assetsPath)) return namespaces
 
-    const entries = fs.readdirSync(assetsPath, { withFileTypes: true })
+    const entries = getFs().readdirSync(assetsPath, { withFileTypes: true })
 
     for (const entry of entries) {
         if (entry.name.startsWith("@") && isDirectoryEntry(entry, assetsPath)) {
@@ -149,7 +149,7 @@ export function copyAssetsPlugin(options = {}) {
                 }
 
                 // 1. Scan user assets for @-namespaces
-                if (fs.existsSync(userAssetsPath)) {
+                if (getFs().existsSync(userAssetsPath)) {
                     const userNamespaces = findAssetNamespaces(userAssetsPath)
                     for (const ns of userNamespaces) {
                         manifest.namespaces[ns] = {
@@ -171,8 +171,8 @@ export function copyAssetsPlugin(options = {}) {
                 }
 
                 // 3. Write manifest file
-                fs.mkdirSync(path.dirname(manifestFullPath), { recursive: true })
-                fs.writeFileSync(manifestFullPath, JSON.stringify(manifest, null, 2))
+                getFs().mkdirSync(path.dirname(manifestFullPath), { recursive: true })
+                getFs().writeFileSync(manifestFullPath, JSON.stringify(manifest, null, 2))
 
                 if (verbose) {
                     console.log(`[copy-assets] Generated manifest: ${manifestPath}`)
