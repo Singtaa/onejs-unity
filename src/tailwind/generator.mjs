@@ -564,9 +564,34 @@ function applyOpacityToDeclarations(decls, opacity) {
 /**
  * Generate USS for a set of class names
  */
+/**
+ * Tailwind families USS cannot express, and what to do instead.
+ *
+ * These are not typos, so they never reach the unknown-class path a user would
+ * notice: they are real Tailwind classes that compile to nothing here. Silence
+ * is the worst outcome, because the layout simply comes out wrong with no
+ * indication why, which is exactly how every Wordle tile ended up flush against
+ * its neighbour.
+ *
+ * gap is not polyfillable cleanly. USS supports `> *`, so half-margins on the
+ * children are expressible, but cancelling the outer half needs a negative
+ * margin on the parent, and that silently clobbers any margin the author put on
+ * the same element (`gap-2 mb-3` is a real and common pairing). Saying so beats
+ * guessing.
+ */
+const UNSUPPORTED_FAMILIES = [
+    {
+        test: (base) => /^gap(-x|-y)?-/.test(base),
+        name: "gap-*",
+        advice: "UI Toolkit has no gap property. Put a margin on the children instead: " +
+            "half the gap on each child gives the same spacing between them.",
+    },
+]
+
 export function generateUSS(classNames, options = {}) {
-    const { includeReset = false } = options
+    const { includeReset = false, onUnsupported = defaultUnsupportedWarning } = options
     const rules = []
+    const unsupported = new Map()
     const breakpointRules = {} // Group by breakpoint
 
     // Initialize breakpoint groups
@@ -606,7 +631,15 @@ export function generateUSS(classNames, options = {}) {
         }
 
         if (!declarations) {
-            // Unknown utility class, skip
+            // Unknown utility class. Most are not Tailwind at all (CSS module
+            // names, arbitrary strings the scanner picked up), so staying quiet
+            // is right, except for the families we know are real Tailwind and
+            // silently do nothing here.
+            for (const family of UNSUPPORTED_FAMILIES) {
+                if (!family.test(base)) continue
+                if (!unsupported.has(family.name)) unsupported.set(family.name, { family, used: new Set() })
+                unsupported.get(family.name).used.add(className)
+            }
             continue
         }
 
@@ -661,6 +694,14 @@ export function generateUSS(classNames, options = {}) {
         }
     }
 
+    if (unsupported.size > 0 && typeof onUnsupported === "function") {
+        onUnsupported([...unsupported.values()].map(({ family, used }) => ({
+            name: family.name,
+            advice: family.advice,
+            used: [...used].sort(),
+        })))
+    }
+
     // Build final USS
     let uss = ""
 
@@ -691,6 +732,15 @@ export function generateUSS(classNames, options = {}) {
     }
 
     return uss.trim()
+}
+
+/** Reports unsupported utilities once per build, on stderr. */
+function defaultUnsupportedWarning(families) {
+    for (const { name, advice, used } of families) {
+        const shown = used.slice(0, 8).join(" ")
+        const more = used.length > 8 ? ` (and ${used.length - 8} more)` : ""
+        console.warn(`[tailwind] ${name} is not supported and was skipped: ${shown}${more}\n            ${advice}`)
+    }
 }
 
 /**
