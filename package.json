@@ -21,7 +21,8 @@
     "./esbuild/uss-modules": "./src/esbuild/uss-modules.mjs",
     "./esbuild/tailwind": "./src/esbuild/tailwind.mjs",
     "./esbuild/themes": "./src/esbuild/themes.mjs",
-    "./esbuild/copy-assets": "./src/esbuild/copy-assets.mjs"
+    "./esbuild/copy-assets": "./src/esbuild/copy-assets.mjs",
+    "./audio": "./src/audio/index.ts"
   },
   "files": [
     "src"
