@@ -22,7 +22,8 @@
     "./esbuild/tailwind": "./src/esbuild/tailwind.mjs",
     "./esbuild/themes": "./src/esbuild/themes.mjs",
     "./esbuild/copy-assets": "./src/esbuild/copy-assets.mjs",
-    "./audio": "./src/audio/index.ts"
+    "./audio": "./src/audio/index.ts",
+    "./physics2d": "./src/physics2d/index.ts"
   },
   "files": [
     "src"
