@@ -231,7 +231,7 @@ Assets/Singtaa/OneJS/Unity/Shaders/Noise/
 | Small samples (< 64x64) | CPU (no dispatch overhead) |
 | Large textures (512+) | GPU |
 | Per-frame updates | GPU with `dispatchSync()` |
-| WebGL builds | CPU (more consistent) |
+| WebGL builds | CPU: compute shaders are unavailable there, so guard on `.gpu.available` |
 | One-time generation | Either |
 
 ### Zero-Allocation Pattern
@@ -319,7 +319,10 @@ function AnimatedBackground() {
         })
     })
 
-    return <RawImage texture={texture} style={{ width: "100%", height: "100%" }} />
+    // A texture reaches an element through the backgroundImage style. There is
+    // no component for it: the reconciler special-cases the property so the
+    // texture is attached on the C# side rather than marshalled every frame.
+    return <View style={{ width: "100%", height: "100%", backgroundImage: texture }} />
 }
 ```
 
