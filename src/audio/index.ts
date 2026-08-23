@@ -113,9 +113,19 @@ export const audio = {
      * Loads a sound.
      *
      * The URL is fetched the same way anywhere: on WebGL from the game's own
-     * origin, elsewhere from the file system or the network. Format is inferred
-     * from the extension, which matters on WebGL where the browser has to be
-     * told what it is decoding. Prefer .ogg, which every platform supports.
+     * origin, elsewhere from the file system or the network.
+     *
+     * Format is inferred from the extension, because it has to be declared
+     * before the download starts and WebGL cannot sniff bytes. An extension
+     * nobody recognises asks for AudioType.UNKNOWN, which works on desktop,
+     * where the decoder inspects the bytes, and fails in a browser.
+     *
+     * Prefer .wav for anything that will run on the web. On WebGL the decode is
+     * the browser's rather than Unity's, so the format has to be one that
+     * browser supports, and Ogg Vorbis is exactly the one Safari has been
+     * unreliable about: a game whose only music is an .ogg can be silent for a
+     * real share of players. .ogg and .mp3 are much smaller and are the right
+     * answer for music, with a Safari check or a .wav fallback behind them.
      */
     async load(url: string): Promise<Sound> {
         if (typeof url !== "string" || url === "") throw new Error("[oj] audio.load needs a url")
