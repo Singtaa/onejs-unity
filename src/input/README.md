@@ -259,6 +259,23 @@ function Game() {
 }
 ```
 
+**"Auto-updates each frame" is not free.** Each of these calls `setState` from a
+frame callback, so a component holding one re-renders at frame rate, and so does
+everything below it. That is what you want for the display above: a readout has
+to change when the input does.
+
+It is the wrong tool for game logic. Read `input` directly inside your frame
+loop instead, where the same values cost no render at all:
+
+```typescript
+useFrame(() => {
+    if (input.keyboard.isKeyDown("Space")) jump()
+})
+```
+
+Keep the hooks for the parts of the screen that show input, and keep the parts
+that react to it out of React.
+
 ### Event Hooks
 
 ```typescript
