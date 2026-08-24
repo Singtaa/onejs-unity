@@ -59,12 +59,40 @@ Two things end a pass, and both are in `FxBridge.Execute`:
 Neither is visible from JS. A chain of any length works; it just costs more
 passes.
 
+## Sources
+
+A chain starts from one of these.
+
+| Source | Notes |
+|---|---|
+| `image.load(path)` | Through `Resources.Load`, so the path is Resources relative with no extension |
+| `image.fromHandle(h)` | A texture you already hold |
+| `image.color(w, h, rgba)` | A flat colour |
+| `image.blank(w, h)` | Transparent |
+| `image.noise(w, h, opts)` | Scrolling fBm value noise, greyscale |
+| `image.gradient(w, h, stops, angle)` | Up to 8 stops, sorted for you |
+| `image.sdf(w, h, kind, opts)` | Any of the 42 signed distance shapes, as a mask |
+
+`noise`, `gradient` and `sdf` run through `OneJS/FxSources`, a separate shader
+from the fused op pass because they read only uv and take no input texture.
+Folding both into one shader would make every fused pass carry generator code it
+never runs.
+
+`sdf` takes the same shape names, defaults and centred aspect corrected space as
+`fx.sdf` in `onejs-react`'s `TextureFX`, because both feed the same
+`SDF2D.cginc`. The table is restated in `sdf.ts` rather than imported:
+`onejs-unity` does not depend on `onejs-react`, and inverting that to share one
+table would make the whole Unity utility package depend on the React renderer.
+**A shape id therefore changes in four places**: `sdf.ts`, `texturefx.ts`, and
+the `sdfDistance` switch in each of the two shaders.
+
 ## Files
 
 | File | Purpose |
 |---|---|
 | `ops.ts` | The wire contract: opcodes, operand modes, the window size |
 | `image.ts` | The `Image` node and the `image` source factory |
+| `sdf.ts` | Shape ids and parameter packing for the sdf source |
 | `fx.test.ts` | Encoding tests |
 
 The other half is `Assets/Singtaa/OneJS/Runtime/Fx/FxBridge.cs` and
@@ -77,8 +105,6 @@ the failure mode the particle wire was built to avoid.
 
 Phase 2a covers sources and the maths operations. Still to come:
 
-- **2a remainder**: `noise`, `gradient` and `sdf` sources. Today a chain starts
-  from `load`, `color` or `blank`.
 - **2b**: colour operations, the 27 blend modes, spatial operations.
 - **2c**: multi pass filters (blur, sharpen, edge, dilate, erode, outline).
 - **2d**: the compute backend for jump flood SDF generation and histograms.

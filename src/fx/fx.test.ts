@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { MAX_FUSED_OPS, MODE, OP, WIRE_VERSION, isPixelOp } from "./ops"
+import { MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MODE, OP, WIRE_VERSION, isPixelOp } from "./ops"
+import { SDF_SHAPES } from "./sdf"
 
 /**
  * The encoded chain is the contract with Runtime/Fx/FxBridge.cs. If anything
@@ -143,5 +144,72 @@ describe("fx chain encoding", () => {
         const second = img.render()
         expect(first).toBe(second)
         expect(executed.length).toBe(1)
+    })
+})
+
+describe("fx generated sources", () => {
+    it("encodes noise with its octaves clamped to what the shader unrolls", async () => {
+        const { image } = await load()
+        const d = decode(image.noise(64, 64, { scale: 3, seed: 9, octaves: 99, rotation: 90 }).encode())
+        expect(d.steps[0].op).toBe(OP.SOURCE_NOISE)
+        // w, h, scaleX, scaleY, octaves, seed, offsetX, offsetY, rotation
+        expect(d.steps[0].args.slice(0, 6)).toEqual([64, 64, 3, 3, 4, 9])
+        expect(d.steps[0].args[8]).toBeCloseTo(Math.PI / 2)
+    })
+
+    it("sorts gradient stops, because the shader walks them in order", async () => {
+        const { image } = await load()
+        const d = decode(image.gradient(32, 32, [
+            { color: [1, 1, 1, 1], at: 1 },
+            { color: [0, 0, 0, 1], at: 0 },
+            { color: [1, 0, 0, 1], at: 0.5 },
+        ]).encode())
+        expect(d.steps[0].op).toBe(OP.SOURCE_GRADIENT)
+        expect(d.steps[0].args[3]).toBe(3)
+        // positions are the 5th float of each stop record
+        const positions = [d.steps[0].args[8], d.steps[0].args[13], d.steps[0].args[18]]
+        expect(positions).toEqual([0, 0.5, 1])
+    })
+
+    it("refuses a gradient the shader cannot hold", async () => {
+        const { image } = await load()
+        const many = Array.from({ length: MAX_GRADIENT_STOPS + 1 }, (_, i) => ({
+            color: [0, 0, 0, 1] as [number, number, number, number], at: i / 10,
+        }))
+        expect(() => image.gradient(8, 8, many)).toThrow(/at most/)
+        expect(() => image.gradient(8, 8, [])).toThrow(/at least one/)
+    })
+
+    it("packs an sdf source the way FxSources reads it", async () => {
+        const { image } = await load()
+        const d = decode(image.sdf(64, 64, "hexagon", {
+            r: 0.4, x: 0.1, rotation: 180, scale: 2, rounded: 0.03, onion: 0.01,
+            softness: 0.05, field: true,
+        }).encode())
+        expect(d.steps[0].op).toBe(OP.SOURCE_SDF)
+        const a = d.steps[0].args
+        expect(a.slice(0, 3)).toEqual([64, 64, SDF_SHAPES.hexagon])
+        expect(a[3]).toBeCloseTo(0.4)          // param 1
+        // Float32Array rounds, so these compare loosely rather than exactly.
+        expect(a[9]).toBeCloseTo(0.1); expect(a[10]).toBe(0)
+        expect(a[11]).toBeCloseTo(Math.PI)     // rotation
+        expect(a[12]).toBe(2)                  // scale
+        expect(a[13]).toBeCloseTo(0.03); expect(a[14]).toBeCloseTo(0.01)
+        expect(a[15]).toBeCloseTo(0.05); expect(a[16]).toBe(1)
+        expect(a.length).toBe(17)
+    })
+
+    it("keeps the sdf shape ids contiguous and unique", async () => {
+        const ids = Object.values(SDF_SHAPES)
+        expect(new Set(ids).size).toBe(ids.length)
+        expect(Math.min(...ids)).toBe(0)
+        expect(Math.max(...ids)).toBe(41)
+        expect(ids.length).toBe(42)
+    })
+
+    it("treats every generated source as a source, not a fusable op", async () => {
+        for (const code of [OP.SOURCE_NOISE, OP.SOURCE_GRADIENT, OP.SOURCE_SDF]) {
+            expect(isPixelOp(code)).toBe(false)
+        }
     })
 })

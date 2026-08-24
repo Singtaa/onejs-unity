@@ -28,6 +28,9 @@ export const OP = {
     // Sources: begin a chain. Exactly one, and it must come first.
     SOURCE_TEXTURE: 0, // args: handle
     SOURCE_COLOR: 1,   // args: width, height, r, g, b, a
+    SOURCE_NOISE: 2,    // args: w, h, scaleX, scaleY, octaves, seed, offsetX, offsetY, rotation
+    SOURCE_GRADIENT: 3, // args: w, h, angle, stopCount, then (r, g, b, a, pos) per stop
+    SOURCE_SDF: 4,      // args: w, h, shapeId, f1..f6, x, y, rot, scale, rounded, onion, softness, field
 
     // Basic maths
     ADD: 16,
@@ -91,3 +94,18 @@ export const FIRST_PIXEL_OP = 16
 export function isPixelOp(op: number): boolean {
     return op >= FIRST_PIXEL_OP
 }
+
+/**
+ * Sources that generate rather than read. They run through OneJS/FxSources,
+ * which is a separate shader from the fused op pass because it takes no input
+ * texture: folding both into one would make every fused pass carry generator
+ * code it never runs.
+ */
+export const SOURCE = {
+    NOISE: OP.SOURCE_NOISE,
+    GRADIENT: OP.SOURCE_GRADIENT,
+    SDF: OP.SOURCE_SDF,
+} as const
+
+/** Must match MAX_STOPS in OneJS/FxSources.shader and MaxGradientStops in FxBridge.cs. */
+export const MAX_GRADIENT_STOPS = 8
