@@ -58,6 +58,11 @@ export const OP = {
     POSTERIZE: 53,
     RECIPROCAL: 54,
 
+    // Interpolation
+    LERP: 64,        // operand, then t
+    SMOOTHSTEP: 65,  // args: edge0, edge1
+    INVERSE_LERP: 66,
+
     // Colour. These leave alpha alone: an adjustment that silently
     // changed opacity would surprise everywhere it is used.
     GRAYSCALE: 80,
@@ -80,10 +85,15 @@ export const OP = {
     FLIP: 114,      // horizontal, vertical
     CROP: 115,      // x, y, w, h in uv
 
-    // Interpolation
-    LERP: 64,        // operand, then t
-    SMOOTHSTEP: 65,  // args: edge0, edge1
-    INVERSE_LERP: 66,
+    // Neighbourhood filters. These read MANY pixels, so they need the
+    // texel size and cannot fuse either. One of them can be several
+    // passes: the separable ones run horizontal then vertical.
+    BLUR: 128,    // radius in pixels
+    SHARPEN: 129, // amount
+    EDGE: 130,    // amount
+    DILATE: 131,  // radius in pixels
+    ERODE: 132,   // radius in pixels
+    OUTLINE: 133, // width, rgba, then 1 to key on luminance instead of alpha
 } as const
 
 export type OpCode = (typeof OP)[keyof typeof OP]
@@ -154,6 +164,24 @@ export type BlendMode = keyof typeof BLEND
 /** Ops at or above this change uv before sampling, so they never fuse. */
 export const FIRST_SPATIAL_OP = 112
 
+/** Ops at or above this sample their neighbours, so they never fuse either. */
+export const FIRST_FILTER_OP = 128
+
 export function isSpatialOp(op: number): boolean {
-    return op >= FIRST_SPATIAL_OP
+    // A range, not just a floor: the filter ops sit above the spatial ones, so
+    // a bare `op >= FIRST_SPATIAL_OP` calls every filter spatial too. FxBridge
+    // avoids this by testing the filter range first; a predicate has no order
+    // to lean on and has to say what it means.
+    return op >= FIRST_SPATIAL_OP && op < FIRST_FILTER_OP
 }
+
+export function isFilterOp(op: number): boolean {
+    return op >= FIRST_FILTER_OP
+}
+
+/**
+ * Taps per side in OneJS/FxFilter. A blur wider than this is split into
+ * repeated passes by the runtime rather than sampling more sparsely, so the
+ * cap is not a ceiling on blur radius, only on the cost of one pass.
+ */
+export const MAX_FILTER_TAPS = 32

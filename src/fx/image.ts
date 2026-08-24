@@ -273,6 +273,49 @@ export class Image {
         return this.#then(OP.CROP, MODE.SCALAR, [x, y, width, height])
     }
 
+    // MARK: filters
+    //
+    // These sample the neighbourhood, so they need the texel size and take
+    // passes of their own. The separable ones are two passes each.
+
+    /**
+     * Gaussian blur, radius in pixels.
+     *
+     * There is no radius limit. Past what one pass can tap the runtime repeats
+     * the pass instead of spreading the taps, which would alias; blurring twice
+     * at sigma widens by sqrt(2), so the result is the blur you asked for.
+     * A big radius costs passes, not quality.
+     */
+    blur(radius: number): Image { return this.#then(OP.BLUR, MODE.SCALAR, [radius]) }
+
+    /** Unsharp mask. 0 is a no op; around 0.5 to 2 is the useful range. */
+    sharpen(amount = 1): Image { return this.#then(OP.SHARPEN, MODE.SCALAR, [amount]) }
+
+    /**
+     * Sobel edge magnitude, greyscale. Measured on luminance rather than per
+     * channel, which would give three uncorrelated edge maps.
+     */
+    edge(amount = 1): Image { return this.#then(OP.EDGE, MODE.SCALAR, [amount]) }
+
+    /** Grows bright areas (a per channel maximum over the radius). */
+    dilate(radius: number): Image { return this.#then(OP.DILATE, MODE.SCALAR, [radius]) }
+
+    /** Shrinks bright areas (a per channel minimum over the radius). */
+    erode(radius: number): Image { return this.#then(OP.ERODE, MODE.SCALAR, [radius]) }
+
+    /**
+     * Draws a ring of `color` around the shape, `width` pixels thick, with the
+     * original composited on top of it.
+     *
+     * `on` says which channel carries the shape, and it matters: a loaded sprite
+     * keeps its shape in alpha, while the `sdf` and `noise` sources put theirs in
+     * rgb and leave alpha at 1. Outlining a mask with the alpha default gives an
+     * empty ring rather than an error, so pass `"luminance"` for those.
+     */
+    outline(width: number, color: RGBA = [0, 0, 0, 1], on: "alpha" | "luminance" = "alpha"): Image {
+        return this.#then(OP.OUTLINE, MODE.SCALAR, [width, ...color, on === "luminance" ? 1 : 0])
+    }
+
     /**
      * Flattens the chain into the buffer FxBridge reads. Exposed for tests and
      * for anyone who wants to see what a chain costs; render() calls it.

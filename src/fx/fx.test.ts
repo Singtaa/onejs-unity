@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { BLEND, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MODE, OP, WIRE_VERSION, isPixelOp, isSpatialOp } from "./ops"
+import { BLEND, FIRST_FILTER_OP, MAX_FILTER_TAPS, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MODE, OP, WIRE_VERSION, isFilterOp, isPixelOp, isSpatialOp } from "./ops"
 import { SDF_SHAPES } from "./sdf"
 
 /**
@@ -291,3 +291,64 @@ describe("fx colour, blend and spatial", () => {
         expect(a).toEqual([2, 1, 0, 4])
     })
 })
+
+describe("fx neighbourhood filters", () => {
+    it("marks the filters unfusable and keeps the families disjoint", async () => {
+        const filters = [OP.BLUR, OP.SHARPEN, OP.EDGE, OP.DILATE, OP.ERODE, OP.OUTLINE]
+        for (const code of filters) {
+            expect(isFilterOp(code)).toBe(true)
+            // A filter must not also read as spatial, or FxBridge would take the
+            // wrong branch: it tests the filter range first, then the spatial one.
+            expect(code >= FIRST_FILTER_OP).toBe(true)
+        }
+        for (const [name, code] of Object.entries(OP)) {
+            if (filters.includes(code as any)) continue
+            expect(isFilterOp(code)).toBe(false)
+        }
+    })
+
+    it("encodes each filter's arguments", async () => {
+        const { image } = await load()
+        const d = decode(image.blank(8, 8)
+            .blur(12)
+            .sharpen(0.75)
+            .edge(2)
+            .dilate(3)
+            .erode(4)
+            .outline(2, [1, 0, 0, 1])
+            .encode())
+        expect(d.steps.map((s) => s.op)).toEqual([
+            OP.SOURCE_COLOR, OP.BLUR, OP.SHARPEN, OP.EDGE, OP.DILATE, OP.ERODE, OP.OUTLINE,
+        ])
+        expect(d.steps[1].args).toEqual([12])
+        expect(d.steps[3].args).toEqual([2])
+        expect(d.steps[6].args).toEqual([2, 1, 0, 0, 1, 0])
+        expect(d.consumed).toBe(d.consumed) // whole buffer walked, see the first suite
+    })
+
+    it("lets a blur exceed one pass's tap budget", async () => {
+        const { image } = await load()
+        // The cap bounds the cost of a pass, not the radius: the runtime splits
+        // this into several passes rather than refusing or aliasing.
+        const big = MAX_FILTER_TAPS * 4
+        const d = decode(image.blank(8, 8).blur(big).encode())
+        expect(d.steps[1].args).toEqual([big])
+    })
+
+    it("defaults an outline to opaque black", async () => {
+        const { image } = await load()
+        const a = decode(image.blank(8, 8).outline(3).encode()).steps[1].args
+        expect(a).toEqual([3, 0, 0, 0, 1, 0])
+    })
+
+    it("tags which channel an outline reads its shape from", async () => {
+        const { image } = await load()
+        const alpha = decode(image.blank(8, 8).outline(2).encode()).steps[1].args
+        const luma = decode(image.blank(8, 8).outline(2, [1, 0, 0, 1], "luminance").encode()).steps[1].args
+        // Silently defaulting this gives an empty ring for the mask sources, so
+        // the flag rides on the wire rather than being inferred in the shader.
+        expect(alpha[5]).toBe(0)
+        expect(luma[5]).toBe(1)
+    })
+})
+

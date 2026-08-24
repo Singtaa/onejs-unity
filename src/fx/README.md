@@ -1,7 +1,7 @@
 # fx: textures as values
 
 `onejs-unity/fx` makes a texture something you can hold, chain operations on,
-and hand to an element. Phases 2a and 2b of `Specs/GPU_2D.md`.
+and hand to an element. Phases 2a to 2c of `Specs/GPU_2D.md`.
 
 ```ts
 import { image } from "onejs-unity/fx"
@@ -56,21 +56,32 @@ Four things end a pass, all in `FxBridge.Execute`:
 2. A second **texture** operand appears. The shader has one spare sampler, so
    one texture operand fits per pass.
 3. A second **ramp** appears. Same reason: one set of ramp uniforms.
-4. A **spatial** op appears, which cannot fuse at all (see below).
+4. A **spatial or filter** op appears, which cannot fuse at all (see below).
 
 None of it is visible from JS. A chain of any length works; it just costs more
 passes.
 
-## Why spatial ops are different
+## Three kinds of op
 
-Every op in `FxOps` works on a colour that has **already been sampled**. A
-spatial op has to change the uv *before* the sample happens, so there is
-nothing for it to fuse into: it always takes a pass of its own, through
-`OneJS/FxSpatial`. `crop` is also the only op that changes the target size.
+How an op reads its input decides where it can run, and the opcode ranges encode
+exactly that:
 
-That is the whole reason the op numbering has a gap at 112: everything at or
-above `FIRST_SPATIAL_OP` is in this family, and both sides split on that one
-comparison.
+| Range | Family | Reads | Where |
+|---|---|---|---|
+| 16..111 | maths, colour, composite | one pixel | fuses into `FxOps` |
+| 112..127 | spatial | one pixel at a **moved uv** | own pass, `FxSpatial` |
+| 128+ | filters | **many** pixels | own pass(es), `FxFilter` |
+
+Every op in `FxOps` works on a colour that has already been sampled, so
+anything that has to move the uv first, or read neighbours, has nothing to fuse
+into. `crop` is the only op that changes the target size, and the filters are
+the only ops where **one op can be several passes**: the separable ones
+(`blur`, `dilate`, `erode`) run horizontally then vertically.
+
+Watch the range predicates: `isSpatialOp` has to be a range and not just
+`op >= FIRST_SPATIAL_OP`, or every filter reads as spatial too. `FxBridge`
+gets away with a floor because it tests the filter range first; a predicate has
+no order to lean on.
 
 ## Sources
 
@@ -117,9 +128,8 @@ the failure mode the particle wire was built to avoid.
 
 ## What is not here yet
 
-Phases 2a and 2b are in. Still to come:
+Phases 2a, 2b and 2c are in. Still to come:
 
-- **2c**: multi pass filters (blur, sharpen, edge, dilate, erode, outline).
 - **2d**: the compute backend for jump flood SDF generation and histograms.
 - **3**: the React surface, `useTexture` and friends.
 
@@ -151,6 +161,7 @@ operand across several chains renders it once.
 | Colour | `grayscale` `brightness` `contrast` `saturation` `hueShift` `levels` `swizzle` `ramp` |
 | Composite | `blend(operand, mode, opacity)`, 27 Photoshop modes |
 | Spatial | `transform` `tile` `flip` `crop` |
+| Filters | `blur` `sharpen` `edge` `dilate` `erode` `outline` |
 
 Colour operations adjust rgb and leave alpha alone: an adjustment that silently
 changed opacity would surprise everywhere it is used.
@@ -163,3 +174,20 @@ the spec's `D(b)` rather than the cheap two branch version, which has a visible
 kink at 0.5 on smooth gradients, and `hue`, `saturation`, `color` and
 `luminosity` use `SetLum` / `SetSat` rather than an HSV round trip, which is what
 makes them agree with Photoshop.
+
+**Blur has no radius limit.** `MAX_FILTER_TAPS` bounds what one pass can sample,
+not how wide a blur can be: past that the runtime repeats the pass rather than
+spreading the taps, which would alias. Blurring twice at sigma widens by
+sqrt(2), because variances add, so N passes at sigma/sqrt(N) reproduce the sigma
+asked for. A big radius costs passes, not quality.
+
+**`outline` needs to be told which channel holds the shape.** A loaded sprite
+keeps its shape in alpha; the `sdf` and `noise` sources put theirs in rgb and
+leave alpha at 1. The alpha default gives an empty ring for those rather than an
+error, so pass `"luminance"`.
+
+**Do not use UnityCG's `Luminance` in these shaders.** It reads
+`unity_ColorSpaceLuminance`, whose linear space weights sum to about 0.502
+rather than 1, so white comes back as half and everything downstream is
+mysteriously dim. `FxFilter` defines `fxLuma` with Rec. 709 weights, matching
+`onejsLuma` in `FxColor.cginc`.
