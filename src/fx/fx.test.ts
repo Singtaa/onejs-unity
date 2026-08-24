@@ -413,6 +413,12 @@ describe("fx noise and sdf extras", () => {
         expect(wild[10]).toBeCloseTo(0.9)
     })
 
+    it("flags which noise to use, defaulting to value", async () => {
+        const { image } = await load()
+        expect(decode(image.noise(64, 64).encode()).steps[0].args[11]).toBe(0)
+        expect(decode(image.noise(64, 64, { type: "simplex" }).encode()).steps[0].args[11]).toBe(1)
+    })
+
     it("stretches an sdf shape when scale is a pair", async () => {
         const { image } = await load()
         const uniform = decode(image.sdf(64, 64, "egg", { scale: 2 }).encode()).steps[0].args

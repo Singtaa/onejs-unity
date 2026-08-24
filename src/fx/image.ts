@@ -76,6 +76,13 @@ export interface NoiseOptions {
     lacunarity?: number
     /** How much quieter each octave gets, 0..1. Default 0.5. */
     gain?: number
+    /**
+     * Which noise. Default "value", which interpolates a square grid and is
+     * cheap; at a high octave gain its cells show through as blocks. "simplex"
+     * is built on triangles and has no axis-aligned structure to leak, so it is
+     * the one to reach for when the detail matters.
+     */
+    type?: "value" | "simplex"
 }
 
 export interface GradientStop {
@@ -447,6 +454,7 @@ export const image = {
             (o.rotation ?? 0) * DEG2RAD,
             o.lacunarity ?? 2,
             o.gain ?? 0.5,
+            o.type === "simplex" ? 1 : 0,
         ])
     },
 
