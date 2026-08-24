@@ -23,7 +23,8 @@
     "./esbuild/themes": "./src/esbuild/themes.mjs",
     "./esbuild/copy-assets": "./src/esbuild/copy-assets.mjs",
     "./audio": "./src/audio/index.ts",
-    "./physics2d": "./src/physics2d/index.ts"
+    "./physics2d": "./src/physics2d/index.ts",
+    "./fx": "./src/fx/index.ts"
   },
   "files": [
     "src"

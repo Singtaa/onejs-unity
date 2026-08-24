@@ -1,0 +1,93 @@
+/**
+ * The FxBridge wire contract.
+ *
+ * Shared with Assets/Singtaa/OneJS/Runtime/Fx/FxBridge.cs and kept in sync by
+ * fx.test.ts on this side and FxTests.cs on the other. Change both together.
+ *
+ * A chain is encoded as a flat Float32Array:
+ *
+ *     [WIRE_VERSION, opCount, (opcode, argCount, ...args) * opCount]
+ *
+ * Everything that is not a number, which today means a texture, crosses
+ * separately as an integer handle and is referenced from the buffer by that
+ * handle. That keeps the chain itself a pure float buffer, so it marshals
+ * through the same __csArray float path PainterBridge uses and costs one
+ * crossing per render rather than one per operation.
+ */
+
+/** Bumped when the encoding changes. C# accepts 1..CURRENT and refuses newer. */
+export const WIRE_VERSION = 1
+
+/**
+ * Per pixel operations, evaluated by a bounded loop in OneJS/FxOps.shader.
+ *
+ * The numbering deliberately matches Spark2D's `maop` kernel, which grouped ops
+ * so a reader can tell the family from the value. There are gaps; leave them.
+ */
+export const OP = {
+    // Sources: begin a chain. Exactly one, and it must come first.
+    SOURCE_TEXTURE: 0, // args: handle
+    SOURCE_COLOR: 1,   // args: width, height, r, g, b, a
+
+    // Basic maths
+    ADD: 16,
+    SUBTRACT: 17,
+    MULTIPLY: 18,
+    DIVIDE: 19,
+    POW: 20,
+    SQRT: 21,
+
+    // Range
+    CLAMP: 32,      // args: min, max
+    FRACTION: 33,
+    MAXIMUM: 34,
+    MINIMUM: 35,
+    ONE_MINUS: 36,
+    REMAP: 37,      // args: fromMin, fromMax, toMin, toMax
+    SATURATE: 38,
+
+    // Advanced
+    ABSOLUTE: 48,
+    EXPONENTIAL: 49,
+    LOG: 50,
+    MODULO: 51,
+    NEGATE: 52,
+    POSTERIZE: 53,
+    RECIPROCAL: 54,
+
+    // Interpolation
+    LERP: 64,        // operand, then t
+    SMOOTHSTEP: 65,  // args: edge0, edge1
+    INVERSE_LERP: 66,
+} as const
+
+export type OpCode = (typeof OP)[keyof typeof OP]
+
+/**
+ * How a two operand op reads its right hand side. The shader switches on this
+ * because the three cases sample from different places.
+ */
+export const MODE = {
+    /** The operand is one float, broadcast to every channel. */
+    SCALAR: 0,
+    /** The operand is a float4. */
+    VECTOR: 1,
+    /**
+     * The operand is another texture. Only ONE of these fits in a pass, because
+     * the shader has a single spare sampler, so the C# side flushes and starts a
+     * new pass when it meets a second one.
+     */
+    TEXTURE: 2,
+} as const
+
+export type Mode = (typeof MODE)[keyof typeof MODE]
+
+/** Must match MAX_OPS in OneJS/FxOps.shader. The fusion window. */
+export const MAX_FUSED_OPS = 16
+
+/** Ops at or above this value are per pixel and therefore fusable. */
+export const FIRST_PIXEL_OP = 16
+
+export function isPixelOp(op: number): boolean {
+    return op >= FIRST_PIXEL_OP
+}
