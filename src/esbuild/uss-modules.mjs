@@ -172,16 +172,30 @@ export function ussModulesPlugin(options = {}) {
             // Handle .module.uss imports
             build.onResolve({ filter: /\.module\.uss$/ }, (args) => {
                 const resolved = path.resolve(args.resolveDir, args.path)
+                // esbuild annotates each bundled module with `// <namespace>:<path>`,
+                // so whatever goes in `path` is baked into the output. Handing it
+                // the absolute path put the builder's home directory in a committed
+                // bundle, which then differed on every machine. Give it the project
+                // relative, forward-slashed path and carry the real one alongside.
                 return {
-                    path: resolved,
-                    namespace: "uss-module"
+                    path: path.relative(process.cwd(), resolved).replace(/\\/g, "/"),
+                    namespace: "uss-module",
+                    pluginData: { absolutePath: resolved },
                 }
             })
 
             // Transform .module.uss files
             build.onLoad({ filter: /.*/, namespace: "uss-module" }, async (args) => {
-                const ussContent = await getFs().promises.readFile(args.path, "utf8")
-                const relativePath = path.relative(process.cwd(), args.path)
+                // args.path is now the project-relative, forward-slashed form, so
+                // read through the absolute path carried on pluginData.
+                const absolutePath = args.pluginData?.absolutePath
+                    ?? path.resolve(process.cwd(), args.path)
+                const ussContent = await getFs().promises.readFile(absolutePath, "utf8")
+                // Hash the forward-slashed relative path. path.relative yields
+                // backslashes on Windows, and hashing those gave the same file a
+                // different class name than it got on macOS, so the committed
+                // bundle flipped every class each time the other machine rebuilt.
+                const relativePath = args.path.replace(/\\/g, "/")
                 const hash = generateHash(relativePath)
 
                 // Extract and scope class names. :global(...) segments are masked
@@ -193,7 +207,9 @@ export function ussModulesPlugin(options = {}) {
 
                 // Generate TypeScript declarations
                 if (generateTypes) {
-                    const dtsPath = args.path + ".d.ts"
+                    // Absolute, not args.path: that is project-relative now, and a
+                    // relative write would land wherever the process happens to be.
+                    const dtsPath = absolutePath + ".d.ts"
                     const dtsContent = generateDts(classMap)
                     await getFs().promises.writeFile(dtsPath, dtsContent)
                 }
@@ -208,7 +224,9 @@ export function ussModulesPlugin(options = {}) {
                 const classMapJson = JSON.stringify(classMap, null, 4)
                 // Normalize to forward slashes to avoid \u being
                 // interpreted as a Unicode escape sequence on Windows
-                const safeRelativePath = relativePath.replace(/\\/g, "/")
+                // relativePath is already forward-slashed above, so this is just a
+                // clearer name for the same string at its point of use.
+                const safeRelativePath = relativePath
 
                 const jsContent = `// USS Module: ${safeRelativePath}
 // Auto-generated: do not edit
