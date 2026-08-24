@@ -35,6 +35,39 @@ function generateHash(filePath) {
 }
 
 /**
+ * The path to identify a module by, relative to the project that owns it.
+ *
+ * Not relative to the working directory, which is where this started: the same
+ * source then produced different class names on two machines simply because
+ * one checkout sat deeper than the other, and on Windows the separators
+ * differed as well. Bundles churned for no reason, and comparing a rebuilt
+ * bundle against an old one stopped being able to tell a real change from a
+ * different desk.
+ *
+ * Falls back to the file name when no project root is found, which still
+ * cannot depend on the machine.
+ */
+function moduleIdentity(filePath) {
+    let dir = path.dirname(filePath)
+    for (let up = 0; up < 20; up++) {
+        for (const marker of ["oj.json", "package.json"]) {
+            try {
+                if (getFs().existsSync(path.join(dir, marker))) {
+                    return path.relative(dir, filePath).split(path.sep).join("/")
+                }
+            } catch {
+                // An fs provider that cannot stat is a reason to keep walking,
+                // never a reason to fail a build over a class name.
+            }
+        }
+        const parent = path.dirname(dir)
+        if (parent === dir) break
+        dir = parent
+    }
+    return path.basename(filePath)
+}
+
+/**
  * Masks `:global(...)` segments with dot-free placeholders so their classes are
  * neither extracted nor scoped, and returns the segments for later restoration
  * (unwrapped: `:global(.foo)` restores as `.foo`).
@@ -181,7 +214,7 @@ export function ussModulesPlugin(options = {}) {
             // Transform .module.uss files
             build.onLoad({ filter: /.*/, namespace: "uss-module" }, async (args) => {
                 const ussContent = await getFs().promises.readFile(args.path, "utf8")
-                const relativePath = path.relative(process.cwd(), args.path)
+                const relativePath = moduleIdentity(args.path)
                 const hash = generateHash(relativePath)
 
                 // Extract and scope class names. :global(...) segments are masked
