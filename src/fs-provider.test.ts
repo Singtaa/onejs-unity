@@ -60,4 +60,40 @@ describe("plugins read through the provider", () => {
         setFsProvider(null)
         expect(() => findThemeModules("/app")).toThrow(/no fs provider installed/)
     })
+    it("descends into nested directories of a virtual filesystem", async () => {
+        const { setFsProvider } = await import("./fs-provider.mjs")
+        const { findThemeModules } = await import("./esbuild/themes.mjs")
+        // Two levels deep, which is the real cartridge shape
+        // (@cartridges/@scope/name/nameTheme.ts). The old walk joined children
+        // with the host separator, so on Windows it looked for "\app\@singtaa"
+        // against a provider keyed on "/app/@singtaa", found nothing below the
+        // root, and reported a single stray file instead of failing.
+        const tree: Record<string, string[]> = {
+            "/app": ["@singtaa"],
+            "/app/@singtaa": ["kawaii", "sketch"],
+            "/app/@singtaa/kawaii": ["kawaiiTheme.ts"],
+            "/app/@singtaa/sketch": ["sketchTheme.ts", "notes.md"],
+        }
+        setFsProvider({
+            readdirSync: (dir: string) => {
+                const names = tree[dir]
+                if (!names) throw new Error("ENOENT")
+                return names.map((name) => ({
+                    name,
+                    isDirectory: () => `${dir}/${name}` in tree,
+                    isFile: () => !(`${dir}/${name}` in tree),
+                }))
+            },
+        })
+        const { files, dirs } = findThemeModules("/app")
+        expect(files).toEqual([
+            "/app/@singtaa/kawaii/kawaiiTheme.ts",
+            "/app/@singtaa/sketch/sketchTheme.ts",
+        ])
+        // Every directory is watched, so a newly extracted cartridge rebuilds.
+        expect(dirs).toEqual([
+            "/app", "/app/@singtaa", "/app/@singtaa/kawaii", "/app/@singtaa/sketch",
+        ])
+    })
 })
+

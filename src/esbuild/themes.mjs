@@ -42,7 +42,13 @@ export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
         }
         dirs.push(dir)
         for (const entry of entries) {
-            const full = path.join(dir, entry.name)
+            // Joined with "/" rather than path.join, because the fs provider owns
+            // this path namespace, not the host OS. A provider keyed on POSIX
+            // paths (what a non-Node host supplies) never matches a child that
+            // path.join built with backslashes, so the walk found the root and
+            // then silently stopped. Node accepts forward slashes on every OS,
+            // and the caller normalizes with path.relative regardless.
+            const full = /[\\/]$/.test(dir) ? dir + entry.name : dir + "/" + entry.name
             if (entry.isDirectory()) walk(full)
             else if (pattern.test(entry.name)) files.push(full)
         }
