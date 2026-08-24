@@ -28,9 +28,9 @@ export const OP = {
     // Sources: begin a chain. Exactly one, and it must come first.
     SOURCE_TEXTURE: 0, // args: handle
     SOURCE_COLOR: 1,   // args: width, height, r, g, b, a
-    SOURCE_NOISE: 2,    // args: w, h, scaleX, scaleY, octaves, seed, offsetX, offsetY, rotation
+    SOURCE_NOISE: 2,    // args: w, h, scaleX, scaleY, octaves, seed, offsetX, offsetY, rotation, [lacunarity, gain]
     SOURCE_GRADIENT: 3, // args: w, h, angle, stopCount, then (r, g, b, a, pos) per stop
-    SOURCE_SDF: 4,      // args: w, h, shapeId, f1..f6, x, y, rot, scale, rounded, onion, softness, field
+    SOURCE_SDF: 4,      // args: w, h, shapeId, f1..f6, x, y, rot, scaleX, rounded, onion, softness, field, [scaleY]
 
     // Basic maths
     ADD: 16,

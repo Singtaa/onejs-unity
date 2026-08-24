@@ -32,8 +32,8 @@ export interface SdfOptions {
     y?: number
     /** Degrees, clockwise. Default 0. */
     rotation?: number
-    /** Uniform scale, for the shapes IQ authored at unit size. Default 1. */
-    scale?: number
+    /** Scale about the centre. A pair stretches the shape. Default 1. */
+    scale?: number | [number, number]
     /** Rounds every corner. Works on any shape. Default 0. */
     rounded?: number
     /** Turns the shape into an outline of this half width. Default 0. */
@@ -134,16 +134,24 @@ export function packSdfParams(kind: SdfKind, o: SdfOptions): [Quad, Pair] {
     }
 }
 
+const scaleXY = (o: SdfOptions): [number, number] => {
+    const s = o.scale ?? 1
+    return typeof s === "number" ? [s, s] : [s[0], s[1]]
+}
+
 /** The transform and edge floats that follow the shape params on the wire. */
 export function packSdfCommon(o: SdfOptions): number[] {
     return [
         o.x ?? 0,
         o.y ?? 0,
         (o.rotation ?? 0) * DEG2RAD,
-        o.scale ?? 1,
+        scaleXY(o)[0],
         o.rounded ?? 0,
         o.onion ?? 0,
         o.softness ?? 0.01,
         o.field ? 1 : 0,
+        // Y last, so a buffer written before the second axis existed still
+        // decodes and stays uniform.
+        scaleXY(o)[1],
     ]
 }

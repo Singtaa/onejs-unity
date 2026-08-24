@@ -35,6 +35,8 @@ declare const CS: {
             FxBridge: {
                 LoadTexture: (path: string) => number
                 Execute: (buffer: unknown) => number
+                ExecuteInto: (dst: number, buffer: unknown) => void
+                CreateTarget: (width: number, height: number) => number
                 GetTexture: (handle: number) => unknown
                 Release: (handle: number) => void
             }
@@ -66,6 +68,14 @@ export interface NoiseOptions {
     offset?: [number, number]
     /** Rotates the field, in degrees. Default 0. */
     rotation?: number
+    /**
+     * How much finer each octave gets. Default 2. Pushing this up, with a gain
+     * near 1, gives the stringy turbulent look that reads as fire or smoke
+     * rather than cloud.
+     */
+    lacunarity?: number
+    /** How much quieter each octave gets, 0..1. Default 0.5. */
+    gain?: number
 }
 
 export interface GradientStop {
@@ -368,6 +378,15 @@ export class Image {
         return this.#rendered
     }
 
+    /**
+     * Runs the chain into a target you already hold, instead of allocating a new
+     * one. This is what makes animation cheap: the element keeps pointing at the
+     * same texture, so a new frame costs no re-render and no new handle.
+     */
+    renderTo(target: RenderTarget): void {
+        CS.OneJS.Fx.FxBridge.ExecuteInto(target.handle, this.encode())
+    }
+
     /** The Unity texture, for `backgroundImage` or `<Image src>`. */
     texture(): unknown {
         return CS.OneJS.Fx.FxBridge.GetTexture(this.render())
@@ -398,6 +417,13 @@ export const image = {
         return Image.from(OP.SOURCE_COLOR, [width, height, ...rgba])
     },
 
+    /**
+     * A target you keep and render into, for animation. See RenderTarget.
+     */
+    target(width: number, height: number): RenderTarget {
+        return new RenderTarget(CS.OneJS.Fx.FxBridge.CreateTarget(width, height))
+    },
+
     /** A transparent target of the given size. */
     blank(width: number, height: number): Image {
         return image.color(width, height, [0, 0, 0, 0])
@@ -419,6 +445,8 @@ export const image = {
             o.seed ?? 1,
             offset[0], offset[1],
             (o.rotation ?? 0) * DEG2RAD,
+            o.lacunarity ?? 2,
+            o.gain ?? 0.5,
         ])
     },
 
@@ -444,4 +472,25 @@ export const image = {
             ...packSdfCommon(o),
         ])
     },
+}
+
+/**
+ * A texture you hold, rather than one handed back per render.
+ *
+ * `render()` allocates its result, which is right for a chain that is built
+ * once. An animated chain runs every frame, and a new texture per frame would
+ * mean re-pointing the element every frame. Render into one of these instead
+ * and the element is assigned once.
+ */
+export class RenderTarget {
+    constructor(readonly handle: number) {}
+
+    /** The Unity texture, for `backgroundImage` or `<Image src>`. */
+    texture(): unknown {
+        return CS.OneJS.Fx.FxBridge.GetTexture(this.handle)
+    }
+
+    dispose(): void {
+        CS.OneJS.Fx.FxBridge.Release(this.handle)
+    }
 }

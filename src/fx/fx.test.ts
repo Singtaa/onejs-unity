@@ -196,7 +196,8 @@ describe("fx generated sources", () => {
         expect(a[12]).toBe(2)                  // scale
         expect(a[13]).toBeCloseTo(0.03); expect(a[14]).toBeCloseTo(0.01)
         expect(a[15]).toBeCloseTo(0.05); expect(a[16]).toBe(1)
-        expect(a.length).toBe(17)
+        expect(a[17]).toBe(2)   // scale on Y, defaulting to the X scale
+        expect(a.length).toBe(18)
     })
 
     it("keeps the sdf shape ids contiguous and unique", async () => {
@@ -399,5 +400,25 @@ describe("fx ownership scope", () => {
         img.dispose()
         const releases = (globalThis as any).CS.OneJS.Fx.FxBridge.Release.mock.calls.length
         expect(releases).toBe(1)
+    })
+})
+
+describe("fx noise and sdf extras", () => {
+    it("carries lacunarity and gain, defaulting to the classic fBm pair", async () => {
+        const { image } = await load()
+        const plain = decode(image.noise(64, 64).encode()).steps[0].args
+        expect(plain.slice(9, 11)).toEqual([2, 0.5])
+        const wild = decode(image.noise(64, 64, { lacunarity: 3.4, gain: 0.9 }).encode()).steps[0].args
+        expect(wild[9]).toBeCloseTo(3.4)
+        expect(wild[10]).toBeCloseTo(0.9)
+    })
+
+    it("stretches an sdf shape when scale is a pair", async () => {
+        const { image } = await load()
+        const uniform = decode(image.sdf(64, 64, "egg", { scale: 2 }).encode()).steps[0].args
+        expect([uniform[12], uniform[17]]).toEqual([2, 2])
+        const stretched = decode(image.sdf(64, 64, "egg", { scale: [1, 1.8] }).encode()).steps[0].args
+        expect(stretched[12]).toBe(1)
+        expect(stretched[17]).toBeCloseTo(1.8)
     })
 })

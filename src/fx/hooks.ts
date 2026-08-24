@@ -13,7 +13,9 @@
  */
 
 import { useEffect, useRef, useState, type DependencyList } from "react"
-import { Image, beginOwnership, endOwnership } from "./image"
+import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory } from "./image"
+
+const createTarget = (w: number, h: number): RenderTarget => imageFactory.target(w, h)
 
 /**
  * Builds a chain, renders it, and returns the Unity texture to hand to a
@@ -93,4 +95,73 @@ export function useImage(build: () => Image, deps: DependencyList = []): Image |
     }, deps)
 
     return img
+}
+
+/**
+ * An animated chain: rebuilt every frame against a clock, rendered into one
+ * stable target.
+ *
+ *     const fire = useAnimatedTexture(512, 512, (t) => buildFire(t), [])
+ *     <View style={{ backgroundImage: fire }} />
+ *
+ * The returned texture never changes identity, so the element is assigned once
+ * and the component does not re-render per frame. That is the whole reason this
+ * exists rather than driving `useTexture` off a ticking state value: doing it
+ * that way costs a React render, a fresh target and a released target every
+ * frame, for a picture that was going to change anyway.
+ *
+ * `build` receives seconds since the effect started, accumulated from the frame
+ * delta rather than read off the wall clock, so it follows whatever clock the
+ * frame loop is on. An offline render runs far faster than realtime, and wall
+ * time would leave it looking frozen.
+ */
+export function useAnimatedTexture(
+    width: number,
+    height: number,
+    build: (seconds: number) => Image,
+    deps: DependencyList = [],
+): unknown {
+    const [texture, setTexture] = useState<unknown>(null)
+
+    useEffect(() => {
+        const target = createTarget(width, height)
+        setTexture(target.texture())
+
+        let raf = 0
+        let last: number | null = null
+        let seconds = 0
+        const tick = (ms: number) => {
+            raf = requestAnimationFrame(tick)
+            if (last !== null) seconds += (ms - last) / 1000
+            last = ms
+            // The same ownership scope useTexture uses, per frame.
+            //
+            // renderTo itself tracks nothing, but an Image used as an operand
+            // renders when the chain is BUILT, not when it is rendered, so a
+            // build that composes two fresh sources allocates and tracks a
+            // target for each of them every frame. Measured at 348 live handles
+            // and climbing before this was here.
+            //
+            // An operand created outside the callback, which is the usual way to
+            // hold something constant like a mask, has already rendered and so
+            // does not join the scope. It survives.
+            beginOwnership()
+            let owned: Image[] = []
+            try {
+                build(seconds).renderTo(target)
+            } finally {
+                owned = endOwnership()
+            }
+            for (const img of owned) img.dispose()
+        }
+        raf = requestAnimationFrame(tick)
+
+        return () => {
+            cancelAnimationFrame(raf)
+            target.dispose()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [width, height, ...deps])
+
+    return texture
 }
