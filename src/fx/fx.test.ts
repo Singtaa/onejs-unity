@@ -352,3 +352,52 @@ describe("fx neighbourhood filters", () => {
     })
 })
 
+
+describe("fx ownership scope", () => {
+    it("claims every chain that first renders inside the scope", async () => {
+        const { image, beginOwnership, endOwnership } = await import("./image")
+        beginOwnership()
+        const mask = image.sdf(64, 64, "star", { r: 0.4 })
+        const out = image.noise(64, 64).blend(mask, "multiply")
+        out.render()
+        const owned = endOwnership()
+        // The outer chain and the operand it pulled in: releasing only the outer
+        // one would strand the operand's target.
+        expect(owned.length).toBe(2)
+        expect(owned).toContain(out)
+        expect(owned).toContain(mask)
+    })
+
+    it("leaves an already rendered chain with whoever made it", async () => {
+        const { image, beginOwnership, endOwnership } = await import("./image")
+        const shared = image.sdf(64, 64, "circle", { r: 0.3 })
+        shared.render() // created outside, so not ours
+        beginOwnership()
+        const out = image.noise(64, 64).blend(shared, "multiply")
+        out.render()
+        const owned = endOwnership()
+        expect(owned).toEqual([out])
+        expect(owned).not.toContain(shared)
+    })
+
+    it("does not claim anything once the scope is closed", async () => {
+        const { image, beginOwnership, endOwnership } = await import("./image")
+        beginOwnership()
+        endOwnership()
+        const after = image.noise(64, 64)
+        after.render()
+        // A second scope must not inherit it either.
+        beginOwnership()
+        expect(endOwnership()).toEqual([])
+    })
+
+    it("releases a chain once, so a double dispose is harmless", async () => {
+        const { image } = await import("./image")
+        const img = image.noise(64, 64)
+        img.render()
+        img.dispose()
+        img.dispose()
+        const releases = (globalThis as any).CS.OneJS.Fx.FxBridge.Release.mock.calls.length
+        expect(releases).toBe(1)
+    })
+})

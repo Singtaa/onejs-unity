@@ -107,6 +107,32 @@ function packStops(stops: GradientStop[], what: string): number[] {
     return args
 }
 
+/**
+ * Ownership scope, for useTexture.
+ *
+ * A chain allocates its target the first time it renders, and something has to
+ * release it. The rule this implements is "you own what you caused to exist":
+ * while a scope is open, every chain that renders *for the first time* joins it.
+ * A chain that had already rendered is only being used, not created, so it stays
+ * with whoever made it.
+ *
+ * Nested scopes are not supported and not needed: useTexture opens one inside an
+ * effect, and effects do not nest.
+ */
+let ownershipScope: Image[] | null = null
+
+/** @internal */
+export function beginOwnership(): void {
+    ownershipScope = []
+}
+
+/** @internal Closes the scope and returns what rendered inside it. */
+export function endOwnership(): Image[] {
+    const scope = ownershipScope ?? []
+    ownershipScope = null
+    return scope
+}
+
 function operandParts(v: Operand): { mode: Mode; args: number[] } {
     if (typeof v === "number") return { mode: MODE.SCALAR, args: [v] }
     if (Array.isArray(v)) return { mode: MODE.VECTOR, args: [v[0], v[1], v[2], v[3]] }
@@ -335,6 +361,9 @@ export class Image {
     render(): number {
         if (this.#rendered === null) {
             this.#rendered = CS.OneJS.Fx.FxBridge.Execute(this.encode())
+            // Only on first render: rendering again is a cache hit, and joining
+            // a scope then would hand ownership to whoever happened to use it.
+            if (ownershipScope !== null) ownershipScope.push(this)
         }
         return this.#rendered
     }
