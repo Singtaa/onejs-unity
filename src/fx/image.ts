@@ -24,7 +24,7 @@
  * is the runtime's business.
  */
 
-import { MAX_GRADIENT_STOPS, MODE, OP, SOURCE, WIRE_VERSION, type Mode, type OpCode } from "./ops"
+import { BLEND, MAX_GRADIENT_STOPS, MODE, OP, SOURCE, WIRE_VERSION, type BlendMode, type Mode, type OpCode } from "./ops"
 import { SDF_SHAPES, packSdfCommon, packSdfParams, type SdfKind, type SdfOptions } from "./sdf"
 
 const DEG2RAD = Math.PI / 180
@@ -72,6 +72,39 @@ export interface GradientStop {
     color: RGBA
     /** Position along the gradient, 0..1. */
     at: number
+}
+
+export interface TransformOptions {
+    /** Offset in uv. Default 0. */
+    x?: number
+    y?: number
+    /** Degrees, clockwise. Default 0. */
+    rotation?: number
+    /** Uniform scale about the pivot. Default 1. */
+    scale?: number
+    /** What rotation and scale turn about, in uv. Default the centre. */
+    pivot?: [number, number]
+    /** Repeat instead of leaving background outside the source. Default false. */
+    wrap?: boolean
+    /** Shown outside the source when not wrapping. Default transparent. */
+    background?: RGBA
+}
+
+/**
+ * Sorts and clamps gradient stops, and checks the ceiling. The shader walks
+ * stops in order and reads a descending pair as a zero width span rather than
+ * an error, and overflowing a uniform array is silent on the other side.
+ */
+function packStops(stops: GradientStop[], what: string): number[] {
+    if (stops.length < 1) throw new Error(`[onejs fx] a ${what} needs at least one stop`)
+    if (stops.length > MAX_GRADIENT_STOPS)
+        throw new Error(`[onejs fx] a ${what} takes at most ${MAX_GRADIENT_STOPS} stops`)
+    const sorted = [...stops].sort((a, b) => a.at - b.at)
+    const args: number[] = [sorted.length]
+    for (const s of sorted) {
+        args.push(s.color[0], s.color[1], s.color[2], s.color[3], Math.min(1, Math.max(0, s.at)))
+    }
+    return args
 }
 
 function operandParts(v: Operand): { mode: Mode; args: number[] } {
@@ -154,6 +187,91 @@ export class Image {
         return this.#unary(OP.SMOOTHSTEP, [edge0, edge1])
     }
     inverseLerp(v: Operand): Image { return this.#binary(OP.INVERSE_LERP, v) }
+
+    // MARK: colour
+    //
+    // These adjust rgb and leave alpha alone.
+
+    /** Rec. 709 luminance in all three channels. */
+    grayscale(): Image { return this.#unary(OP.GRAYSCALE) }
+    /** Adds a constant. Negative darkens. */
+    brightness(amount: number): Image { return this.#unary(OP.BRIGHTNESS, [amount]) }
+    /** Scales around mid grey, so it does not also shift brightness. 1 is neutral. */
+    contrast(amount: number): Image { return this.#unary(OP.CONTRAST, [amount]) }
+    /** 0 is greyscale, 1 is neutral, above 1 oversaturates. */
+    saturation(amount: number): Image { return this.#unary(OP.SATURATION, [amount]) }
+    /** Rotates hue, in degrees. */
+    hueShift(degrees: number): Image { return this.#unary(OP.HUE_SHIFT, [degrees * DEG2RAD]) }
+    /**
+     * Remaps an input range through a gamma curve. Output is 0..1; chain
+     * `remap` if you want something else.
+     */
+    levels(inBlack: number, inWhite: number, gamma = 1): Image {
+        return this.#unary(OP.LEVELS, [inBlack, inWhite, gamma])
+    }
+    /**
+     * Rewires the channels. Each argument names the source channel by index
+     * (0 red, 1 green, 2 blue, 3 alpha) or 4 to keep what is already there.
+     */
+    swizzle(r: number, g: number, b: number, a = 4): Image {
+        return this.#unary(OP.SWIZZLE, [r, g, b, a])
+    }
+    /**
+     * Colours by luminance through a gradient, which is what turns a greyscale
+     * field into an image. Spark2D called this `dye`.
+     *
+     * One ramp fits per fused pass, so a chain with two costs an extra pass.
+     */
+    ramp(stops: GradientStop[]): Image {
+        const args = packStops(stops, "ramp")
+        return this.#then(OP.RAMP, MODE.SCALAR, args)
+    }
+
+    // MARK: composite
+
+    /**
+     * Blends an operand over this image with one of the 27 Photoshop modes.
+     *
+     * A texture operand always ends the fused pass, since the shader has one
+     * spare sampler. Blending against a flat colour does not.
+     */
+    blend(v: Operand, mode: BlendMode = "normal", opacity = 1): Image {
+        const { mode: operandMode, args } = operandParts(v)
+        // The mode and the opacity ride at the end, which is where FxBridge
+        // looks for them regardless of how wide the operand is.
+        return this.#then(OP.BLEND, operandMode, [...args, BLEND[mode], opacity])
+    }
+
+    // MARK: spatial
+    //
+    // Each of these takes a pass of its own: they move uv before the sample, so
+    // there is nothing for them to fuse into.
+
+    /** Offsets, rotates and scales about a pivot. Offsets are in uv. */
+    transform(o: TransformOptions = {}): Image {
+        const pivot = o.pivot ?? [0.5, 0.5]
+        const bg = o.background ?? [0, 0, 0, 0]
+        return this.#then(OP.TRANSFORM, MODE.SCALAR, [
+            o.x ?? 0, o.y ?? 0, (o.rotation ?? 0) * DEG2RAD, o.scale ?? 1,
+            pivot[0], pivot[1], o.wrap ? 1 : 0,
+            bg[0], bg[1], bg[2], bg[3],
+        ])
+    }
+
+    /** Repeats the image. Fractional counts are allowed. */
+    tile(repeatX: number, repeatY = repeatX, offsetX = 0, offsetY = 0): Image {
+        return this.#then(OP.TILE, MODE.SCALAR, [repeatX, repeatY, offsetX, offsetY])
+    }
+
+    /** Mirrors on either axis. */
+    flip(horizontal = true, vertical = false): Image {
+        return this.#then(OP.FLIP, MODE.SCALAR, [horizontal ? 1 : 0, vertical ? 1 : 0])
+    }
+
+    /** Takes a window, in uv. The result is smaller. */
+    crop(x: number, y: number, width: number, height: number): Image {
+        return this.#then(OP.CROP, MODE.SCALAR, [x, y, width, height])
+    }
 
     /**
      * Flattens the chain into the buffer FxBridge reads. Exposed for tests and
@@ -238,15 +356,8 @@ export const image = {
      * zero width span rather than an error.
      */
     gradient(width: number, height: number, stops: GradientStop[], angle = 0): Image {
-        if (stops.length < 1) throw new Error("[onejs fx] a gradient needs at least one stop")
-        if (stops.length > MAX_GRADIENT_STOPS)
-            throw new Error(`[onejs fx] a gradient takes at most ${MAX_GRADIENT_STOPS} stops`)
-        const sorted = [...stops].sort((a, b) => a.at - b.at)
-        const args: number[] = [width, height, angle * DEG2RAD, sorted.length]
-        for (const s of sorted) {
-            args.push(s.color[0], s.color[1], s.color[2], s.color[3], Math.min(1, Math.max(0, s.at)))
-        }
-        return Image.from(SOURCE.GRADIENT, args)
+        const packed = packStops(stops, "gradient")
+        return Image.from(SOURCE.GRADIENT, [width, height, angle * DEG2RAD, ...packed])
     },
 
     /**

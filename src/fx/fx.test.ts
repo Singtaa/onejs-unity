@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MODE, OP, WIRE_VERSION, isPixelOp } from "./ops"
+import { BLEND, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MODE, OP, WIRE_VERSION, isPixelOp, isSpatialOp } from "./ops"
 import { SDF_SHAPES } from "./sdf"
 
 /**
@@ -211,5 +211,83 @@ describe("fx generated sources", () => {
         for (const code of [OP.SOURCE_NOISE, OP.SOURCE_GRADIENT, OP.SOURCE_SDF]) {
             expect(isPixelOp(code)).toBe(false)
         }
+    })
+})
+
+describe("fx colour, blend and spatial", () => {
+    it("converts hue and rotation to radians for the shader", async () => {
+        const { image } = await load()
+        const d = decode(image.blank(4, 4).hueShift(180).transform({ rotation: 90 }).encode())
+        expect(d.steps[1].args[0]).toBeCloseTo(Math.PI)
+        expect(d.steps[2].args[2]).toBeCloseTo(Math.PI / 2)
+    })
+
+    it("puts the blend mode and opacity last whatever the operand width", async () => {
+        const { image } = await load()
+        const operand = image.blank(4, 4)
+        const d = decode(image.blank(4, 4)
+            .blend([1, 0, 0, 1], "multiply", 0.5)
+            .blend(operand, "screen", 0.25)
+            .encode())
+        // FxBridge reads the last two args as (mode, opacity) regardless, so a
+        // four float colour operand and a one float handle both work.
+        const vec = d.steps[1].args
+        expect(vec.length).toBe(6)
+        expect(vec.slice(0, 4)).toEqual([1, 0, 0, 1])
+        expect(vec[4]).toBe(BLEND.multiply)
+        expect(vec[5]).toBe(0.5)
+        const tex = d.steps[2].args
+        expect(tex.length).toBe(3)
+        expect(tex[1]).toBe(BLEND.screen)
+        expect(tex[2]).toBe(0.25)
+        expect(d.steps[2].mode).toBe(MODE.TEXTURE)
+    })
+
+    it("has 27 blend modes with unique contiguous ids", async () => {
+        const ids = Object.values(BLEND)
+        expect(ids.length).toBe(27)
+        expect(new Set(ids).size).toBe(27)
+        expect(Math.min(...ids)).toBe(0)
+        expect(Math.max(...ids)).toBe(26)
+    })
+
+    it("marks the spatial ops as unfusable and nothing else", async () => {
+        const spatial = [OP.TRANSFORM, OP.TILE, OP.FLIP, OP.CROP]
+        for (const code of spatial) expect(isSpatialOp(code)).toBe(true)
+        for (const [name, code] of Object.entries(OP)) {
+            if (spatial.includes(code as any)) continue
+            expect(isSpatialOp(code)).toBe(false)
+        }
+    })
+
+    it("sorts ramp stops and refuses more than the shader holds", async () => {
+        const { image } = await load()
+        const d = decode(image.blank(4, 4).ramp([
+            { color: [1, 1, 1, 1], at: 1 },
+            { color: [0, 0, 0, 1], at: 0 },
+        ]).encode())
+        expect(d.steps[1].op).toBe(OP.RAMP)
+        expect(d.steps[1].args[0]).toBe(2)      // stop count first
+        expect(d.steps[1].args[5]).toBe(0)      // first stop's position
+        expect(d.steps[1].args[10]).toBe(1)     // second stop's position
+        const many = Array.from({ length: MAX_GRADIENT_STOPS + 1 }, (_, i) => ({
+            color: [0, 0, 0, 1] as [number, number, number, number], at: i / 10,
+        }))
+        expect(() => image.blank(4, 4).ramp(many)).toThrow(/at most/)
+    })
+
+    it("defaults a transform to a centred pivot and transparent background", async () => {
+        const { image } = await load()
+        const a = decode(image.blank(4, 4).transform({}).encode()).steps[1].args
+        expect(a.length).toBe(11)
+        expect(a.slice(4, 7)).toEqual([0.5, 0.5, 0])   // pivot, wrap off
+        expect(a.slice(7, 11)).toEqual([0, 0, 0, 0])   // background
+    })
+
+    it("keeps swizzle indices as raw channel numbers", async () => {
+        const { image } = await load()
+        // blue, green, red, keep alpha
+        const a = decode(image.blank(4, 4).swizzle(2, 1, 0).encode()).steps[1].args
+        expect(a).toEqual([2, 1, 0, 4])
     })
 })

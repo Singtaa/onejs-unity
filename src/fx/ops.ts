@@ -58,6 +58,28 @@ export const OP = {
     POSTERIZE: 53,
     RECIPROCAL: 54,
 
+    // Colour. These leave alpha alone: an adjustment that silently
+    // changed opacity would surprise everywhere it is used.
+    GRAYSCALE: 80,
+    BRIGHTNESS: 81,
+    CONTRAST: 82,
+    SATURATION: 83,
+    HUE_SHIFT: 84,
+    LEVELS: 85,   // inBlack, inWhite, gamma
+    SWIZZLE: 86,  // per channel source index, 0..3, or 4 to keep
+    RAMP: 87,     // stopCount, then (r, g, b, a, pos) per stop
+
+    // Composite. The last two args are always the blend mode and the
+    // opacity; everything before them is the operand.
+    BLEND: 96,
+
+    // Spatial. These change uv BEFORE the sample, so unlike every op
+    // above they cannot fuse and always take a pass of their own.
+    TRANSFORM: 112, // offX, offY, rotation, scale, pivotX, pivotY, wrap, bg rgba
+    TILE: 113,      // repeatX, repeatY, offsetX, offsetY
+    FLIP: 114,      // horizontal, vertical
+    CROP: 115,      // x, y, w, h in uv
+
     // Interpolation
     LERP: 64,        // operand, then t
     SMOOTHSTEP: 65,  // args: edge0, edge1
@@ -109,3 +131,29 @@ export const SOURCE = {
 
 /** Must match MAX_STOPS in OneJS/FxSources.shader and MaxGradientStops in FxBridge.cs. */
 export const MAX_GRADIENT_STOPS = 8
+
+/**
+ * The Photoshop blend modes, in the order onejsBlend switches on them in
+ * OneJS/FxColor.cginc.
+ *
+ * Order is the PDF blend spec's grouping (darken, lighten, contrast, inversion,
+ * component) rather than alphabetical, so a reader can see the families.
+ */
+export const BLEND = {
+    normal: 0, dissolve: 1,
+    darken: 2, multiply: 3, colorBurn: 4, linearBurn: 5, darkerColor: 6,
+    lighten: 7, screen: 8, colorDodge: 9, linearDodge: 10, lighterColor: 11,
+    overlay: 12, hardLight: 13, softLight: 14, vividLight: 15, linearLight: 16,
+    pinLight: 17, hardMix: 18,
+    difference: 19, exclusion: 20, subtract: 21, divide: 22,
+    hue: 23, saturation: 24, color: 25, luminosity: 26,
+} as const
+
+export type BlendMode = keyof typeof BLEND
+
+/** Ops at or above this change uv before sampling, so they never fuse. */
+export const FIRST_SPATIAL_OP = 112
+
+export function isSpatialOp(op: number): boolean {
+    return op >= FIRST_SPATIAL_OP
+}

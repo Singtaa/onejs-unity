@@ -7,8 +7,8 @@
  */
 
 export { image, Image } from "./image"
-export type { Operand, RGBA, NoiseOptions, GradientStop } from "./image"
-export { OP, MODE, SOURCE, WIRE_VERSION, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, isPixelOp } from "./ops"
-export type { OpCode, Mode } from "./ops"
+export type { Operand, RGBA, NoiseOptions, GradientStop, TransformOptions } from "./image"
+export { OP, MODE, SOURCE, BLEND, WIRE_VERSION, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, FIRST_SPATIAL_OP, isPixelOp, isSpatialOp } from "./ops"
+export type { OpCode, Mode, BlendMode } from "./ops"
 export { SDF_SHAPES } from "./sdf"
 export type { SdfKind, SdfOptions } from "./sdf"

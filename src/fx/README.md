@@ -1,7 +1,7 @@
 # fx: textures as values
 
 `onejs-unity/fx` makes a texture something you can hold, chain operations on,
-and hand to an element. Phase 2a of `Specs/GPU_2D.md`.
+and hand to an element. Phases 2a and 2b of `Specs/GPU_2D.md`.
 
 ```ts
 import { image } from "onejs-unity/fx"
@@ -50,14 +50,27 @@ cannot compile shaders at runtime**, so a JS chain can never become generated
 shader code. It has to be data for a fixed loop. `TextureFX` is capped at six
 layers for exactly the same reason.
 
-Two things end a pass, and both are in `FxBridge.Execute`:
+Four things end a pass, all in `FxBridge.Execute`:
 
 1. The window fills.
 2. A second **texture** operand appears. The shader has one spare sampler, so
    one texture operand fits per pass.
+3. A second **ramp** appears. Same reason: one set of ramp uniforms.
+4. A **spatial** op appears, which cannot fuse at all (see below).
 
-Neither is visible from JS. A chain of any length works; it just costs more
+None of it is visible from JS. A chain of any length works; it just costs more
 passes.
+
+## Why spatial ops are different
+
+Every op in `FxOps` works on a colour that has **already been sampled**. A
+spatial op has to change the uv *before* the sample happens, so there is
+nothing for it to fuse into: it always takes a pass of its own, through
+`OneJS/FxSpatial`. `crop` is also the only op that changes the target size.
+
+That is the whole reason the op numbering has a gap at 112: everything at or
+above `FIRST_SPATIAL_OP` is in this family, and both sides split on that one
+comparison.
 
 ## Sources
 
@@ -96,16 +109,16 @@ the `sdfDistance` switch in each of the two shaders.
 | `fx.test.ts` | Encoding tests |
 
 The other half is `Assets/Singtaa/OneJS/Runtime/Fx/FxBridge.cs` and
-`Resources/OneJS/FxOps.shader`. **The opcode numbers appear in all three**;
+`Resources/OneJS/{FxOps,FxSources,FxSpatial}.shader`. **The opcode numbers appear
+on both sides**;
 change them together. `WIRE_VERSION` guards the pairing: a newer package against
 an older runtime fails loudly rather than silently dropping operations, which is
 the failure mode the particle wire was built to avoid.
 
 ## What is not here yet
 
-Phase 2a covers sources and the maths operations. Still to come:
+Phases 2a and 2b are in. Still to come:
 
-- **2b**: colour operations, the 27 blend modes, spatial operations.
 - **2c**: multi pass filters (blur, sharpen, edge, dilate, erode, outline).
 - **2d**: the compute backend for jump flood SDF generation and histograms.
 - **3**: the React surface, `useTexture` and friends.
@@ -129,3 +142,24 @@ safety nets.
 **An `Image` used as an operand renders when the chain that uses it is built,**
 not when that chain renders. The result is cached on the node, so sharing one
 operand across several chains renders it once.
+
+## Operations
+
+| Group | Methods |
+|---|---|
+| Maths | `add` `subtract` `multiply` `divide` `pow` `sqrt` `clamp` `frac` `min` `max` `oneMinus` `remap` `saturate` `abs` `exp` `log` `modulo` `negate` `posterize` `reciprocal` `lerp` `smoothstep` `inverseLerp` |
+| Colour | `grayscale` `brightness` `contrast` `saturation` `hueShift` `levels` `swizzle` `ramp` |
+| Composite | `blend(operand, mode, opacity)`, 27 Photoshop modes |
+| Spatial | `transform` `tile` `flip` `crop` |
+
+Colour operations adjust rgb and leave alpha alone: an adjustment that silently
+changed opacity would surprise everywhere it is used.
+
+`ramp` is Spark2D's `dye`. It colours by luminance, which is what turns a
+greyscale field (a `noise` or `sdf` source, say) into an image.
+
+The blend modes are the PDF blend spec's, not an approximation. `softLight` uses
+the spec's `D(b)` rather than the cheap two branch version, which has a visible
+kink at 0.5 on smooth gradients, and `hue`, `saturation`, `color` and
+`luminosity` use `SetLum` / `SetSat` rather than an HSV round trip, which is what
+makes them agree with Photoshop.
