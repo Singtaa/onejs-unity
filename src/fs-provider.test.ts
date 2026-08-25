@@ -55,6 +55,21 @@ describe("plugins read through the provider", () => {
         expect(files.map((f: string) => f.split("/").pop())).toEqual(["kawaiiTheme.ts", "sketchTheme.ts"])
     })
 
+    // A root that is not there yet is the normal pre-extraction state. A child
+    // that was just enumerated as a directory and then cannot be read is not,
+    // and reporting it as "no themes" hides the fault behind a good message.
+    it("throws naming the directory when a child cannot be read mid-walk", async () => {
+        const { findThemeModules } = await import("./esbuild/themes.mjs")
+        setFsProvider({
+            readdirSync: (dir: string) => {
+                if (dir.endsWith("/ui")) throw new Error("EACCES")
+                return [{ name: "ui", isDirectory: () => true, isFile: () => false }]
+            },
+        })
+        expect(() => findThemeModules("/app")).toThrow(/could not read/)
+        expect(() => findThemeModules("/app")).toThrow(/ui/)
+    })
+
     it("surfaces a missing provider instead of reporting an empty scan", async () => {
         const { findThemeModules } = await import("./esbuild/themes.mjs")
         setFsProvider(null)

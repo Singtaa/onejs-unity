@@ -33,12 +33,20 @@ export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
     // catch would swallow it as though the directory were simply absent, and a
     // misconfigured host would silently find no themes at all.
     const fs = getFs()
-    const walk = (dir) => {
+    const walk = (dir, isRoot = false) => {
         let entries
         try {
             entries = fs.readdirSync(dir, { withFileTypes: true })
-        } catch {
-            return // missing or unreadable: same as empty
+        } catch (e) {
+            // Only the root is forgiven. Its absence is the ordinary state
+            // before anything is extracted, and the plugin already reports that
+            // with a message naming the fix. A child reached this line after
+            // being enumerated as a directory, so failing to read it is a real
+            // fault, and answering "no themes" sends the reader looking a long
+            // way from the cause.
+            if (isRoot) return
+            throw new Error(
+                `[onejs:themes] could not read ${dir} during the theme scan: ${e.message}`)
         }
         dirs.push(dir)
         for (const entry of entries) {
@@ -53,7 +61,7 @@ export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
             else if (pattern.test(entry.name)) files.push(full)
         }
     }
-    walk(rootDir)
+    walk(rootDir, true)
     files.sort()
     return { files, dirs }
 }
