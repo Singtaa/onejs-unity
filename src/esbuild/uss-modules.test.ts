@@ -45,7 +45,12 @@ async function bundle(root: string, entry: string): Promise<string> {
             format: "esm",
             plugins: [ussModulesPlugin({ generateTypes: false })],
         })
-        return result.outputFiles[0].text
+        // write:false guarantees outputFiles in practice, but not in the types.
+        // Assert it rather than silencing it, so a build that somehow produced
+        // nothing says so instead of failing on an unreadable undefined.
+        const [out] = result.outputFiles ?? []
+        if (!out) throw new Error(`esbuild produced no output for ${entry}`)
+        return out.text
     } finally {
         process.chdir(prevCwd)
     }

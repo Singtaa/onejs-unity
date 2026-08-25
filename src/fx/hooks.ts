@@ -1,3 +1,4 @@
+/// <reference path="../timers.d.ts" />
 /**
  * React surface for the fx pipeline.
  *

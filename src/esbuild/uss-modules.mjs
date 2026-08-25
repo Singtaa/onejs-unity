@@ -199,7 +199,11 @@ export default styles
  * Creates the esbuild plugin for USS Modules
  * @param {Object} options: Plugin options
  * @param {boolean} options.generateTypes: Whether to generate .d.ts files (default: true)
- * @returns {Object} esbuild plugin
+ *
+ * No @returns tag on purpose. Annotating it as {Object} widens the inferred
+ * shape to the near-useless Object type, which then fails to satisfy esbuild's
+ * Plugin at every call site. Letting the object literal speak for itself is
+ * what makes the sibling plugins typecheck.
  */
 export function ussModulesPlugin(options = {}) {
     const { generateTypes = true } = options
