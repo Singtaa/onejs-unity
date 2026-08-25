@@ -35,6 +35,45 @@ function generateHash(filePath) {
 }
 
 /**
+ * The path to identify a module by, relative to the project that owns it.
+ *
+ * Not relative to the working directory, which is where this started: the same
+ * source then produced different class names on two machines simply because
+ * one checkout sat deeper than the other, and on Windows the separators
+ * differed as well. Bundles churned for no reason, and comparing a rebuilt
+ * bundle against an old one stopped being able to tell a real change from a
+ * different desk.
+ *
+ * `fallback` is used when no project root is found: the resolver's own project
+ * relative path, which is machine independent for the same reason. It is a
+ * parameter rather than a bare `path.basename`, because a basename is not an
+ * identity. Two modules both called `style.module.uss`, in different folders,
+ * would hash to the same six characters and scope their classes to the same
+ * names, which is the exact collision CSS module scoping exists to prevent. A
+ * tree with no marker above it is not exotic either: it is what an in-memory
+ * build sees, and what the tests here build.
+ */
+function moduleIdentity(filePath, fallback) {
+    let dir = path.dirname(filePath)
+    for (let up = 0; up < 20; up++) {
+        for (const marker of ["oj.json", "package.json"]) {
+            try {
+                if (getFs().existsSync(path.join(dir, marker))) {
+                    return path.relative(dir, filePath).split(path.sep).join("/")
+                }
+            } catch {
+                // An fs provider that cannot stat is a reason to keep walking,
+                // never a reason to fail a build over a class name.
+            }
+        }
+        const parent = path.dirname(dir)
+        if (parent === dir) break
+        dir = parent
+    }
+    return fallback ?? path.basename(filePath)
+}
+
+/**
  * Masks `:global(...)` segments with dot-free placeholders so their classes are
  * neither extracted nor scoped, and returns the segments for later restoration
  * (unwrapped: `:global(.foo)` restores as `.foo`).
@@ -186,16 +225,17 @@ export function ussModulesPlugin(options = {}) {
 
             // Transform .module.uss files
             build.onLoad({ filter: /.*/, namespace: "uss-module" }, async (args) => {
-                // args.path is now the project-relative, forward-slashed form, so
+                // args.path is the project-relative, forward-slashed form, so
                 // read through the absolute path carried on pluginData.
                 const absolutePath = args.pluginData?.absolutePath
                     ?? path.resolve(process.cwd(), args.path)
                 const ussContent = await getFs().promises.readFile(absolutePath, "utf8")
-                // Hash the forward-slashed relative path. path.relative yields
-                // backslashes on Windows, and hashing those gave the same file a
-                // different class name than it got on macOS, so the committed
-                // bundle flipped every class each time the other machine rebuilt.
-                const relativePath = args.path.replace(/\\/g, "/")
+                // Identity from the absolute path, so it anchors to the project
+                // rather than to wherever the build was started, and comes back
+                // forward-slashed so Windows and macOS agree. Hashing the plain
+                // relative path did neither, and the committed bundle flipped
+                // every class name whenever the other machine rebuilt it.
+                const relativePath = moduleIdentity(absolutePath, args.path)
                 const hash = generateHash(relativePath)
 
                 // Extract and scope class names. :global(...) segments are masked
