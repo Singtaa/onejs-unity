@@ -588,6 +588,117 @@ const UNSUPPORTED_FAMILIES = [
     },
 ]
 
+/**
+ * Canonical property order, mirroring the order Tailwind emits its own utility
+ * layers in.
+ *
+ * Every utility here compiles to a single-class rule, so they all carry the
+ * same specificity and USS falls back to document order to pick a winner. That
+ * order used to be file-scan order, which meant `p-4 pt-0` resolved by which
+ * file the scanner happened to read first: sometimes `pt-0` won, sometimes it
+ * silently did nothing. On the web `pt-0` always wins, because Tailwind emits
+ * the per-side utilities after the shorthand.
+ *
+ * Sorting by the earliest property a rule touches reproduces that, and it
+ * ranks the emitted CSS rather than the class name, so arbitrary values
+ * (`p-[10px]`) and opacity modifiers (`bg-red-500/50`) fall into place without
+ * knowing anything about how they were written. Sides run top, right, bottom,
+ * left so that `px-2 pl-0` also lands the way it reads.
+ *
+ * Adding a utility that emits a property missing from this list is safe: it
+ * sorts to the end, after everything ranked, and stays deterministic. Add the
+ * property here if it needs to interact with the ones above it.
+ */
+const PROPERTY_ORDER = [
+    // Layout
+    "aspect-ratio",
+    "display",
+    "visibility",
+    "overflow",
+    "position",
+    "top", "right", "bottom", "left",
+
+    // Flex
+    "flex-direction",
+    "flex-wrap",
+    "flex-grow",
+    "flex-shrink",
+    "flex-basis",
+    "justify-content",
+    "align-content",
+    "align-items",
+    "align-self",
+
+    // Sizing
+    "width", "min-width", "max-width",
+    "height", "min-height", "max-height",
+
+    // Spacing
+    "margin-top", "margin-right", "margin-bottom", "margin-left",
+    "padding-top", "padding-right", "padding-bottom", "padding-left",
+
+    // Typography
+    "font-size",
+    "-unity-font-style",
+    "-unity-text-align",
+    "letter-spacing",
+    "white-space",
+    "color",
+
+    // Background
+    "background-color",
+
+    // Border: each shorthand ahead of the sides it expands to
+    "border-radius",
+    "border-top-left-radius", "border-top-right-radius",
+    "border-bottom-right-radius", "border-bottom-left-radius",
+    "border-width",
+    "border-top-width", "border-right-width",
+    "border-bottom-width", "border-left-width",
+    "border-color",
+    "border-top-color", "border-right-color",
+    "border-bottom-color", "border-left-color",
+
+    // Effects
+    "opacity",
+
+    // Transform
+    "transform-origin",
+    "translate", "scale", "rotate",
+    "--tw-translate-x", "--tw-translate-y",
+    "--tw-scale-x", "--tw-scale-y",
+
+    // Transition
+    "transition-property",
+    "transition-duration",
+    "transition-timing-function",
+    "transition-delay",
+]
+
+const PROPERTY_RANK = new Map(PROPERTY_ORDER.map((p, i) => [p, i]))
+
+/**
+ * Orders two emitted rules. Earliest property first, then the rule declaring
+ * the most properties, so a shorthand lands before the side override that
+ * refines it (`p-4` before `pt-0`, `rounded` before `rounded-t-lg`). Class name
+ * settles the rest, which keeps the output byte-identical no matter what order
+ * the filesystem handed the scanner its files in.
+ */
+function compareRules(a, b) {
+    if (a.rank !== b.rank) return a.rank - b.rank
+    if (a.count !== b.count) return b.count - a.count
+    return a.className < b.className ? -1 : a.className > b.className ? 1 : 0
+}
+
+function rankOf(declarations) {
+    let rank = PROPERTY_ORDER.length
+    for (const property of Object.keys(declarations)) {
+        const r = PROPERTY_RANK.get(property)
+        if (r !== undefined && r < rank) rank = r
+    }
+    return rank
+}
+
 export function generateUSS(classNames, options = {}) {
     const { includeReset = false, onUnsupported = defaultUnsupportedWarning } = options
     const rules = []
@@ -681,16 +792,22 @@ export function generateUSS(classNames, options = {}) {
             selector = `.${escapedClass}`
         }
 
-        // Generate the rule
-        const rule = `${selector} {\n${generateDeclarations(declarations)}\n}`
+        // Generate the rule. Carry the sort key alongside it: the rules are
+        // ordered by property, not by the order the scanner found them.
+        const entry = {
+            rule: `${selector} {\n${generateDeclarations(declarations)}\n}`,
+            rank: rankOf(declarations),
+            count: Object.keys(declarations).length,
+            className,
+        }
 
         // parseClassName only ever yields a known breakpoint, but guard the bucket
         // lookup anyway so an unexpected value degrades to an unscoped rule instead
         // of throwing and failing the whole build.
         if (breakpoint && breakpointRules[breakpoint]) {
-            breakpointRules[breakpoint].push(rule)
+            breakpointRules[breakpoint].push(entry)
         } else {
-            rules.push(rule)
+            rules.push(entry)
         }
     }
 
@@ -712,15 +829,17 @@ export function generateUSS(classNames, options = {}) {
     uss += `/* USS variable declarations */\n* {\n    --tw-scale-x: 1;\n    --tw-scale-y: 1;\n    --tw-translate-x: 0;\n    --tw-translate-y: 0;\n}\n\n`
     
     uss += `/* Base utilities */\n`
-    uss += rules.join("\n\n")
+    uss += rules.sort(compareRules).map((e) => e.rule).join("\n\n")
 
     // Add breakpoint-scoped rules
-    for (const [bp, bpRules] of Object.entries(breakpointRules)) {
-        if (bpRules.length === 0) continue
+    for (const [bp, bpEntries] of Object.entries(breakpointRules)) {
+        if (bpEntries.length === 0) continue
 
         uss += `\n\n/* ${bp} breakpoint (${breakpoints[bp] || 1536}px+) */\n`
         // For USS, we use ancestor selectors instead of media queries
         // .sm .sm_c_p-4 { ... }
+        // Each bucket is a cascade of its own, so it gets the same ordering.
+        const bpRules = bpEntries.sort(compareRules).map((e) => e.rule)
         for (const rule of bpRules) {
             // Wrap with breakpoint ancestor selector
             const wrappedRule = rule.replace(

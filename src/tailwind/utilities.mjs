@@ -76,10 +76,15 @@ function colorUtilities(prefix, property) {
 // ============================================================================
 
 export const staticUtilities = {
-    // Display (USS uses display for visibility control)
+    // Display. Every UI Toolkit element is already a flex container, so USS has
+    // no layout mode to switch into and `display` only controls visibility.
+    // These two therefore carry the direction the web mode implies, which is
+    // the whole reason a web developer reaches for them: `flex` means "lay these
+    // out in a row", `block` means "stack them". Without the direction, `flex`
+    // was a no-op that quietly left the element a column.
     "hidden": { "display": "none" },
-    "block": { "display": "flex" }, // USS doesn't have block, use flex
-    "flex": { "display": "flex" },
+    "block": { "display": "flex", "flex-direction": "column" },
+    "flex": { "display": "flex", "flex-direction": "row" },
 
     // Flex direction
     "flex-row": { "flex-direction": "row" },
@@ -92,8 +97,9 @@ export const staticUtilities = {
     "flex-wrap-reverse": { "flex-wrap": "wrap-reverse" },
     "flex-nowrap": { "flex-wrap": "nowrap" },
 
-    // Flex grow/shrink
-    "flex-1": { "flex-grow": "1", "flex-shrink": "1" },
+    // Flex grow/shrink. `flex-1` is `flex: 1 1 0%` on the web: the zero basis is
+    // what makes siblings share the space evenly instead of by content size.
+    "flex-1": { "flex-grow": "1", "flex-shrink": "1", "flex-basis": "0" },
     "flex-auto": { "flex-grow": "1", "flex-shrink": "1" },
     "flex-initial": { "flex-grow": "0", "flex-shrink": "1" },
     "flex-none": { "flex-grow": "0", "flex-shrink": "0" },

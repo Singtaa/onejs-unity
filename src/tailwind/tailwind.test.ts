@@ -677,6 +677,106 @@ describe("generateUSS", () => {
 })
 
 // ============================================================================
+// Rule order
+//
+// Every utility is a single-class rule, so they all carry the same specificity
+// and USS decides between them on document order alone. These assert the order
+// is the web's, and that it does not depend on the order the scanner happened
+// to find the classes in: that was scan order, so `p-4 pt-0` used to resolve
+// differently depending on which file the glob returned first.
+// ============================================================================
+
+describe("rule order", () => {
+    /** The emitted class names, in the order their rules appear. */
+    function order(classNames: string[]): string[] {
+        const uss = generateUSS(new Set(classNames))
+        const base = uss.split("/* Base utilities */")[1] ?? ""
+        return [...base.matchAll(/^\.([^\s{]+)/gm)].map((m) => m[1])
+    }
+
+    /** Asserts the order holds whichever way round the scanner found them. */
+    function alwaysOrders(a: string, b: string) {
+        expect(order([a, b])).toEqual([a, b])
+        expect(order([b, a])).toEqual([a, b])
+    }
+
+    it("puts a spacing shorthand before the side that refines it", () => {
+        alwaysOrders("p-4", "pt-0")
+        alwaysOrders("m-4", "mb-0")
+    })
+
+    it("puts an axis shorthand before the side that refines it", () => {
+        alwaysOrders("px-2", "pl-0")
+        alwaysOrders("py-2", "pt-0")
+    })
+
+    it("orders shorthand, axis and side together", () => {
+        expect(order(["mt-0", "my-2", "m-4"])).toEqual(["m-4", "my-2", "mt-0"])
+    })
+
+    it("puts border and radius shorthands before their sides", () => {
+        alwaysOrders("rounded", "rounded-t-lg")
+        alwaysOrders("border", "border-t-0")
+    })
+
+    it("puts display before flex-direction so flex-col beats flex", () => {
+        alwaysOrders("flex", "flex-col")
+        alwaysOrders("block", "flex-row")
+    })
+
+    it("orders arbitrary values by the property they emit", () => {
+        // Ranking the emitted CSS rather than the class name is what lets
+        // these sort at all: neither is a known utility key.
+        const expected = [escapeClassName("p-[10px]"), escapeClassName("pt-[2px]")]
+        expect(order(["p-[10px]", "pt-[2px]"])).toEqual(expected)
+        expect(order(["pt-[2px]", "p-[10px]"])).toEqual(expected)
+    })
+
+    it("orders breakpoint rules the same way", () => {
+        const uss = generateUSS(new Set(["md:pt-0", "md:p-4"]))
+        const md = uss.split("/* md breakpoint")[1] ?? ""
+        const names = [...md.matchAll(/^\.md \.([^\s{]+)/gm)].map((m) => m[1])
+        expect(names).toEqual(["md_c_p-4", "md_c_pt-0"])
+    })
+
+    it("emits byte-identical USS regardless of scan order", () => {
+        const classes = ["p-4", "pt-0", "flex", "flex-col", "bg-red-500", "m-2", "rounded"]
+        const forward = generateUSS(new Set(classes))
+        const reverse = generateUSS(new Set([...classes].reverse()))
+        expect(forward).toBe(reverse)
+    })
+})
+
+// ============================================================================
+// Web parity
+// ============================================================================
+
+describe("web parity", () => {
+    it("makes flex a row and block a column", () => {
+        // Every UI Toolkit element is already a flex container, so `display`
+        // alone said nothing and `flex` silently left the element a column.
+        expect(generateUSS(new Set(["flex"]))).toContain("flex-direction: row")
+        expect(generateUSS(new Set(["block"]))).toContain("flex-direction: column")
+    })
+
+    it("gives flex-1 a zero basis", () => {
+        // `flex: 1 1 0%` on the web. Without the basis, siblings share space by
+        // content size instead of evenly.
+        const uss = generateUSS(new Set(["flex-1"]))
+        expect(uss).toContain("flex-grow: 1")
+        expect(uss).toContain("flex-shrink: 1")
+        expect(uss).toContain("flex-basis: 0")
+    })
+
+    it("leaves flex-auto, flex-initial and flex-none basis-free", () => {
+        // These three are `1 1 auto`, `0 1 auto` and `0 0 auto`: auto already.
+        for (const cls of ["flex-auto", "flex-initial", "flex-none"]) {
+            expect(generateUSS(new Set([cls]))).not.toContain("flex-basis")
+        }
+    })
+})
+
+// ============================================================================
 // End-to-end: extraction -> USS generation
 // ============================================================================
 
