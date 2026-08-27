@@ -665,6 +665,50 @@ describe("generateUSS", () => {
         expect(uss).not.toContain("not-a-real-utility")
     })
 
+    // The scanner harvests every string literal, so a blanket unknown-class
+    // warning would be all noise. The near-miss report threads the needle: a
+    // known family head plus a numeric tail that resolves to nothing is an
+    // intended class with a wrong scale value, and it used to emit nothing
+    // with no indication why.
+    describe("near-miss reporting", () => {
+        function run(classNames: string[]) {
+            const reported: string[][] = []
+            const uss = generateUSS(new Set(classNames), {
+                onUnknown: (c: string[]) => reported.push(c),
+            })
+            return { reported, uss }
+        }
+
+        it("reports a known family with a scale value that does not exist", () => {
+            const { reported, uss } = run(["bg-gray-90", "p-4"])
+            expect(reported).toEqual([["bg-gray-90"]])
+            expect(uss).not.toContain("bg-gray-90")
+        })
+
+        it("reports variant-prefixed near-misses under their full name", () => {
+            const { reported } = run(["hover:bg-gray-90"])
+            expect(reported).toEqual([["hover:bg-gray-90"]])
+        })
+
+        it("collects and sorts multiple near-misses into one report", () => {
+            const { reported } = run(["p-45", "bg-gray-90"])
+            expect(reported).toEqual([["bg-gray-90", "p-45"]])
+        })
+
+        it("stays quiet for classes that resolve", () => {
+            const { reported } = run(["bg-gray-900", "p-4", "hover:bg-blue-500", "w-[200]"])
+            expect(reported).toEqual([])
+        })
+
+        it("stays quiet for ordinary strings the scanner picks up", () => {
+            const { reported } = run([
+                "not-a-real-utility", "2026-08", "utf-8", "Content-Type", "hello",
+                "container__a1b2c3",
+            ])
+            expect(reported).toEqual([])
+        })
+    })
+
     it("generates multiple rules without conflicts", () => {
         const classes = new Set(["p-4", "m-2", "flex", "text-lg", "bg-gray-900"])
         const uss = generateUSS(classes)

@@ -589,6 +589,37 @@ const UNSUPPORTED_FAMILIES = [
 ]
 
 /**
+ * Near-miss detection for the unknown-class branch.
+ *
+ * The scanner deliberately harvests every string literal, so most unknown
+ * candidates are ordinary strings and a blanket warning would be all noise.
+ * But a candidate whose head matches a real utility family and whose tail is
+ * a number ("bg-gray-90", "p-45", "w-13") is almost certainly an intended
+ * class with a wrong scale value, which today emits nothing and renders the
+ * element unstyled with no indication why. Heads come from the utility table
+ * itself ("bg-gray-300" contributes "bg-gray", "p-4" contributes "p"), so
+ * the check can never disagree with what the generator actually supports.
+ */
+let _familyHeads = null
+function familyHeads() {
+    if (_familyHeads) return _familyHeads
+    _familyHeads = new Set()
+    for (const key of Object.keys(allUtilities)) {
+        const cut = key.lastIndexOf("-")
+        if (cut > 0) _familyHeads.add(key.slice(0, cut))
+    }
+    return _familyHeads
+}
+
+function isNearMiss(base) {
+    const cut = base.lastIndexOf("-")
+    if (cut <= 0) return false
+    const tail = base.slice(cut + 1)
+    if (!/^\d+(\.\d+)?$/.test(tail)) return false
+    return familyHeads().has(base.slice(0, cut))
+}
+
+/**
  * Canonical property order, mirroring the order Tailwind emits its own utility
  * layers in.
  *
@@ -700,9 +731,14 @@ function rankOf(declarations) {
 }
 
 export function generateUSS(classNames, options = {}) {
-    const { includeReset = false, onUnsupported = defaultUnsupportedWarning } = options
+    const {
+        includeReset = false,
+        onUnsupported = defaultUnsupportedWarning,
+        onUnknown = defaultUnknownWarning,
+    } = options
     const rules = []
     const unsupported = new Map()
+    const nearMisses = new Set()
     const breakpointRules = {} // Group by breakpoint
 
     // Initialize breakpoint groups
@@ -745,12 +781,14 @@ export function generateUSS(classNames, options = {}) {
             // Unknown utility class. Most are not Tailwind at all (CSS module
             // names, arbitrary strings the scanner picked up), so staying quiet
             // is right, except for the families we know are real Tailwind and
-            // silently do nothing here.
+            // silently do nothing here, and for near-misses that name a real
+            // family with a scale value that does not exist.
             for (const family of UNSUPPORTED_FAMILIES) {
                 if (!family.test(base)) continue
                 if (!unsupported.has(family.name)) unsupported.set(family.name, { family, used: new Set() })
                 unsupported.get(family.name).used.add(className)
             }
+            if (isNearMiss(base)) nearMisses.add(className)
             continue
         }
 
@@ -819,6 +857,10 @@ export function generateUSS(classNames, options = {}) {
         })))
     }
 
+    if (nearMisses.size > 0 && typeof onUnknown === "function") {
+        onUnknown([...nearMisses].sort())
+    }
+
     // Build final USS
     let uss = ""
 
@@ -851,6 +893,15 @@ export function generateUSS(classNames, options = {}) {
     }
 
     return uss.trim()
+}
+
+/** Reports classes that name a real utility family with a value that does not
+ * exist ("bg-gray-90"), once per build, on stderr. Without this the class
+ * emits nothing and the element renders unstyled with no indication why. */
+function defaultUnknownWarning(classNames) {
+    const shown = classNames.slice(0, 12).join(" ")
+    const more = classNames.length > 12 ? ` (and ${classNames.length - 12} more)` : ""
+    console.warn(`[tailwind] matched a known family but no utility, so emitted nothing: ${shown}${more}`)
 }
 
 /** Reports unsupported utilities once per build, on stderr. */
