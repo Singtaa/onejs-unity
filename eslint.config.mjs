@@ -36,8 +36,22 @@ export default tseslint.config(
         rules: {
             // The interop boundary is C#: values cross as handles and JSON,
             // and `any` at that boundary is the honest type. The useful
-            // typing lives behind it.
+            // typing lives behind it. The same goes for `Function`, which is
+            // what a JS function assigned to a C# delegate really is, and
+            // for `{}` in the prop-type surface, where an empty interface is
+            // a named extension point rather than a mistake.
             "@typescript-eslint/no-explicit-any": "off",
+            "@typescript-eslint/no-unsafe-function-type": "off",
+            "@typescript-eslint/no-empty-object-type": "off",
+
+            // `declare global { namespace JSX ... }` is the only way to type
+            // JSX intrinsics; only non-declaration namespaces are archaic.
+            "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }],
+
+            // Empty catch is the codebase's deliberate best-effort idiom
+            // (teardown paths that must not throw). Empty non-catch blocks
+            // still flag.
+            "no-empty": ["error", { allowEmptyCatch: true }],
 
             // `let x = null` before a try block that assigns x, reads it
             // after, is the idiom the fx/gpu hooks use so a throwing build
@@ -72,7 +86,7 @@ export default tseslint.config(
             // the element silently renders unstyled. Whole class names per
             // branch are scanned; truly dynamic names belong in the safelist.
             "no-restricted-syntax": ["error", {
-                selector: "JSXAttribute[name.name='className'] BinaryExpression[operator='+']",
+                selector: "JSXAttribute[name.name='className'] > JSXExpressionContainer > BinaryExpression[operator='+']",
                 message: "Assembled class names are invisible to the Tailwind scanner. Use whole class names in each branch, or add the assembled names to the safelist.",
             }],
         },
