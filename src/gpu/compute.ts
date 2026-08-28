@@ -221,7 +221,7 @@ class ComputeBufferImpl<T extends TypedArray = Float32Array> implements ComputeB
         this._arrayType = arrayType
     }
 
-    write(data: T, options?: { offset?: number }): void {
+    write(data: T, _options?: { offset?: number }): void {
         // Convert TypedArray to JSON array for C# interop
         const arr = Array.from(data as unknown as ArrayLike<number>)
         const json = JSON.stringify(arr)
@@ -399,9 +399,6 @@ interface ZeroAllocBindingIds {
     getScreenWidth: number
     getScreenHeight: number
 }
-
-// Zero-alloc invoker function types
-type InvokerFn = (...args: unknown[]) => unknown
 
 // Native zero-alloc invoke functions (registered by quickjs_unity.c)
 declare const __zaInvoke0: (bindingId: number) => unknown

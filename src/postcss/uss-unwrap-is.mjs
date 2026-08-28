@@ -109,17 +109,7 @@ function expandIsSelector(selector) {
     return current
 }
 
-/**
- * Also handle :where() which is similar to :is() but with 0 specificity
- * Since USS doesn't have specificity concerns the same way, we can treat it the same
- */
-function expandWhereSelector(selector) {
-    // Replace :where( with :is( and use the same expansion logic
-    const normalized = selector.replace(/:where\(/g, ":is(")
-    return expandIsSelector(normalized)
-}
-
-export function ussUnwrapIs(opts = {}) {
+export function ussUnwrapIs() {
     return {
         postcssPlugin: "postcss-uss-unwrap-is",
 

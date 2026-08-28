@@ -87,7 +87,6 @@ describe("themesPlugin", () => {
         // The generated module must actually execute the registrations
         const registered: string[] = []
         ;(globalThis as any).__registered = registered
-        // eslint-disable-next-line no-eval
         eval(code)
         expect(registered.sort()).toEqual(["kawaii", "sketch"])
         delete (globalThis as any).__registered

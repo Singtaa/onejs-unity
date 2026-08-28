@@ -10,7 +10,6 @@ import {
     percentages,
     colors,
     fontSize,
-    fontWeight,
     borderRadius,
     borderWidth,
     opacity,

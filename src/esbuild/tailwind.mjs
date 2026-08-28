@@ -30,7 +30,7 @@ export function tailwindPlugin(options = {}) {
 
         setup(build) {
             // Handle virtual import: import "onejs:tailwind"
-            build.onResolve({ filter: /^onejs:tailwind$/ }, (args) => {
+            build.onResolve({ filter: /^onejs:tailwind$/ }, () => {
                 return {
                     path: "onejs:tailwind",
                     namespace: "onejs-tailwind",

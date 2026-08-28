@@ -137,7 +137,7 @@ function transformSelector(selector) {
     // Match class selectors including backslash escapes
     // Captures characters OR backslash+any char, but stops at unescaped : # [ etc.
     return selector.replace(
-        /\.(-?[_a-zA-Z](?:[^\s,.#:\[\]{}()+>~\\]|\\.)*)(?=[:\s,.#\[\]{}()+>~]|$)/g,
+        /\.(-?[_a-zA-Z](?:[^\s,.#:[\]{}()+>~\\]|\\.)*)(?=[:\s,.#[\]{}()+>~]|$)/g,
         (match, className) => {
             // Remove any backslash escapes that Tailwind adds
             const unescaped = className.replace(/\\/g, "")

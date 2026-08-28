@@ -28,7 +28,7 @@ import type { MeshData } from "../types"
 /**
  * Verify mesh data format is valid.
  */
-function verifyMeshData(data: MeshData, name: string): void {
+function verifyMeshData(data: MeshData, _name: string): void {
     // Vertices must exist and have 3 components per vertex
     expect(data.vertices).toBeInstanceOf(Float32Array)
     expect(data.vertices.length % 3).toBe(0)

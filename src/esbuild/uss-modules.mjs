@@ -96,6 +96,9 @@ function maskGlobals(ussContent) {
  * Restores masked `:global(...)` segments as their unwrapped (unscoped) content.
  */
 function restoreGlobals(content, globals) {
+    // The mask markers are literal \x01 bytes on purpose: a control character
+    // cannot appear in real USS, so it cannot collide with user content.
+    // eslint-disable-next-line no-control-regex
     return content.replace(/G(\d+)/g, (_, i) => globals[Number(i)])
 }
 

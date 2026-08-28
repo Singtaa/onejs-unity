@@ -8,7 +8,7 @@
  * - Frequency scaling works
  */
 
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect } from "vitest"
 import { perlin2D, perlin3D } from "./perlin"
 import { simplex2D, simplex3D } from "./simplex"
 import { value2D, value3D } from "./value"

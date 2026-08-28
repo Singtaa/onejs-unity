@@ -16,7 +16,6 @@ import type {
     PlaneOptions,
     TorusOptions,
     QuadOptions,
-    Vector3,
     Color
 } from "../types"
 import type { ProceduralTexture } from "../texture/generators"

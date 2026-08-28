@@ -1,3 +1,7 @@
+// timers.d.ts declares ambient globals (setTimeout on the OneJS clock), so a
+// reference keeps this file a plain module; an import would pull it into the
+// module graph for nothing.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../timers.d.ts" />
 /**
  * React surface for the fx pipeline.

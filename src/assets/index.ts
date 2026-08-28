@@ -30,7 +30,10 @@ declare function useExtensions(typeRef: any): void
 // platforms and by the browser on WebGL
 declare function fetch(url: string): Promise<{ ok: boolean; status: number; text(): Promise<string> }>
 
-// Register ImageConversion extension methods so tex.LoadImage(bytes) works
+// Register ImageConversion extension methods so tex.LoadImage(bytes) works.
+// useExtensions is OneJS's C# extension-method registrar, not a React hook;
+// module level is exactly where it belongs (it mirrors a C# using).
+// eslint-disable-next-line react-hooks/rules-of-hooks
 useExtensions(CS.UnityEngine.ImageConversion)
 
 declare global {

@@ -255,7 +255,7 @@ describe("fx colour, blend and spatial", () => {
     it("marks the spatial ops as unfusable and nothing else", async () => {
         const spatial = [OP.TRANSFORM, OP.TILE, OP.FLIP, OP.CROP]
         for (const code of spatial) expect(isSpatialOp(code)).toBe(true)
-        for (const [name, code] of Object.entries(OP)) {
+        for (const [, code] of Object.entries(OP)) {
             if (spatial.includes(code as any)) continue
             expect(isSpatialOp(code)).toBe(false)
         }
@@ -302,7 +302,7 @@ describe("fx neighbourhood filters", () => {
             // wrong branch: it tests the filter range first, then the spatial one.
             expect(code >= FIRST_FILTER_OP).toBe(true)
         }
-        for (const [name, code] of Object.entries(OP)) {
+        for (const [, code] of Object.entries(OP)) {
             if (filters.includes(code as any)) continue
             expect(isFilterOp(code)).toBe(false)
         }

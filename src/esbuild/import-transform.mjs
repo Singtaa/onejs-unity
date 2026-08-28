@@ -116,7 +116,7 @@ export function transformCsImports(ts, source, filePath, shouldTransform) {
             ? parts.join("; ")
             // Side-effect imports and type-only imports bind nothing at
             // runtime; a comment keeps the removal visible in the bundle.
-            : `/* ${original.replace(/\*\//g, "*\/")} - removed, no runtime binding */`
+            : `/* ${original.replace(/\*\//g, "*\\/")} - removed, no runtime binding */`
 
         if (original.endsWith(";") && !replacement.endsWith(";")) replacement += ";"
 

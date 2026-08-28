@@ -105,13 +105,10 @@ class InputActionImpl implements InputAction {
         const callbacks = this._callbacks.get(event)
         if (!callbacks) return
 
-        const self = this
         const context: ActionCallbackContext = {
             time: performance.now() / 1000,
             phase: this.phase,
-            readValue<T>(): T {
-                return self.value() as T
-            },
+            readValue: <T>(): T => this.value() as T,
         }
 
         for (const cb of callbacks) {
@@ -255,7 +252,7 @@ class CompositeBindingBuilderImpl implements CompositeBindingBuilder {
 
     done(): ActionBuilder {
         // Apply all bindings
-        for (const [part, path] of this._parts) {
+        for (const [, path] of this._parts) {
             // For now, add as individual bindings
             // Full composite support would require C# side changes
             getInputBridge().AddBinding(this._actionBuilder._getHandle(), path)

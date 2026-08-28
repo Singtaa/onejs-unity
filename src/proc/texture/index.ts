@@ -47,13 +47,12 @@ import {
     generateGradient,
     colorMaps,
     createTexture,
-    ProceduralTexture,
     checker,
     gradient,
     solid,
     fromData
 } from "./generators"
-import { gpuTexture, registerPatternShader } from "./gpu"
+import { gpuTexture } from "./gpu"
 import type {
     NoiseTextureOptions,
     VoronoiTextureOptions,

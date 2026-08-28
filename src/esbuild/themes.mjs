@@ -46,7 +46,8 @@ export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
             // way from the cause.
             if (isRoot) return
             throw new Error(
-                `[onejs:themes] could not read ${dir} during the theme scan: ${e.message}`)
+                `[onejs:themes] could not read ${dir} during the theme scan: ${e.message}`,
+                { cause: e })
         }
         dirs.push(dir)
         for (const entry of entries) {

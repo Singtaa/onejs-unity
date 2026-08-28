@@ -28,7 +28,7 @@ import { perlin2D, perlin3D } from "./perlin"
 import { simplex2D, simplex3D } from "./simplex"
 import { value2D, value3D } from "./value"
 import { worley2D, worley3D } from "./worley"
-import { gpuNoise, registerNoiseShader } from "./gpu"
+import { gpuNoise } from "./gpu"
 import type {
     NoiseConfig,
     NoiseSource2D,

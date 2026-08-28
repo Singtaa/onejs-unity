@@ -26,7 +26,6 @@ import type {
     NoiseSource2D,
     NoiseSource3D,
     NoiseConfig,
-    WorleyConfig,
     FBMConfig,
     NoiseType,
     GPUNoiseOptions,

@@ -8,7 +8,7 @@
  */
 
 import { perlin2D, simplex2D, worley2D } from "../noise"
-import type { TextureOptions, NoiseConfig, FBMConfig } from "../types"
+import type { TextureOptions, FBMConfig } from "../types"
 
 // =============================================================================
 // Types
@@ -442,11 +442,12 @@ export function generateGradient(options: GradientTextureOptions): Uint8ClampedA
                 case "diagonal":
                     t = (nx + ny) / 2
                     break
-                case "radial":
+                case "radial": {
                     const dx = nx - 0.5
                     const dy = ny - 0.5
                     t = Math.min(1, Math.sqrt(dx * dx + dy * dy) * 2)
                     break
+                }
             }
 
             data[idx++] = (startColor[0] + (endColor[0] - startColor[0]) * t) * 255

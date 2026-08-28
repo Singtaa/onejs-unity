@@ -2,8 +2,8 @@
  * React hooks for input handling
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import type { Keyboard, Mouse, Gamepad, Touch, Vector2, InputAction, InputReader, InputReaderBuilder } from "./types"
+import { useState, useEffect, useRef, useMemo } from "react"
+import type { Gamepad, Touch, Vector2, InputAction, InputReader, InputReaderBuilder } from "./types"
 import { input } from "./input"
 import { createReader } from "./reader"
 
@@ -29,17 +29,6 @@ function useAnimationFrame(callback: () => void): void {
         animId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(animId)
     }, [])
-}
-
-/**
- * Internal hook for tracking previous value
- */
-function usePrevious<T>(value: T): T | undefined {
-    const ref = useRef<T | undefined>(undefined)
-    useEffect(() => {
-        ref.current = value
-    })
-    return ref.current
 }
 
 // ============ Keyboard Hooks ============
