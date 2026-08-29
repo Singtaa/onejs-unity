@@ -18,11 +18,13 @@ import { generateFromFiles } from "../tailwind/generator.mjs"
  * @param {Object} options
  * @param {string[]} options.content: Content patterns to scan for classes
  * @param {string[]} [options.safelist]: Class names to always include (for dynamic/variable classes)
+ * @param {boolean} [options.preflight]: Strip the runtime theme's control chrome, like web Tailwind's preflight (default false)
  */
 export function tailwindPlugin(options = {}) {
     const {
         content = ["./index.tsx", "./**/*.{tsx,ts,jsx,js}"],
         safelist = [],
+        preflight = false,
     } = options
 
     return {
@@ -43,6 +45,7 @@ export function tailwindPlugin(options = {}) {
                     // Scan source files and generate USS
                     const ussContent = await generateFromFiles(content, {
                         includeReset: true,
+                        preflight,
                         safelist,
                     })
 

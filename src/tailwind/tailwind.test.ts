@@ -792,6 +792,49 @@ describe("rule order", () => {
 })
 
 // ============================================================================
+// Preflight
+// ============================================================================
+
+describe("preflight", () => {
+    it("is off by default", () => {
+        const uss = generateUSS(new Set(["p-4"]))
+        expect(uss).not.toContain("Preflight")
+        expect(uss).not.toContain(".unity-button")
+    })
+
+    it("emits the control reset when enabled", () => {
+        const uss = generateUSS(new Set(["p-4"]), { preflight: true })
+        expect(uss).toContain(".unity-button {")
+        expect(uss).toContain(".unity-text-field__input, .unity-base-text-field__input {")
+        expect(uss).toContain(".unity-label {")
+    })
+
+    it("neutralizes the theme's composite state selectors at the same shape", () => {
+        // These outrank any single utility class, so the preflight must carry
+        // matching selectors of its own; a resting-only reset would leave the
+        // theme's gray flashing back on hover and focus.
+        const uss = generateUSS(new Set([]), { preflight: true })
+        expect(uss).toContain(".unity-text-field:focus .unity-text-field__input")
+        expect(uss).toContain(".unity-text-field:hover .unity-text-field__input")
+        expect(uss).toContain(".unity-button:hover")
+    })
+
+    it("emits before the utilities so a utility wins the cascade tie", () => {
+        const uss = generateUSS(new Set(["bg-blue-500"]), { preflight: true })
+        expect(uss.indexOf(".unity-button")).toBeLessThan(uss.indexOf(".bg-blue-500"))
+    })
+
+    it("leaves Toggle and Slider styled apart from margins", () => {
+        // Web preflight keeps native checkbox/range rendering; an unstyled
+        // slider is unusable. Only the outer margin is zeroed.
+        const uss = generateUSS(new Set([]), { preflight: true })
+        expect(uss).not.toContain(".unity-toggle__checkmark")
+        expect(uss).not.toContain(".unity-base-slider__dragger")
+        expect(uss).toContain(".unity-toggle, .unity-base-slider {")
+    })
+})
+
+// ============================================================================
 // Web parity
 // ============================================================================
 

@@ -730,9 +730,76 @@ function rankOf(declarations) {
     return rank
 }
 
+/**
+ * Opt-in preflight, the OneJS analogue of web Tailwind's: strip the control
+ * chrome the runtime theme paints on Button, TextField and Label, the way web
+ * preflight strips the browser's, so utilities start from a bare element.
+ *
+ * Two things decide its shape. First, it sits in the same stylesheet as the
+ * utilities, BEFORE them, so a utility beats it on the cascade tie exactly as
+ * utilities beat web preflight. Second, the theme styles the states of
+ * composite controls through selectors like
+ * `.unity-text-field:focus .unity-text-field__input`, which outrank any single
+ * utility class; the preflight neutralizes those at the same selector shapes,
+ * permanently. The consequence is a deliberate one: with preflight on, the
+ * inner input is a transparent text region in every state, and the visible box
+ * is painted on the field itself (`className`) or inline on the input
+ * (`inputStyle`), both of which always win.
+ *
+ * Toggle and Slider keep their look: web preflight leaves native checkbox and
+ * range rendering alone too, and a fully unstyled slider is unusable. Only
+ * their outer margins are zeroed, matching preflight's `margin: 0` on inputs.
+ */
+export const PREFLIGHT_USS = `/* Preflight: strip the runtime theme's control chrome */
+.unity-button {
+    margin-top: 0; margin-right: 0; margin-bottom: 0; margin-left: 0;
+    padding-top: 0; padding-right: 0; padding-bottom: 0; padding-left: 0;
+    border-top-width: 0; border-right-width: 0; border-bottom-width: 0; border-left-width: 0;
+    border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; border-bottom-left-radius: 0;
+    background-color: rgba(0, 0, 0, 0);
+    background-image: none;
+}
+
+.unity-button:hover, .unity-button:active, .unity-button:focus, .unity-button:disabled {
+    background-color: rgba(0, 0, 0, 0);
+    border-top-color: rgba(0, 0, 0, 0); border-right-color: rgba(0, 0, 0, 0); border-bottom-color: rgba(0, 0, 0, 0); border-left-color: rgba(0, 0, 0, 0);
+}
+
+.unity-text-field, .unity-base-text-field {
+    margin-top: 0; margin-right: 0; margin-bottom: 0; margin-left: 0;
+}
+
+.unity-text-field__input, .unity-base-text-field__input {
+    padding-top: 0; padding-right: 0; padding-bottom: 0; padding-left: 0;
+    border-top-width: 0; border-right-width: 0; border-bottom-width: 0; border-left-width: 0;
+    border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; border-bottom-left-radius: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.unity-text-field:hover .unity-text-field__input,
+.unity-base-text-field:hover .unity-base-text-field__input,
+.unity-text-field:focus .unity-text-field__input,
+.unity-base-text-field:focus .unity-base-text-field__input,
+.unity-text-field:disabled .unity-text-field__input,
+.unity-base-text-field:disabled .unity-base-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-top-color: rgba(0, 0, 0, 0); border-right-color: rgba(0, 0, 0, 0); border-bottom-color: rgba(0, 0, 0, 0); border-left-color: rgba(0, 0, 0, 0);
+}
+
+.unity-label {
+    margin-top: 0; margin-right: 0; margin-bottom: 0; margin-left: 0;
+    padding-top: 0; padding-right: 0; padding-bottom: 0; padding-left: 0;
+}
+
+.unity-toggle, .unity-base-slider {
+    margin-top: 0; margin-right: 0; margin-bottom: 0; margin-left: 0;
+}
+`
+
 export function generateUSS(classNames, options = {}) {
     const {
         includeReset = false,
+        preflight = false,
         onUnsupported = defaultUnsupportedWarning,
         onUnknown = defaultUnknownWarning,
     } = options
@@ -866,6 +933,11 @@ export function generateUSS(classNames, options = {}) {
 
     if (includeReset) {
         uss += `/* OneJS Tailwind Reset */\n* {\n    margin: 0;\n    padding: 0;\n}\n\n`
+    }
+
+    // Before the utilities, so a utility wins the cascade tie against it.
+    if (preflight) {
+        uss += PREFLIGHT_USS + "\n"
     }
 
     uss += `/* USS variable declarations */\n* {\n    --tw-scale-x: 1;\n    --tw-scale-y: 1;\n    --tw-translate-x: 0;\n    --tw-translate-y: 0;\n}\n\n`
