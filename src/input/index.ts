@@ -42,6 +42,7 @@ export {
 
     // Event hooks
     useKeyPress,
+    useKeyHeld,
     useKeyDown,
     useKeyRelease,
     useMouseClick,

@@ -134,18 +134,19 @@ export function useKeyPress(key: string, callback: () => void): void {
 }
 
 /**
- * Hook that fires a callback while a key is held down.
+ * Hook that fires a callback EVERY FRAME while a key is held down.
+ * For a callback that fires once on the press, use useKeyPress.
  *
  * @example
  * ```tsx
  * function Game() {
- *     useKeyDown("W", () => {
+ *     useKeyHeld("W", () => {
  *         player.moveForward()
  *     })
  * }
  * ```
  */
-export function useKeyDown(key: string, callback: () => void): void {
+export function useKeyHeld(key: string, callback: () => void): void {
     const callbackRef = useRef(callback)
     callbackRef.current = callback
 
@@ -154,6 +155,26 @@ export function useKeyDown(key: string, callback: () => void): void {
             callbackRef.current()
         }
     })
+}
+
+let warnedUseKeyDown = false
+
+/**
+ * @deprecated Renamed useKeyHeld. This hook fires every frame while the key
+ * is held, but "key down" reads as the edge event everywhere else (React's
+ * onKeyDown, Unity's GetKeyDown), which made held-state code look
+ * edge-triggered: a jump that fires every frame in code that reads correct.
+ * The name is retired rather than repurposed, so this alias keeps the exact
+ * old behavior. Use useKeyHeld (held) or useKeyPress (once per press).
+ */
+export function useKeyDown(key: string, callback: () => void): void {
+    if (!warnedUseKeyDown) {
+        warnedUseKeyDown = true
+        console.warn("[onejs-unity] useKeyDown is deprecated: it fires every frame while "
+            + "the key is held, not once on the press. Use useKeyHeld for held, "
+            + "useKeyPress for once per press.")
+    }
+    useKeyHeld(key, callback)
 }
 
 /**
