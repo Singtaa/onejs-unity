@@ -14,6 +14,7 @@
     "./proc/noise": "./src/proc/noise/index.ts",
     "./proc/geometry": "./src/proc/geometry/index.ts",
     "./proc/texture": "./src/proc/texture/index.ts",
+    "./sl": "./src/sl/index.ts",
     "./esbuild": "./src/esbuild/index.mjs",
     "./esbuild/import-transform": "./src/esbuild/import-transform.mjs",
     "./postcss": "./src/postcss/index.mjs",
