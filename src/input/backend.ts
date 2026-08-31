@@ -185,7 +185,7 @@ for (const name of [
 /** The canonical Key name for any accepted spelling, or null if unrecognised. */
 export function resolveKeyName(name: string): string | null {
     const lower = name.toLowerCase()
-    return KEY_ALIASES[lower] ?? CANONICAL.get(lower) ?? null
+    return KEY_ALIASES[lower] ?? DOM_QUERY_ALIASES[lower] ?? CANONICAL.get(lower) ?? null
 }
 
 /**
@@ -219,6 +219,22 @@ const DOM_CODE_SPECIALS: Record<string, string> = {
     ContextMenu: "ContextMenu",
     Escape: "Escape",
 }
+
+/**
+ * The same DOM spellings, accepted as QUERIES as well as as incoming codes.
+ *
+ * A browser sends `ArrowUp` and this backend stores `UpArrow`, so a game
+ * written by somebody who knows KeyboardEvent asks for the spelling their own
+ * events use and gets silence: no error, no warning, a key that simply never
+ * fires. That cost a live game its controls.
+ *
+ * Derived from the table above rather than restated, so the ingest direction
+ * and the query direction cannot drift apart. Only the irregular spellings
+ * need it; a game asks for "W", never "KeyW".
+ */
+const DOM_QUERY_ALIASES: Record<string, string> = Object.fromEntries(
+    Object.entries(DOM_CODE_SPECIALS).map(([code, name]) => [code.toLowerCase(), name]),
+)
 
 /** The canonical Key name for a DOM KeyboardEvent.code, or null if unmapped. */
 export function keyNameFromDomCode(code: string): string | null {

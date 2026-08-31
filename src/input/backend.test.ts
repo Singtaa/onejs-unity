@@ -152,3 +152,49 @@ describe("keyNameFromDomCode", () => {
         expect(keyNameFromDomCode("Sparkle")).toBeNull()
     })
 })
+
+/**
+ * Both spellings of the same key resolve, because both are written in practice.
+ *
+ * The browser sends `ArrowUp` and this backend stores `UpArrow`. Until these
+ * aliases existed a game querying the browser spelling got a key that never
+ * fired: `resolveKeyName` returned null, the lookup missed, and nothing
+ * anywhere reported a problem. A live game shipped with dead arrow keys.
+ *
+ * The existing coverage could not catch it: "Space" is spelled identically
+ * either way, so a test using Space passes whether or not this works.
+ */
+describe("DOM spellings as queries", () => {
+    it("resolves the arrows written either way to the same key", () => {
+        for (const [dom, unity] of [
+            ["ArrowUp", "UpArrow"], ["ArrowDown", "DownArrow"],
+            ["ArrowLeft", "LeftArrow"], ["ArrowRight", "RightArrow"],
+        ]) {
+            expect(resolveKeyName(dom!)).toBe(unity)
+            expect(resolveKeyName(unity!)).toBe(unity)
+        }
+    })
+
+    it("resolves the sided modifiers written either way", () => {
+        expect(resolveKeyName("ShiftLeft")).toBe("LeftShift")
+        expect(resolveKeyName("ControlRight")).toBe("RightCtrl")
+        expect(resolveKeyName("MetaLeft")).toBe("LeftMeta")
+    })
+
+    /** Case is already insensitive, and the new table must not change that. */
+    it("stays case insensitive", () => {
+        expect(resolveKeyName("arrowup")).toBe("UpArrow")
+        expect(resolveKeyName("ARROWUP")).toBe("UpArrow")
+    })
+
+    /** What a game stores and what it queries must agree, which is the bug. */
+    it("agrees with the spelling the ingest side stores", () => {
+        for (const code of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft"]) {
+            expect(resolveKeyName(code)).toBe(keyNameFromDomCode(code))
+        }
+    })
+
+    it("still refuses a name that is not a key", () => {
+        expect(resolveKeyName("NotAKey")).toBe(null)
+    })
+})
