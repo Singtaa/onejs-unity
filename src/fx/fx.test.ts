@@ -473,3 +473,13 @@ describe("fx noise scroll", () => {
         expect(at(4)).toEqual([1, 0])
     })
 })
+
+describe("fx egg", () => {
+    it("packs height, both radii and the bulge, in the order the shader reads them", async () => {
+        const { image } = await load()
+        const a = decode(image.sdf(64, 64, "egg", { h: 0.5, r: 0.22, rTop: 0.02, bulge: 0.6 }).encode()).steps[0].args
+        expect(a.slice(3, 7)).toEqual([0.5, 0.22, 0.02, 0.6])
+        const d = decode(image.sdf(64, 64, "egg").encode()).steps[0].args
+        expect(d.slice(3, 7)).toEqual([0.4, 0.2, 0.1, 0.7])
+    })
+})

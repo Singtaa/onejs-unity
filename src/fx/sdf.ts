@@ -40,6 +40,8 @@ export interface SdfOptions {
     onion?: number
     /** Width of the antialiased edge. Default 0.01. */
     softness?: number
+    /** For egg: how far the sides swell, 0..1, with 1 nearly straight. Default 0.7. */
+    bulge?: number
     /** Emit the raw signed distance instead of a 0..1 mask. Default false. */
     field?: boolean
     [param: string]: unknown
@@ -113,7 +115,10 @@ export function packSdfParams(kind: SdfKind, o: SdfOptions): [Quad, Pair] {
         }
         case "moon": return [q(n(o.d, 0.15), n(o.r, 0.35), n(o.rCut, 0.32)), none]
         case "roundedCross": return [q(n(o.h, 0.5)), none]
-        case "egg": return [q(n(o.r, 0.3), n(o.rTop, 0.12)), none]
+        // h is the distance between the two circles' centres, r and rTop their
+        // radii, and bulge the roundness of the sides: below 1 they swell out,
+        // near 1 they run straight. 0.7 is Quilez's own demo value.
+        case "egg": return [q(n(o.h, 0.4), n(o.r, 0.2), n(o.rTop, 0.1), n(o.bulge, 0.7)), none]
         case "heart": return [q(), none]
         case "cross": return [q(n(o.w, 0.35), n(o.h, 0.12), n(o.r, 0.03)), none]
         case "roundedX": return [q(n(o.w, 0.5), n(o.r, 0.08)), none]
