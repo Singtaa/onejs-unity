@@ -25,6 +25,7 @@
  */
 
 import { BLEND, MAX_GRADIENT_STOPS, MODE, OP, SOURCE, WIRE_VERSION, type BlendMode, type Mode, type OpCode } from "./ops"
+import { parseColor } from "../color"
 import { SDF_SHAPES, packSdfCommon, packSdfParams, type SdfKind, type SdfOptions } from "./sdf"
 
 const DEG2RAD = Math.PI / 180
@@ -64,8 +65,9 @@ interface Step {
  */
 export type Texture = object & { readonly __textureBrand?: never }
 
-/** Colour written as 0..1 components. */
-export type RGBA = [number, number, number, number]
+/** Colour written as 0..1 components, or as "#rgb", "#rrggbb" or "#rrggbbaa". */
+export type RGBA = readonly [number, number, number, number]
+export type ColorLike = RGBA | string
 
 export interface NoiseOptions {
     /** Repeats across the texture. A scalar applies to both axes. Default 4. */
@@ -75,7 +77,14 @@ export interface NoiseOptions {
     /** Detail levels, 1 to 4. More is wispier and costs more. Default 3. */
     octaves?: number
     /** Pans the field, in noise space. Default [0, 0]. */
-    offset?: [number, number]
+    offset?: readonly [number, number]
+    /**
+     * Pans the field over time, in noise space per second, on top of `offset`.
+     * Read against the clock of the animated build this chain is built inside
+     * (`useAnimatedTexture`); outside one it is a still at time zero. A flame
+     * rises with `scroll: [0, -0.2]`, since noise space counts downward.
+     */
+    scroll?: readonly [number, number]
     /** Rotates the field, in degrees. Default 0. */
     rotation?: number
     /**
@@ -96,7 +105,7 @@ export interface NoiseOptions {
 }
 
 export interface GradientStop {
-    color: RGBA
+    color: ColorLike
     /** Position along the gradient, 0..1. */
     at: number
 }
@@ -122,17 +131,37 @@ export interface TransformOptions {
  * stops in order and reads a descending pair as a zero width span rather than
  * an error, and overflowing a uniform array is silent on the other side.
  */
-function packStops(stops: GradientStop[], what: string): number[] {
+/**
+ * What a ramp or gradient takes: stops with a position, or bare colours spread
+ * evenly from 0 to 1, in either notation.
+ */
+export type Stops = readonly (GradientStop | ColorLike)[]
+
+const toRGBA = (c: ColorLike): RGBA => (typeof c === "string" ? parseColor(c) : c)
+
+function packStops(stops: Stops, what: string): number[] {
     if (stops.length < 1) throw new Error(`[onejs fx] a ${what} needs at least one stop`)
     if (stops.length > MAX_GRADIENT_STOPS)
         throw new Error(`[onejs fx] a ${what} takes at most ${MAX_GRADIENT_STOPS} stops`)
-    const sorted = [...stops].sort((a, b) => a.at - b.at)
+    const isStop = (s: GradientStop | ColorLike): s is GradientStop =>
+        typeof s === "object" && !Array.isArray(s)
+    const placed = stops.map((s, i) => isStop(s)
+        ? { color: toRGBA(s.color), at: s.at }
+        : { color: toRGBA(s), at: stops.length === 1 ? 0 : i / (stops.length - 1) })
+    const sorted = placed.sort((a, b) => a.at - b.at)
     const args: number[] = [sorted.length]
     for (const s of sorted) {
         args.push(s.color[0], s.color[1], s.color[2], s.color[3], Math.min(1, Math.max(0, s.at)))
     }
     return args
 }
+
+/**
+ * The clock an animated build runs on. `useAnimatedTexture` sets it around
+ * each build so a source with a `scroll` can pan itself; nothing else reads it.
+ */
+let animationTime = 0
+export function setAnimationTime(seconds: number): void { animationTime = seconds }
 
 /**
  * Ownership scope, for useTexture.
@@ -275,7 +304,7 @@ export class Image {
      *
      * One ramp fits per fused pass, so a chain with two costs an extra pass.
      */
-    ramp(stops: GradientStop[]): Image {
+    ramp(stops: Stops): Image {
         const args = packStops(stops, "ramp")
         return this.#then(OP.RAMP, MODE.SCALAR, args)
     }
@@ -454,7 +483,9 @@ export const image = {
         const scale = o.scale === undefined ? [4, 4]
             : typeof o.scale === "number" ? [o.scale, o.scale]
             : o.scale
-        const offset = o.offset ?? [0, 0]
+        const base = o.offset ?? [0, 0]
+        const scroll = o.scroll ?? [0, 0]
+        const offset = [base[0] + scroll[0] * animationTime, base[1] + scroll[1] * animationTime]
         return Image.from(SOURCE.NOISE, [
             width, height,
             scale[0], scale[1],
@@ -473,7 +504,7 @@ export const image = {
      * because the shader walks them in order and reads a descending pair as a
      * zero width span rather than an error.
      */
-    gradient(width: number, height: number, stops: GradientStop[], angle = 0): Image {
+    gradient(width: number, height: number, stops: Stops, angle = 0): Image {
         const packed = packStops(stops, "gradient")
         return Image.from(SOURCE.GRADIENT, [width, height, angle * DEG2RAD, ...packed])
     },

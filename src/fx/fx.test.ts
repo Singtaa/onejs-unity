@@ -428,3 +428,48 @@ describe("fx noise and sdf extras", () => {
         expect(stretched[17]).toBeCloseTo(1.8)
     })
 })
+
+describe("fx stops in either notation", () => {
+    it("takes hex strings as stop colours", async () => {
+        const { image } = await load()
+        const d = decode(image.gradient(8, 8, [{ color: "#ff0000", at: 0 }, { color: "#00ff0080", at: 1 }]).encode())
+        const a = d.steps[0].args
+        expect(a.slice(4, 8)).toEqual([1, 0, 0, 1])
+        expect(a[9]).toBe(0)
+        expect(a[10]).toBe(1)
+        expect(a[12]).toBeCloseTo(128 / 255, 5)
+    })
+
+    it("spreads bare colours evenly from 0 to 1", async () => {
+        const { image } = await load()
+        const d = decode(image.blank(4, 4).ramp(["#000", "#f00", "#fff"]).encode())
+        const a = d.steps[1].args
+        expect(a[0]).toBe(3)
+        expect([a[5], a[10], a[15]]).toEqual([0, 0.5, 1])
+        expect(a.slice(6, 9)).toEqual([1, 0, 0])
+    })
+
+    it("accepts a readonly tuple list, as `as const` produces", async () => {
+        const { image } = await load()
+        const stops = [{ color: [1, 1, 1, 1], at: 0 }, { color: [0, 0, 0, 1], at: 1 }] as const
+        expect(() => image.blank(4, 4).ramp(stops)).not.toThrow()
+    })
+
+    it("names a colour it cannot read", async () => {
+        const { image } = await load()
+        expect(() => image.blank(4, 4).ramp(["red"])).toThrow(/not a colour/)
+    })
+})
+
+describe("fx noise scroll", () => {
+    it("is a still at time zero and pans with the animation clock", async () => {
+        const { image, setAnimationTime } = await load()
+        const at = (t: number) => {
+            setAnimationTime(t)
+            try { return decode(image.noise(64, 64, { offset: [1, 2], scroll: [0, -0.5] }).encode()).steps[0].args.slice(6, 8) }
+            finally { setAnimationTime(0) }
+        }
+        expect(at(0)).toEqual([1, 2])
+        expect(at(4)).toEqual([1, 0])
+    })
+})

@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useRef, useState, type DependencyList } from "react"
-import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory, type Texture } from "./image"
+import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory, setAnimationTime, type Texture } from "./image"
 
 const createTarget = (w: number, h: number): RenderTarget => imageFactory.target(w, h)
 
@@ -75,31 +75,51 @@ export function useTexture(build: () => Image, deps: DependencyList = []): Textu
 }
 
 /**
- * The same, but returns the chain as well, for code that wants to read the
- * handle or dispose early.
+ * A chain kept for the life of the component: a mask, an envelope, anything
+ * built once and used by every frame of an animated chain.
+ *
+ *     const mask = useImage(() => image.sdf(512, 512, "star", { r: 0.4 }).blur(40), [])
+ *     const fire = useAnimatedTexture(512, 512, (t) => image.noise(512, 512, { scroll: [0, -0.2] }).multiply(mask), [mask])
+ *
+ * Built synchronously, on the first render and again when `deps` change, so
+ * the result is always an Image and never null: the first version handed back
+ * null until an effect ran, and every caller grew an `envelope ? ... :` guard
+ * around it. What the build causes to render is owned here and released when
+ * the chain is rebuilt or the component unmounts.
  */
-export function useImage(build: () => Image, deps: DependencyList = []): Image | null {
-    const [img, setImg] = useState<Image | null>(null)
-
-    useEffect(() => {
-        let images: Image[] = []
-        let result: Image | null = null
+export function useImage(build: () => Image, deps: DependencyList = []): Image {
+    const held = useRef<{ deps: DependencyList; img: Image; owned: Image[] } | null>(null)
+    const current = held.current
+    if (current === null || !sameDeps(current.deps, deps)) {
+        if (current !== null) for (const i of current.owned) i.dispose()
+        let owned: Image[] = []
+        let img: Image
         beginOwnership()
         try {
-            result = build()
-            result.render()
+            img = build()
+            // render() before endOwnership, or the chain's own target is not
+            // counted among what this hook owns.
+            img.render()
         } finally {
-            images = endOwnership()
+            owned = endOwnership()
         }
-        setImg(result)
-        return () => {
-            for (const i of images) i.dispose()
-            setImg(null)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, deps)
+        held.current = { deps: [...deps], img, owned }
+    }
 
-    return img
+    useEffect(() => () => {
+        const h = held.current
+        if (h === null) return
+        for (const i of h.owned) i.dispose()
+        held.current = null
+    }, [])
+
+    return held.current!.img
+}
+
+function sameDeps(a: DependencyList, b: DependencyList): boolean {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false
+    return true
 }
 
 /**
@@ -161,9 +181,13 @@ export function useAnimatedTexture(
             // does not join the scope. It survives.
             beginOwnership()
             let owned: Image[] = []
+            // The clock a `scroll` reads. Cleared after, so a chain built
+            // outside an animated build is a still at time zero.
+            setAnimationTime(seconds)
             try {
                 latest.current(seconds).renderTo(target)
             } finally {
+                setAnimationTime(0)
                 owned = endOwnership()
             }
             for (const img of owned) img.dispose()

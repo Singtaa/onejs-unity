@@ -93,8 +93,8 @@ A chain starts from one of these.
 | `image.fromHandle(h)` | A texture you already hold |
 | `image.color(w, h, rgba)` | A flat colour |
 | `image.blank(w, h)` | Transparent |
-| `image.noise(w, h, opts)` | Scrolling fBm value noise, greyscale |
-| `image.gradient(w, h, stops, angle)` | Up to 8 stops, sorted for you |
+| `image.noise(w, h, opts)` | fBm value or simplex noise, greyscale; `scroll` pans it on the animated build's clock |
+| `image.gradient(w, h, stops, angle)` | Up to 8 stops, sorted for you; colours as hex or rgba, or a bare colour list spread evenly |
 | `image.sdf(w, h, kind, opts)` | Any of the 42 signed distance shapes, as a mask |
 
 `noise`, `gradient` and `sdf` run through `OneJS/FxSources`, a separate shader
@@ -128,10 +128,13 @@ the failure mode the particle wire was built to avoid.
 
 ## What is not here yet
 
-Phases 2a, 2b and 2c are in. Still to come:
+Phases 2a, 2b, 2c and 3 are in. Phase 3 is `hooks.ts`: `useTexture` for a
+chain that ends in a texture, `useImage` for one kept as an operand (built
+synchronously, never null), and `useAnimatedTexture` for one rebuilt per frame
+into a stable target, calling the latest render's build function and setting
+the clock `scroll` reads. Still to come:
 
 - **2d**: the compute backend for jump flood SDF generation and histograms.
-- **3**: the React surface, `useTexture` and friends.
 
 ## Gotchas
 
@@ -167,7 +170,9 @@ Colour operations adjust rgb and leave alpha alone: an adjustment that silently
 changed opacity would surprise everywhere it is used.
 
 `ramp` is Spark2D's `dye`. It colours by luminance, which is what turns a
-greyscale field (a `noise` or `sdf` source, say) into an image.
+greyscale field (a `noise` or `sdf` source, say) into an image. Its stops are
+written like `gradient`'s: hex strings or rgba tuples, positioned or spread
+evenly, readonly or not. The hex parser is `src/color.ts`, shared with `sl`.
 
 The blend modes are the PDF blend spec's, not an approximation. `softLight` uses
 the spec's `D(b)` rather than the cheap two branch version, which has a visible
