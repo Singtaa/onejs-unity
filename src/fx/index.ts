@@ -8,7 +8,7 @@
 
 export { image, Image, RenderTarget } from "./image"
 export { useTexture, useImage, useAnimatedTexture } from "./hooks"
-export type { Operand, RGBA, NoiseOptions, GradientStop, TransformOptions } from "./image"
+export type { Operand, RGBA, Texture, NoiseOptions, GradientStop, TransformOptions } from "./image"
 export { OP, MODE, SOURCE, BLEND, WIRE_VERSION, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MAX_FILTER_TAPS, FIRST_SPATIAL_OP, FIRST_FILTER_OP, isPixelOp, isSpatialOp, isFilterOp } from "./ops"
 export type { OpCode, Mode, BlendMode } from "./ops"
 export { SDF_SHAPES } from "./sdf"

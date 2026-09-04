@@ -54,6 +54,16 @@ interface Step {
     args: number[]
 }
 
+/**
+ * A Unity texture, as `backgroundImage` and `<Image src>` take it.
+ *
+ * Opaque on purpose: a caller holds it and hands it on, never calls anything on
+ * it. Structurally identical to onejs-react's `Texture`, which is the type
+ * `backgroundImage` is declared with, so the two meet without either package
+ * importing the other.
+ */
+export type Texture = object & { readonly __textureBrand?: never }
+
 /** Colour written as 0..1 components. */
 export type RGBA = [number, number, number, number]
 
@@ -395,8 +405,8 @@ export class Image {
     }
 
     /** The Unity texture, for `backgroundImage` or `<Image src>`. */
-    texture(): unknown {
-        return CS.OneJS.Fx.FxBridge.GetTexture(this.render())
+    texture(): Texture {
+        return CS.OneJS.Fx.FxBridge.GetTexture(this.render()) as Texture
     }
 
     /** Returns this image's target to the pool. */
@@ -494,8 +504,8 @@ export class RenderTarget {
     constructor(readonly handle: number) {}
 
     /** The Unity texture, for `backgroundImage` or `<Image src>`. */
-    texture(): unknown {
-        return CS.OneJS.Fx.FxBridge.GetTexture(this.handle)
+    texture(): Texture {
+        return CS.OneJS.Fx.FxBridge.GetTexture(this.handle) as Texture
     }
 
     dispose(): void {

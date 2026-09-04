@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useRef, useState, type DependencyList } from "react"
-import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory } from "./image"
+import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory, type Texture } from "./image"
 
 const createTarget = (w: number, h: number): RenderTarget => imageFactory.target(w, h)
 
@@ -42,13 +42,13 @@ const createTarget = (w: number, h: number): RenderTarget => imageFactory.target
  * Returns null on the first render if the runtime is unavailable, so a caller
  * can render something rather than throwing.
  */
-export function useTexture(build: () => Image, deps: DependencyList = []): unknown {
+export function useTexture(build: () => Image, deps: DependencyList = []): Texture | null {
     const owned = useRef<Image[] | null>(null)
-    const [texture, setTexture] = useState<unknown>(null)
+    const [texture, setTexture] = useState<Texture | null>(null)
 
     useEffect(() => {
         let images: Image[] = []
-        let tex: unknown = null
+        let tex: Texture | null = null
         beginOwnership()
         try {
             const result = build()
@@ -119,14 +119,23 @@ export function useImage(build: () => Image, deps: DependencyList = []): Image |
  * delta rather than read off the wall clock, so it follows whatever clock the
  * frame loop is on. An offline render runs far faster than realtime, and wall
  * time would leave it looking frozen.
+ *
+ * Each frame calls the `build` from the LATEST render, not the one the loop
+ * started with, so a chain can read props and state directly and `deps` only
+ * says when to restart the clock and reallocate the target. Before this, a
+ * callback captured its first render's values for as long as the loop ran,
+ * and every game with a slider ended up mirroring its state into a ref to get
+ * around it.
  */
 export function useAnimatedTexture(
     width: number,
     height: number,
     build: (seconds: number) => Image,
     deps: DependencyList = [],
-): unknown {
-    const [texture, setTexture] = useState<unknown>(null)
+): Texture | null {
+    const [texture, setTexture] = useState<Texture | null>(null)
+    const latest = useRef(build)
+    latest.current = build
 
     useEffect(() => {
         const target = createTarget(width, height)
@@ -153,7 +162,7 @@ export function useAnimatedTexture(
             beginOwnership()
             let owned: Image[] = []
             try {
-                build(seconds).renderTo(target)
+                latest.current(seconds).renderTo(target)
             } finally {
                 owned = endOwnership()
             }
