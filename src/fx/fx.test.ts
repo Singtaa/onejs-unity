@@ -484,3 +484,36 @@ describe("fx egg", () => {
         near(d.slice(3, 7), [0.4, 0.2, 0.1, 0.7])
     })
 })
+
+describe("fx for reading aloud", () => {
+    it("takes a direction word for a gradient, the same as its angle", async () => {
+        const { image } = await load()
+        const byWord = decode(image.gradient(8, 8, ["#000", "#fff"], "up").encode()).steps[0].args
+        const byAngle = decode(image.gradient(8, 8, ["#000", "#fff"], 90).encode()).steps[0].args
+        expect(byWord).toEqual(byAngle)
+        expect(decode(image.gradient(8, 8, ["#000", "#fff"], "down").encode()).steps[0].args[2]).toBeCloseTo(Math.PI * 1.5)
+    })
+
+    it("lets a stop carry its alpha beside a plain colour", async () => {
+        const { image } = await load()
+        const a = decode(image.gradient(8, 8, [{ color: "#ff0000", alpha: 0.25, at: 0 }, { color: "#fff", at: 1 }]).encode()).steps[0].args
+        expect(a.slice(4, 8)).toEqual([1, 0, 0, 0.25])
+    })
+
+    it("has threshold as the plain word for levels without a gamma", async () => {
+        const { image } = await load()
+        const t = decode(image.blank(4, 4).threshold(0.1, 0.4).encode()).steps[1]
+        const l = decode(image.blank(4, 4).levels(0.1, 0.4).encode()).steps[1]
+        expect(t).toEqual(l)
+    })
+
+    it("has a turbulence preset: simplex with stringy octaves", async () => {
+        const { image } = await load()
+        const a = decode(image.noise(64, 64, { type: "turbulence" }).encode()).steps[0].args
+        expect(a[11]).toBe(1)
+        expect(a[9]).toBeCloseTo(2.5)
+        expect(a[10]).toBeCloseTo(0.95)
+        const own = decode(image.noise(64, 64, { type: "turbulence", gain: 0.8 }).encode()).steps[0].args
+        expect(own[10]).toBeCloseTo(0.8)
+    })
+})

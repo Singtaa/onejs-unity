@@ -93,8 +93,8 @@ A chain starts from one of these.
 | `image.fromHandle(h)` | A texture you already hold |
 | `image.color(w, h, rgba)` | A flat colour |
 | `image.blank(w, h)` | Transparent |
-| `image.noise(w, h, opts)` | fBm value or simplex noise, greyscale; `scroll` pans it on the animated build's clock |
-| `image.gradient(w, h, stops, angle)` | Up to 8 stops, sorted for you; colours as hex or rgba, or a bare colour list spread evenly |
+| `image.noise(w, h, opts)` | fBm value, simplex or turbulence noise (simplex with stringy octaves preset), greyscale; `scroll` pans it on the animated build's clock |
+| `image.gradient(w, h, stops, direction)` | Up to 8 stops, sorted for you; colours as hex or rgba with an optional `alpha`, or a bare colour list spread evenly; direction as a word or degrees |
 | `image.sdf(w, h, kind, opts)` | Any of the 42 signed distance shapes, as a mask |
 
 `noise`, `gradient` and `sdf` run through `OneJS/FxSources`, a separate shader
@@ -161,7 +161,7 @@ operand across several chains renders it once.
 | Group | Methods |
 |---|---|
 | Maths | `add` `subtract` `multiply` `divide` `pow` `sqrt` `clamp` `frac` `min` `max` `oneMinus` `remap` `saturate` `abs` `exp` `log` `modulo` `negate` `posterize` `reciprocal` `lerp` `smoothstep` `inverseLerp` |
-| Colour | `grayscale` `brightness` `contrast` `saturation` `hueShift` `levels` `swizzle` `ramp` |
+| Colour | `grayscale` `brightness` `contrast` `saturation` `hueShift` `threshold` `levels` `swizzle` `ramp` |
 | Composite | `blend(operand, mode, opacity)`, 27 Photoshop modes |
 | Spatial | `transform` `tile` `flip` `crop` |
 | Filters | `blur` `sharpen` `edge` `dilate` `erode` `outline` |

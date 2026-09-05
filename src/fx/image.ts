@@ -99,16 +99,25 @@ export interface NoiseOptions {
      * Which noise. Default "value", which interpolates a square grid and is
      * cheap; at a high octave gain its cells show through as blocks. "simplex"
      * is built on triangles and has no axis-aligned structure to leak, so it is
-     * the one to reach for when the detail matters.
+     * the one to reach for when the detail matters. "turbulence" is simplex
+     * with the stringy settings (`lacunarity` 2.5, `gain` 0.95) that read as
+     * fire or smoke, so a flame needs no tuning numbers at all; either can
+     * still be given to override the preset.
      */
-    type?: "value" | "simplex"
+    type?: "value" | "simplex" | "turbulence"
 }
 
 export interface GradientStop {
     color: ColorLike
     /** Position along the gradient, 0..1. */
     at: number
+    /** Opacity 0..1, replacing the colour's own. Easier to read than an 8 digit hex. */
+    alpha?: number
 }
+
+/** Where a gradient travels: its first stop sits at the opposite edge. */
+export type GradientDirection = "right" | "left" | "up" | "down"
+const DIRECTION_DEGREES: Record<GradientDirection, number> = { right: 0, up: 90, left: 180, down: 270 }
 
 export interface TransformOptions {
     /** Offset in uv. Default 0. */
@@ -145,8 +154,10 @@ function packStops(stops: Stops, what: string): number[] {
         throw new Error(`[onejs fx] a ${what} takes at most ${MAX_GRADIENT_STOPS} stops`)
     const isStop = (s: GradientStop | ColorLike): s is GradientStop =>
         typeof s === "object" && !Array.isArray(s)
+    const withAlpha = (c: RGBA, alpha: number | undefined): RGBA =>
+        alpha === undefined ? c : [c[0], c[1], c[2], Math.min(1, Math.max(0, alpha))]
     const placed = stops.map((s, i) => isStop(s)
-        ? { color: toRGBA(s.color), at: s.at }
+        ? { color: withAlpha(toRGBA(s.color), s.alpha), at: s.at }
         : { color: toRGBA(s), at: stops.length === 1 ? 0 : i / (stops.length - 1) })
     const sorted = placed.sort((a, b) => a.at - b.at)
     const args: number[] = [sorted.length]
@@ -290,6 +301,14 @@ export class Image {
      */
     levels(inBlack: number, inWhite: number, gamma = 1): Image {
         return this.#unary(OP.LEVELS, [inBlack, inWhite, gamma])
+    }
+    /**
+     * Keeps what lies between `low` and `high`, stretched to 0..1: below is
+     * black, above is white. The plain word for `levels` without a gamma,
+     * because "threshold" is what a flame or a mask is doing with it.
+     */
+    threshold(low: number, high: number): Image {
+        return this.#unary(OP.LEVELS, [low, high, 1])
     }
     /**
      * Rewires the channels. Each argument names the source channel by index
@@ -493,9 +512,9 @@ export const image = {
             o.seed ?? 1,
             offset[0], offset[1],
             (o.rotation ?? 0) * DEG2RAD,
-            o.lacunarity ?? 2,
-            o.gain ?? 0.5,
-            o.type === "simplex" ? 1 : 0,
+            o.lacunarity ?? (o.type === "turbulence" ? 2.5 : 2),
+            o.gain ?? (o.type === "turbulence" ? 0.95 : 0.5),
+            o.type === "simplex" || o.type === "turbulence" ? 1 : 0,
         ])
     },
 
@@ -504,8 +523,9 @@ export const image = {
      * because the shader walks them in order and reads a descending pair as a
      * zero width span rather than an error.
      */
-    gradient(width: number, height: number, stops: Stops, angle = 0): Image {
+    gradient(width: number, height: number, stops: Stops, direction: GradientDirection | number = 0): Image {
         const packed = packStops(stops, "gradient")
+        const angle = typeof direction === "number" ? direction : DIRECTION_DEGREES[direction]
         return Image.from(SOURCE.GRADIENT, [width, height, angle * DEG2RAD, ...packed])
     },
 
