@@ -91,8 +91,37 @@ export interface Contact {
     y: number
 }
 
+/**
+ * One body, as a game refers to it.
+ *
+ *     const crate = world.bodies[3]
+ *     crate.enabled = true
+ *     crate.moveTo(x, y)
+ *     crate.push(0, -400)
+ *
+ * The world's own methods take an index and still work; this is the same call
+ * with the body named once instead of on every line. Handles exist for the
+ * life of the world, since a world cannot grow or shrink.
+ */
+export interface Body {
+    /** Its position in the `bodies` array, which is what the world and every contact use. */
+    readonly index: number
+    /** Whether it is simulated. Switch on before moving: a body that is not simulating drops a position. */
+    enabled: boolean
+    /** Attach the element this body moves. */
+    bind(element: any): void
+    /** Teleport, in panel pixels. */
+    moveTo(x: number, y: number): void
+    /** Set the velocity outright, in panel pixels per second. */
+    setVelocity(x: number, y: number): void
+    /** A one-off shove. */
+    push(x: number, y: number): void
+}
+
 export interface PhysicsWorld {
     readonly bodyCount: number
+    /** Every body, in the order the config listed them. */
+    readonly bodies: readonly Body[]
     /** Attach an element to a body after construction. */
     bind(index: number, element: any): void
     /** Called with each contact since the last pump. */
@@ -193,8 +222,22 @@ export function createPhysicsWorld(host: any, config: WorldConfig): PhysicsWorld
     let handler: ((contact: Contact) => void) | null = null
     let disposed = false
 
+    const bodies: Body[] = config.bodies.map((_, index) => {
+        let enabled = true
+        return {
+            index,
+            get enabled() { return enabled },
+            set enabled(on: boolean) { enabled = on === true; if (!disposed) world.SetBodyEnabled(index, enabled) },
+            bind(element: any) { if (!disposed) world.Bind(index, element) },
+            moveTo(x: number, y: number) { if (!disposed) world.SetPosition(index, x, y) },
+            setVelocity(x: number, y: number) { if (!disposed) world.SetVelocity(index, x, y) },
+            push(x: number, y: number) { if (!disposed) world.ApplyImpulse(index, x, y) },
+        }
+    })
+
     return {
         get bodyCount() { return disposed ? 0 : world.BodyCount },
+        bodies,
 
         bind(index: number, element: any) { if (!disposed) world.Bind(index, element) },
 

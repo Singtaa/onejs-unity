@@ -144,3 +144,31 @@ describe("createPhysicsWorld", () => {
         expect(() => createPhysicsWorld({}, { bodies: [] })).toThrow(/Physics2DBridge|link\.xml/)
     })
 })
+
+describe("body handles", () => {
+    it("name a body once and forward to the world's index calls", () => {
+        const w = createPhysicsWorld({}, { bodies: [{}, {}] })
+        const crate = w.bodies[1]!
+        expect(crate.index).toBe(1)
+        crate.enabled = false
+        expect(fake.world.SetBodyEnabled).toHaveBeenCalledWith(1, false)
+        expect(crate.enabled).toBe(false)
+        crate.moveTo(30, 40)
+        expect(fake.world.SetPosition).toHaveBeenCalledWith(1, 30, 40)
+        crate.setVelocity(-5, 0)
+        expect(fake.world.SetVelocity).toHaveBeenCalledWith(1, -5, 0)
+        crate.push(0, -100)
+        expect(fake.world.ApplyImpulse).toHaveBeenCalledWith(1, 0, -100)
+        const el = {}
+        crate.bind(el)
+        expect(fake.world.Bind).toHaveBeenCalledWith(1, el)
+    })
+
+    it("go quiet after dispose instead of reaching a dead world", () => {
+        const w = createPhysicsWorld({}, { bodies: [{}] })
+        w.dispose()
+        vi.mocked(fake.world.SetPosition).mockClear()
+        w.bodies[0]!.moveTo(1, 1)
+        expect(fake.world.SetPosition).not.toHaveBeenCalled()
+    })
+})

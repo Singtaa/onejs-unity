@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useRef, useState, type DependencyList } from "react"
-import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory, setAnimationTime, type Texture } from "./image"
+import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory, setAnimationTime, type Canvas, type Texture } from "./image"
 
 const createTarget = (w: number, h: number): RenderTarget => imageFactory.target(w, h)
 
@@ -147,12 +147,19 @@ function sameDeps(a: DependencyList, b: DependencyList): boolean {
  * and every game with a slider ended up mirroring its state into a ref to get
  * around it.
  */
+export function useAnimatedTexture(canvas: Canvas, build: (seconds: number) => Image, deps?: DependencyList): Texture | null
+export function useAnimatedTexture(width: number, height: number, build: (seconds: number) => Image, deps?: DependencyList): Texture | null
 export function useAnimatedTexture(
-    width: number,
-    height: number,
-    build: (seconds: number) => Image,
-    deps: DependencyList = [],
+    sizeOrCanvas: number | Canvas,
+    heightOrBuild: number | ((seconds: number) => Image),
+    buildOrDeps?: ((seconds: number) => Image) | DependencyList,
+    maybeDeps: DependencyList = [],
 ): Texture | null {
+    // Either (canvas, build, deps) or (width, height, build, deps).
+    const width = typeof sizeOrCanvas === "number" ? sizeOrCanvas : sizeOrCanvas.width
+    const height = typeof sizeOrCanvas === "number" ? (heightOrBuild as number) : sizeOrCanvas.height
+    const build = typeof sizeOrCanvas === "number" ? (buildOrDeps as (seconds: number) => Image) : (heightOrBuild as (seconds: number) => Image)
+    const deps: DependencyList = typeof sizeOrCanvas === "number" ? maybeDeps : ((buildOrDeps as DependencyList | undefined) ?? [])
     const [texture, setTexture] = useState<Texture | null>(null)
     const latest = useRef(build)
     latest.current = build

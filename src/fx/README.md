@@ -96,6 +96,7 @@ A chain starts from one of these.
 | `image.noise(w, h, opts)` | fBm value, simplex or turbulence noise (simplex with stringy octaves preset), greyscale; `scroll` pans it on the animated build's clock |
 | `image.gradient(w, h, stops, direction)` | Up to 8 stops, sorted for you; colours as hex or rgba with an optional `alpha`, or a bare colour list spread evenly; direction as a word or degrees |
 | `image.sdf(w, h, kind, opts)` | Any of the 42 signed distance shapes, as a mask |
+| `canvas(w, h?)` | The same sources with the size decided once: `canvas(512).noise(opts)` |
 
 `noise`, `gradient` and `sdf` run through `OneJS/FxSources`, a separate shader
 from the fused op pass because they read only uv and take no input texture.

@@ -544,6 +544,40 @@ export const image = {
 }
 
 /**
+ * The sources, with a size baked in.
+ *
+ *     const canvas = fx.canvas(512)
+ *     const mask = canvas.sdf("egg", { r: 0.2 }).blur(60)
+ *     const field = canvas.noise({ type: "turbulence" })
+ *
+ * A program builds every source at one size, and writing that size on every
+ * line was the most repeated thing in it. A canvas is the same `image` factory
+ * with the size decided once; nothing about the images differs.
+ */
+export interface Canvas {
+    readonly width: number
+    readonly height: number
+    color(rgba: ColorLike): Image
+    blank(): Image
+    noise(o?: NoiseOptions): Image
+    gradient(stops: Stops, direction?: GradientDirection | number): Image
+    sdf(kind: SdfKind, o?: SdfOptions): Image
+    target(): RenderTarget
+}
+
+export function canvas(width: number, height: number = width): Canvas {
+    return {
+        width, height,
+        color: (rgba) => image.color(width, height, toRGBA(rgba)),
+        blank: () => image.blank(width, height),
+        noise: (o) => image.noise(width, height, o),
+        gradient: (stops, direction) => image.gradient(width, height, stops, direction),
+        sdf: (kind, o) => image.sdf(width, height, kind, o),
+        target: () => image.target(width, height),
+    }
+}
+
+/**
  * A texture you hold, rather than one handed back per render.
  *
  * `render()` allocates its result, which is right for a chain that is built
