@@ -492,15 +492,20 @@ export const scale = {
 }
 
 // Letter spacing (tracking)
-// NOTE: USS does not support em units, so we use px approximations
-// (based on 16px base font size: -0.05em ≈ -0.8px, etc.)
+//
+// USS letter-spacing is written in px but the text engine applies it as
+// hundredths of an em (value * fontSize / 100), measured: 5px at 36px type
+// adds about 1.8px per gap. So Tailwind's em values map directly, times 100:
+// tracking-wide is 0.025em, which is 2.5 here, at any font size. The first
+// version scaled them against a 16px base as if they were real pixels, and
+// tracking-widest was invisible.
 export const letterSpacing = {
-    "tighter": "-0.8px",
-    "tight": "-0.4px",
+    "tighter": "-5px",
+    "tight": "-2.5px",
     "normal": "0",
-    "wide": "0.4px",
-    "wider": "0.8px",
-    "widest": "1.6px",
+    "wide": "2.5px",
+    "wider": "5px",
+    "widest": "10px",
 }
 
 export default {

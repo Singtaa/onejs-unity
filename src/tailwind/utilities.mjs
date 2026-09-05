@@ -673,8 +673,12 @@ export const aspectRatioUtilities = {
 }
 
 // Letter spacing (tracking)
+// A spaced line also switches to the Standard text generator: the Advanced one
+// measures it narrower than it lays it out, and a content-sized headline wraps
+// its last glyph. StyleBridge does the same for inline letterSpacing.
 export const letterSpacingUtilities = Object.fromEntries(
-    Object.entries(letterSpacing).map(([key, value]) => [`tracking-${key}`, { "letter-spacing": value }])
+    Object.entries(letterSpacing).map(([key, value]) => [`tracking-${key}`,
+        value === "0" ? { "letter-spacing": value } : { "letter-spacing": value, "-unity-text-generator": "standard" }])
 )
 
 // ============================================================================

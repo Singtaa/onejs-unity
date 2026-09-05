@@ -943,3 +943,13 @@ describe("end-to-end: source code to USS", () => {
         expect(uss).toContain("hover_c_bg-gray-400")
     })
 })
+
+describe("tracking", () => {
+    it("emits the em-scaled spacing and switches the text generator", () => {
+        const uss = generateUSS(["tracking-wide", "tracking-tighter", "tracking-normal"])
+        expect(uss).toMatch(/\.tracking-wide \{\s*letter-spacing: 2\.5px;\s*-unity-text-generator: standard;/)
+        expect(uss).toMatch(/\.tracking-tighter \{\s*letter-spacing: -5px;\s*-unity-text-generator: standard;/)
+        // No spacing, no reason to leave the default generator.
+        expect(uss).toMatch(/\.tracking-normal \{\s*letter-spacing: 0;\s*\}/)
+    })
+})
