@@ -105,15 +105,21 @@ export interface NoiseOptions {
     /** How much quieter each octave gets, 0..1. Default 0.5. */
     gain?: number
     /**
-     * Which noise. Default "value", which interpolates a square grid and is
-     * cheap; at a high octave gain its cells show through as blocks. "simplex"
-     * is built on triangles and has no axis-aligned structure to leak, so it is
-     * the one to reach for when the detail matters. "turbulence" is simplex
-     * with the stringy settings (`lacunarity` 2.5, `gain` 0.95) that read as
-     * fire or smoke, so a flame needs no tuning numbers at all; either can
-     * still be given to override the preset.
+     * Which noise. Every type is fBm: `octaves` layers of it, each `lacunarity`
+     * times finer and `gain` times quieter. What differs is the base and how
+     * the octaves combine.
+     *
+     * "value" (the default) interpolates a square grid and is cheap; at a high
+     * gain its cells show through as blocks. "simplex" is built on triangles
+     * and has no axis-aligned structure to leak, so it is the one to reach for
+     * when the detail matters. Both sum signed octaves, which reads as cloud.
+     *
+     * "turbulence" sums the absolute value of each simplex octave, so the zero
+     * crossings become creases that stack into veins and licks: fire, smoke,
+     * marble. "ridged" is the same crease made bright and squared, so it reads
+     * as mountain ridges, lightning or cracks. Neither needs tuning numbers.
      */
-    type?: "value" | "simplex" | "turbulence"
+    type?: "value" | "simplex" | "turbulence" | "ridged"
 }
 
 export interface GradientStop {
@@ -508,6 +514,7 @@ export const image = {
      * than sampled, so it needs no art and never repeats.
      */
     noise(width: number, height: number, o: NoiseOptions = {}): Image {
+        const NOISE_KIND = { value: 0, simplex: 1, turbulence: 2, ridged: 3 } as const
         const scale = o.scale === undefined ? [4, 4]
             : typeof o.scale === "number" ? [o.scale, o.scale]
             : o.scale
@@ -521,9 +528,11 @@ export const image = {
             o.seed ?? 1,
             offset[0], offset[1],
             (o.rotation ?? 0) * DEG2RAD,
-            o.lacunarity ?? (o.type === "turbulence" ? 2.5 : 2),
-            o.gain ?? (o.type === "turbulence" ? 0.95 : 0.5),
-            o.type === "simplex" || o.type === "turbulence" ? 1 : 0,
+            o.lacunarity ?? 2,
+            o.gain ?? 0.5,
+            // The kind numbers are the contract with onejsFbmKind in
+            // OneJS/Noise2D.cginc.
+            NOISE_KIND[o.type ?? "value"],
         ])
     },
 

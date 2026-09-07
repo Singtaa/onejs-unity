@@ -507,12 +507,15 @@ describe("fx for reading aloud", () => {
         expect(t).toEqual(l)
     })
 
-    it("has a turbulence preset: simplex with stringy octaves", async () => {
+    it("turbulence and ridged are noise kinds of their own, with the classic octave defaults", async () => {
         const { image } = await load()
-        const a = decode(image.noise(64, 64, { type: "turbulence" }).encode()).steps[0].args
-        expect(a[11]).toBe(1)
-        expect(a[9]).toBeCloseTo(2.5)
-        expect(a[10]).toBeCloseTo(0.95)
+        const kinds = { value: 0, simplex: 1, turbulence: 2, ridged: 3 } as const
+        for (const [type, kind] of Object.entries(kinds)) {
+            const a = decode(image.noise(64, 64, { type: type as keyof typeof kinds }).encode()).steps[0].args
+            expect(a[11]).toBe(kind)
+            expect(a[9]).toBeCloseTo(2)
+            expect(a[10]).toBeCloseTo(0.5)
+        }
         const own = decode(image.noise(64, 64, { type: "turbulence", gain: 0.8 }).encode()).steps[0].args
         expect(own[10]).toBeCloseTo(0.8)
     })

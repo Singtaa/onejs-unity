@@ -93,7 +93,7 @@ A chain starts from one of these.
 | `image.fromHandle(h)` | A texture you already hold |
 | `image.color(w, h, rgba)` | A flat colour |
 | `image.blank(w, h)` | Transparent |
-| `image.noise(w, h, opts)` | fBm value, simplex or turbulence noise (simplex with stringy octaves preset), greyscale; `scroll` pans it on the animated build's clock |
+| `image.noise(w, h, opts)` | fBm of value or simplex noise, or turbulence (sum of absolute simplex octaves, the classic fire and smoke field) or ridged (the crease made bright, for ridges and cracks), greyscale; `scroll` pans it on the animated build's clock |
 | `image.gradient(w, h, stops, direction)` | Up to 8 stops, sorted for you; colours as hex or rgba with an optional `alpha`, or a bare colour list spread evenly; direction as a word or degrees |
 | `image.sdf(w, h, kind, opts)` | Any of the 42 signed distance shapes, as a mask |
 | `canvas(w, h?)` | The same sources with the size decided once: `canvas(512).noise(opts)` |
