@@ -144,6 +144,19 @@ the clock `scroll` reads. Still to come:
 path carries no extension. Asset paths that work with `<Image src>` do not work
 here.
 
+**Colours are sRGB as written; the target holds linear light.** `#808080`
+means the grey that swatch shows, as in CSS. `color`, `gradient`, `ramp`,
+`transform`'s background and `outline` convert to the working space
+(`fxColorToWorking` in `FxColor.cginc`, `Working` in `FxBridge`), and `gradient`
+and `ramp` interpolate in sRGB before converting, which is what makes a white to
+black gradient read as an even ramp. Before this every stop was stored as
+written into a linear target that the panel then encoded on display, so
+`#ff4705` drew as `#ff9026` and half of a white to black gradient was above 70%
+brightness. A mask built from a gradient therefore carries perceptual values:
+its midpoint is 0.21, not 0.5, and a threshold tuned on the old numbers needs
+retuning. Vector operands of the maths and blend ops are numbers and are used
+as written; alpha is coverage and is never converted.
+
 **Targets are `ARGBFloat` and values are not clamped.** `multiply(2)` on a white
 pixel really does give you 2.0, which is what makes the maths ops composable.
 Call `saturate()` before handing the result to something that expects 0..1.

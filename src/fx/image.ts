@@ -65,7 +65,16 @@ interface Step {
  */
 export type Texture = object & { readonly __textureBrand?: never }
 
-/** Colour written as 0..1 components, or as "#rgb", "#rrggbb" or "#rrggbbaa". */
+/**
+ * Colour written as 0..1 components, or as "#rgb", "#rrggbb" or "#rrggbbaa".
+ *
+ * sRGB, the way CSS and USS read a colour: `#808080` is the grey a swatch of
+ * that hex shows. The runtime converts it to the target's working space, and
+ * `gradient` and `ramp` interpolate their stops in sRGB before converting, so
+ * a white to black gradient reads as an even ramp. Vector operands of the
+ * maths and blend ops (`multiply([1, 0.5, 0, 1])`) are numbers, not colours,
+ * and are used as written.
+ */
 export type RGBA = readonly [number, number, number, number]
 export type ColorLike = RGBA | string
 
