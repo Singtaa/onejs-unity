@@ -9,6 +9,7 @@ export { ussModulesPlugin } from "./uss-modules.mjs"
 export { tailwindPlugin } from "./tailwind.mjs"
 export { themesPlugin } from "./themes.mjs"
 export { copyAssetsPlugin } from "./copy-assets.mjs"
+export { slPlugin } from "./sl.mjs"
 import nodeFs from "node:fs"
 import { setFsProvider } from "../fs-provider.mjs"
 
