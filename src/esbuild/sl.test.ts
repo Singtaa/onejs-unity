@@ -119,6 +119,33 @@ describe("importing a .sl file", () => {
         expect(code).toContain("[0.5, 0, 0, 1, 0.25, 0, 0, 1]")
     })
 
+    it("keeps the source out of a bundle that does not ask for it", async () => {
+        const root = makeApp({
+            "plasma.sl": PLASMA,
+            "index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
+        })
+        const { code } = await bundle(root, "index.ts")
+        expect(code).not.toContain("uniform float warp")
+    })
+
+    it("hands the source over when something asks, so a panel can show the file itself", async () => {
+        const root = makeApp({
+            "plasma.sl": PLASMA,
+            "index.ts": `import plasma, { source } from "./plasma.sl"\nexport default [plasma, source]`,
+        })
+        const { code } = await bundle(root, "index.ts")
+        expect(code).toContain("uniform float warp = 0.5")
+    })
+
+    it("names the textures in slot order, so a host can bind one", async () => {
+        const root = makeApp({
+            "art.sl": `texture2D grain;\ntexture2D mask;\nfloat4 main() { return tex2D(grain, uv) * tex2D(mask, uv).r; }`,
+            "index.ts": `import art from "./art.sl"\nexport default art`,
+        })
+        const { code } = await bundle(root, "index.ts")
+        expect(code).toContain(`"textures": ["grain", "mask"]`)
+    })
+
     it("writes a .d.ts naming the uniforms", async () => {
         const root = makeApp({
             "plasma.sl": PLASMA,

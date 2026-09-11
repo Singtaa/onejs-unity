@@ -103,23 +103,31 @@ function generateDts(uniformNames) {
     return `// Generated from the .sl file beside this one. Do not edit.
 declare const program: import("onejs-react").EncodedProgram<${names}>
 export default program
+/** The file's own text, for showing a program beside what it draws. */
+export const source: string
 `
 }
 
 /** What an import of a `.sl` file resolves to. Numbers only: no parser, no source. */
-function moduleFor(encoded, relativePath) {
+function moduleFor(encoded, relativePath, source) {
     const payload = {
         data: [...encoded.data],
         instructions: encoded.instructions,
         resultRegister: encoded.resultRegister,
         uniforms: encoded.uniforms,
         defaults: encoded.defaults,
+        textures: encoded.textures,
         hash: encoded.hash,
     }
+    // The source is a NAMED export, so esbuild drops it from any bundle that
+    // does not ask for it: the default import stays numbers only. Something
+    // showing a shader beside its own output can then show the file rather
+    // than a copy of it, which is the only way that copy cannot drift.
     return `// Shader program: ${relativePath}
 // Auto-generated from the .sl source at build time: do not edit
 
 export default ${JSON.stringify(payload)}
+export const source = ${JSON.stringify(source)}
 `
 }
 
@@ -211,7 +219,7 @@ export function slPlugin(options = {}) {
                     await getFs().promises.writeFile(absolutePath + ".d.ts", generateDts(encoded.uniforms))
                 }
 
-                return { contents: moduleFor(encoded, args.path), loader: "js" }
+                return { contents: moduleFor(encoded, args.path, source), loader: "js" }
             })
 
             build.onEnd(async () => {
