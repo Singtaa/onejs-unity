@@ -36,6 +36,7 @@
  */
 
 import path from "path"
+import { fileURLToPath } from "url"
 import { getFs } from "../fs-provider.mjs"
 
 /** Compiled once per process, because the parser does not change inside one. */
@@ -70,10 +71,13 @@ function exists(file) {
 function loadCompiler(esbuild) {
     if (compiling === null) {
         compiling = (async () => {
+            // fileURLToPath, not URL.pathname: on Windows pathname keeps the
+            // URL's leading slash, and esbuild rejects "/D:/..." as a path that
+            // is not absolute. Every .sl build on Windows failed on that.
             const entry = new URL("../sl/compiler.ts", import.meta.url)
             const built = await esbuild.build({
-                entryPoints: [entry.pathname],
-                absWorkingDir: new URL("./", import.meta.url).pathname,
+                entryPoints: [fileURLToPath(entry)],
+                absWorkingDir: fileURLToPath(new URL("./", import.meta.url)),
                 bundle: true,
                 format: "esm",
                 platform: "neutral",
