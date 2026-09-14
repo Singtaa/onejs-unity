@@ -196,7 +196,15 @@ export function slPlugin(options = {}) {
             build.onLoad({ filter: /.*/, namespace: "sl-program" }, async (args) => {
                 const absolutePath = args.pluginData?.absolutePath
                     ?? path.resolve(process.cwd(), args.path)
-                const source = await getFs().promises.readFile(absolutePath, "utf8")
+                // Line endings normalised on read. The source is handed back
+                // as a named export through JSON.stringify, which escapes a
+                // CRLF as the two characters \r\n: that is content, not a line
+                // ending, so nothing downstream normalises it away and a
+                // Windows build emits a different bundle from a mac one. A
+                // panel showing the file then splits on "\n" and keeps a
+                // carriage return on every line. It also makes the parser's
+                // error columns the same on both.
+                const source = (await getFs().promises.readFile(absolutePath, "utf8")).replace(/\r\n/g, "\n")
                 const sl = compiler ?? await loadCompiler(build.esbuild)
 
                 let program

@@ -137,6 +137,25 @@ describe("importing a .sl file", () => {
         expect(code).toContain("uniform float warp = 0.5")
     })
 
+    /**
+     * A `.sl` file is CRLF in any Windows working tree, and the source rides
+     * out through JSON.stringify, which escapes a carriage return as content
+     * rather than as a line ending. Nothing downstream can normalise that: not
+     * esbuild, which normalises CRLF only inside a template literal, and not
+     * git, which sees two ordinary characters. So the bundle differed by the
+     * platform that built it, and a panel doing `source.split("\n")` kept a
+     * carriage return on the end of every line it showed.
+     */
+    it("hands over source with the line endings normalised, whatever the checkout used", async () => {
+        const root = makeApp({
+            "plasma.sl": PLASMA.replace(/\n/g, "\r\n"),
+            "index.ts": `import plasma, { source } from "./plasma.sl"\nexport default [plasma, source]`,
+        })
+        const { code } = await bundle(root, "index.ts")
+        expect(code).toContain("uniform float warp = 0.5")
+        expect(code).not.toContain("\\r\\n")
+    })
+
     it("names the textures in slot order, so a host can bind one", async () => {
         const root = makeApp({
             "art.sl": `texture2D grain;\ntexture2D mask;\nfloat4 main() { return tex2D(grain, uv) * tex2D(mask, uv).r; }`,
