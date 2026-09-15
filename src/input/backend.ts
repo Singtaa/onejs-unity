@@ -3,7 +3,7 @@
  *
  * By default every device module reads UnityEngine's InputBridge through CS.
  * That is correct for a normal OneJS project and impossible anywhere CS is not
- * reachable: OneJS Play evaluates game bundles with the runtime's globals
+ * reachable: OJPlay evaluates game bundles with the runtime's globals
  * shadowed, so `CS.OneJS.Input.InputBridge` is undefined there.
  *
  * Rather than a second input API for those hosts, the bridge lookup goes
@@ -16,7 +16,7 @@
  *     setInputBackend(createInputBackend({
  *         GetKeyDown: (key) => held.has(key),
  *         GetKeyPressed: (key) => pressedThisFrame.has(key),
- *     }, "OneJS Play container"))
+ *     }, "OJPlay container"))
  *
  * getInputBridge keeps returning `any`, exactly as the per-module copies it
  * replaces did, so none of the call sites change shape and the default path

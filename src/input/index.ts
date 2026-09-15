@@ -17,7 +17,7 @@
 // Main input module
 export { input } from "./input"
 
-// Backend seam: lets a host without CS (the OneJS Play container, a headless
+// Backend seam: lets a host without CS (the OJPlay container, a headless
 // test) supply input to this same API instead of forking a second one.
 export { setInputBackend, getInputBackend, createInputBackend, resolveKeyName, keyNameFromDomCode } from "./backend"
 export type { InputBackend, InputBackendMethods } from "./backend"
