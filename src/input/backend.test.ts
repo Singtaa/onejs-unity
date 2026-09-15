@@ -40,9 +40,9 @@ describe("createInputBackend", () => {
 
     // Better than "undefined is not a function" thrown from inside a device module.
     it("throws a message naming the method and the backend for anything missing", () => {
-        const b = createInputBackend({}, "OneJS Play container")
+        const b = createInputBackend({}, "OJPlay container")
         expect(() => (b as any).SetRumble(0, 1, 1, 1)).toThrow(
-            /SetRumble is not available in the OneJS Play container/,
+            /SetRumble is not available in the OJPlay container/,
         )
     })
 
