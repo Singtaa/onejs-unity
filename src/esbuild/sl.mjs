@@ -125,6 +125,8 @@ function moduleFor(encoded, relativePath, source) {
         defaults: encoded.defaults,
         textures: encoded.textures,
         hash: encoded.hash,
+        // Read by the VM, which refuses a program newer than it is.
+        wire: encoded.wire,
         // Emitted here, at build time, so a played game carries no emitter:
         // the web host compiles whichever one its backend speaks.
         wgsl: encoded.wgsl,

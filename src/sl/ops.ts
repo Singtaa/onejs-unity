@@ -22,8 +22,17 @@
  * a dense table.
  */
 
-/** Bumped when the encoding changes. The VM accepts 1..CURRENT and refuses newer. */
-export const SL_WIRE_VERSION = 1
+/**
+ * The newest VM encoding this encoder writes. The VM accepts 1..its own and
+ * refuses newer, where there is a VM: a WebGL player draws compiled and never
+ * reads the buffer.
+ *
+ * A payload records the LOWEST version that can run it (`Encoded.wire`), not
+ * this: a program that uses nothing new stays 1, so a new bundle still runs on
+ * an older Play container, and only a program that needs a newer instruction
+ * is refused by an older one rather than drawn wrong.
+ */
+export const SL_WIRE_VERSION = 2
 
 /**
  * What the VM shader actually declares, and therefore what a program may use.
@@ -120,6 +129,10 @@ export const SLOP = {
     // made bright. imm.x carries the octave count, as FBM does.
     TURBULENCE: 133,
     RIDGED: 134,
+    // VM only: an SDF given a fifth or sixth parameter, which one instruction's
+    // four immediates and id cannot hold. The encoder makes it (`forVm`); the
+    // IR and every compiled backend only ever see SDF.
+    SDF_WIDE: 135,
 
     // Sampling
     SAMPLE: 144,
@@ -157,7 +170,7 @@ export const SL_ARITY: Record<number, number> = {
     [SLOP.RAMP]: -1, [SLOP.HSV2RGB]: 1, [SLOP.RGB2HSV]: 1, [SLOP.LUMINANCE]: 1, [SLOP.TO_LINEAR]: 1,
 
     [SLOP.NOISE]: 1, [SLOP.SIMPLEX]: 1, [SLOP.FBM]: 1, [SLOP.SDF]: 1,
-    [SLOP.VORONOI]: 1, [SLOP.TURBULENCE]: 1, [SLOP.RIDGED]: 1,
+    [SLOP.VORONOI]: 1, [SLOP.TURBULENCE]: 1, [SLOP.RIDGED]: 1, [SLOP.SDF_WIDE]: 2,
 
     [SLOP.SAMPLE]: 1, [SLOP.SAMPLE_LOD]: 2,
 }
@@ -272,6 +285,7 @@ export const SL_HLSL: Record<number, SLSurface> = {
     [SLOP.VORONOI]: { call: "voronoi" },
     [SLOP.TURBULENCE]: { call: "turbulence" },
     [SLOP.RIDGED]: { call: "ridged" },
+    [SLOP.SDF_WIDE]: { syntax: "sdf.<shape>(p, ...) given a fifth or sixth parameter" },
 
     [SLOP.SAMPLE]: { call: "tex2D" },
     [SLOP.SAMPLE_LOD]: { call: "tex2Dlod" },
