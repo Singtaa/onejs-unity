@@ -4,30 +4,29 @@
  * Everything here runs while a game is being built and nothing runs while one
  * is being played: the `.sl` parser, the encoder that turns a program into the
  * buffer the VM reads, and the manifest an editor turns into compiled shaders.
+ * The esbuild plugin and the Play worker import this; a game imports
+ * `onejs-unity/sl`, which leaves the parser out.
  *
- * SEPARATE FROM `onejs-unity/sl` ON PURPOSE. That barrel is what a game
- * imports, and the eject scaffold vendors it file for file into the downloaded
- * project. A parser is two thousand lines a played game never executes, so
- * re-exporting it there put it in every ejected project's source tree, where it
- * could only ever be read as clutter. The esbuild plugin and the Play worker
- * import this instead.
+ * A re-export of `onejs-sl`, by name, so every import that worked before the
+ * shader language became its own package still does.
  */
 
-export { analyze, parse, parseUnit, preludeFunctions, tokenize, PRELUDE_SOURCE, SLParseError } from "./lang"
-export type { Checked, Expr, FuncDecl, ParseOptions, Stmt, Unit } from "./lang"
-export { encode } from "./encode"
-export type { Encoded } from "./encode"
+export {
+    analyze, parse, parseUnit, preludeFunctions, tokenize, PRELUDE_SOURCE, SLParseError,
+    INPUTS, SL_IR_VERSION, TYPE, widthName, toJSON, fromJSON, SL_SDF_SHAPES,
+} from "onejs-sl"
+export type {
+    Checked, Expr, FuncDecl, ParseOptions, Stmt, Unit, ProgramJSON, Program, SLType, SlSdfKind,
+} from "onejs-sl"
+export { encode } from "onejs-sl/vm"
+export type { Encoded } from "onejs-sl/vm"
+export { emitShader, emitFragmentBody, uniformProperty } from "onejs-sl/emit/unity"
+export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "onejs-sl/emit/web"
+export type { WebLanguage } from "onejs-sl/emit/web"
+export {
+    SL_HLSL, SL_CALL_NAMES, SL_GLSL_HINT, SL_UNIMPLEMENTED, BUILTINS, NOT_YET,
+} from "onejs-sl/tables"
+export type { SLSurface } from "onejs-sl/tables"
+export { VM_TEXTURES, VM_UNIFORMS } from "onejs-sl/vm"
 export { manifest } from "./manifest"
 export type { ManifestEntry, ProgramManifest } from "./manifest"
-export { emitShader, emitFragmentBody, uniformProperty } from "./hlsl"
-export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "./web"
-export type { WebLanguage } from "./web"
-export { SL_HLSL, SL_CALL_NAMES, SL_GLSL_HINT, SL_UNIMPLEMENTED, VM_TEXTURES, VM_UNIFORMS } from "./ops"
-export type { SLSurface } from "./ops"
-export { BUILTINS, NOT_YET } from "./lang/builtins"
-export { INPUTS, SL_IR_VERSION, TYPE, widthName } from "./ir"
-export { toJSON, fromJSON } from "./serial"
-export type { ProgramJSON } from "./serial"
-export type { Program, SLType } from "./ir"
-export { SL_SDF_SHAPES } from "./shapes"
-export type { SlSdfKind } from "./shapes"

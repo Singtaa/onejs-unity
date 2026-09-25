@@ -1,210 +1,25 @@
-# sl: write a per pixel program in TypeScript
+# sl: the shader language, re-exported
 
-Phase 1 of `Specs/SHADER_LANG.md`. The IR, the types, the EDSL and the hash.
-Pure TypeScript, no GPU anywhere in it, which is why it lands before either
-backend and why every promise below is covered by a unit test.
+The shader language is its own package, [`onejs-sl`](https://github.com/Singtaa/onejs-sl),
+checked out beside this one at `JSModules/onejs-sl`. Its README is the design:
+the IR, the hash, versions, the VM and every emitter. It has no Unity in it,
+so Magerie runs the same compiler.
 
-```ts
-import { sl } from "onejs-unity/sl"
+This folder keeps OneJS's two import paths working, and the one piece that is
+OneJS's own:
 
-const plasma = sl.program(({ uv, time }) => {
-    const p = uv.mul(8).add(time.mul(0.4))
-    const v = sl.sin(p.x).add(sl.sin(p.y))
-    return sl.vec4(v.mul(0.5).add(0.5), 0, 0, 1)
-})
-```
-
-## The one idea
-
-**One authoring surface, one IR, two backends.** Unity cannot compile a shader
-at runtime in a player build, on any graphics API, so in the browser a program
-has to become data that a fixed shader evaluates. Ejecting to a Unity project
-does not change what the author wrote, it changes what is possible, because an
-editor compiles shaders at build time.
-
-So the same source is interpreted by a VM on play.onejs.com and compiled from
-generated HLSL after an eject, with no edit in between. Both backends exist:
-`encode.ts` feeds `Runtime/SL/SLProgramBridge.cs` and `FxProgram.shader`, and
-`hlsl.ts` feeds `Editor/SLShaderGenerator.cs`. Nobody writes a manifest for the
-second: an editor that interprets a program asks the encoded program for its
-`hlsl` (a lazy getter, never read in Play), records it into
-`Assets/OneJS.Generated/Shaders/Recorded.sl.json`, generates the shader and
-moves the live material onto it. `manifest()` is still there for an app that
-would rather write its programs out at build time.
-
-**A third and fourth backend, for the browser.** A player cannot compile a
-shader, but the page it runs in can. `web.ts` prints every program as WGSL and
-as GLSL ES 3.00 (`weblib.ts` holds the noise, colour and 42 distance functions
-ported from `SLCommon.cginc`, `Noise2D.cginc` and `SDF2D.cginc`), and OneJS's
-`Plugins/WebGL/OneJSSLWeb.jslib` compiles whichever one Unity's device speaks
-and draws it into the element's target in place of the VM. A `.sl` import
-carries both strings, printed at build time; an `encode()` result has them as
-lazy getters, like `hlsl`. The VM draws until the compiled program is ready,
-and for good if it fails to compile. The host contract (the frame block, the
-16 uniform slots, one binding pair per sampled texture) is written out at the
-top of `web.ts`.
-
-The emitters match the HLSL emitter's semantics rather than each language's
-own: `%` truncates like `fmod`, `pow` takes `abs` of its base, `asin` and
-`acos` clamp, `log` and `sqrt` guard their argument, a select is the VM's
-branchless `lerp`. `web.test.ts` checks the structure (every shape, every
-opcode, the library order); whether the output matches the VM within 1/255 is
-measured in a browser, through the real element, by `Tools/sl-web-parity` in
-the container.
-
-## Two ways to write one
-
-A `.sl` file is HLSL text and `sl.program` is a TypeScript EDSL, and they record
-the same graph: a file lowers THROUGH the EDSL, so `sin(x)` and `sl.sin(x)` are
-one call. `lang/` is the parser and `lang/README.md` covers it; the rest of this
-file is the IR, the hash and the EDSL, which both surfaces sit on.
-
-```hlsl
-float4 main() {
-    float2 p = uv * 8 + time * 0.4;
-    float v = sin(p.x) + sin(p.y);
-    return float4(v * 0.5 + 0.5, 0, 0, 1);
-}
-```
-
-Docs lead with the file. The EDSL is the programmatic form: the IR builder, the
-parser's target, and what a program built by code uses.
-
-## Why an EDSL came first
-
-A TypeScript EDSL inherits completion, type errors at the call site, jump to
-definition, rename and the author's editor for free. Monaco in the Play editor
-already has these types loaded.
-
-It also gives common subexpression elimination for nothing, which is the most
-valuable optimisation here, because **a `const` in the host language IS the
-shared node**. `const p = uv.mul(8)` used three times is one node with three
-references, and writing it out long hand three times costs exactly the same,
-because nodes are interned as they are built.
-
-That reasoning is why the parser, when it came, cost only a parser: it emits
-this same IR, so it inherited the encoder, the emitter, the hash and every test
-that runs on a program.
-
-## What is checked, and when
-
-Everything an author can get wrong is refused **when the program is written**,
-at module load, not at draw time:
-
-| Mistake | What happens |
+| File | What it is |
 |---|---|
-| `vec2` combined with a `vec3` | TypeScript error at the call site, and a runtime error behind it |
-| `uv.z` on a two component value | "z is component 3 of a vec2, which has 2" |
-| A program returning something other than a `vec4` | "a program must return a vec4. Wrap it: sl.vec4(value, 1)" |
-| `vec4` given the wrong number of parts | "vec4 needs 4 components, got 3" |
-| One uniform name at two widths | "declared as both a float and a vec4" |
-| More than 15 textures | Names the limit and why it cannot be widened |
-| A value borrowed from another program | "a value from another program cannot be used in this one" |
+| `index.ts` | `onejs-unity/sl`, what a game imports. Built on `onejs-sl/core` and the backend entries, never on the parser |
+| `compiler.ts` | `onejs-unity/sl/compiler`, what a build imports: the esbuild loader and the Play worker. Parser included |
+| `manifest.ts` | `app.sl.json` for `SLShaderGenerator` in the Unity editor |
+| `shapes.test.ts` | Pins `onejs-sl`'s shape table to `fx`'s, since both index `SDF2D.cginc` |
 
-The texture ceiling is the fragment shader's sampler slots on the WebGL2
-baseline, which is the one resource neither backend can widen.
+Both barrels name every export rather than `export *`, so each one's surface is
+exactly what it was before the move, and a name `onejs-sl` adds does not appear
+here until somebody decides it should.
 
-## The hash is the fragile part
-
-`Program.hash` is what will link a program to its compiled shader. If it differs
-between the machine that generated the shader and the machine that runs it, the
-runtime falls back to the VM and **nobody is told**: correct output, quietly
-slow, no error. That is the worst failure this design can have.
-
-So it is a Merkle hash over the graph reachable from the result, not a walk of
-the node array. An earlier version hashed storage order, which meant hoisting a
-shared subexpression into a `const` changed the hash without changing what the
-program computed. Constants go through a fixed precision, so `0.1 + 0.2` and
-`0.3` do not produce different shaders. It is eight lowercase hex characters
-from FNV-1a, chosen so a C# implementation can produce the same string rather
-than for any cryptographic reason.
-
-## Versions
-
-Two numbers, with one rule: a reader accepts every version up to its own and
-refuses a newer one with a message naming both.
-
-- **`SL_IR_VERSION`** (`ir.ts`) is on every `Program` and in the hash, and is
-  bumped whenever an opcode, a shape or what one computes changes. Because it
-  is in the hash, a bump recompiles every cached shader. `toJSON` and
-  `fromJSON` (`serial.ts`) are the IR as JSON for a host that stores programs;
-  `fromJSON` checks everything an emitter relies on, refuses a newer version,
-  and migrates an older one.
-- **`SL_WIRE_VERSION`** (`ops.ts`) is the newest VM encoding, and
-  `SLProgramBridge.WireVersion` in OneJS must match it (a container test
-  compares the two). `Encoded.wire`, and the `wire` in a `.sl` import, is the
-  LOWEST version that can run that program, so a program using nothing new
-  stays 1 and still runs on an older Play container. The VM refuses a newer
-  one, only where the VM runs; a WebGL player draws compiled and never reads
-  the buffer.
-
-IR 2 and wire 2 came with #129. A shape takes as many parameters as it reads
-(`SL_SDF_PARAMS`, six at most, and never fewer than four accepted), where it
-used to take four and lose the rest. One instruction holds a shape id and four
-immediates, so the encoder's `forVm` turns a shape given a fifth or sixth into
-`SDF_WIDE`, which reads the remaining four from a constant register. Only the
-VM sees it, and only those programs are wire 2.
-
-## Control flow
-
-There is none in the IR, deliberately. `sl.select`, `sl.step`, `sl.smoothstep` and
-`sl.mix` cover branching without branching, and `sl.repeat(n, body, seed)`
-unrolls at record time because `n` is a JavaScript number.
-
-`repeat` is honest about being a macro rather than a loop. It covers fbm,
-layered noise and small iterated distance fields, which is most of what 2D
-shaders loop for. A data dependent loop is out of scope: the VM would need a
-nested bounded loop with a dynamic trip count while codegen would handle it
-fine, and the two backends agreeing is the property the whole design protects.
-Because it unrolls, the count multiplies the body's operation count toward the
-VM's 256-instruction ceiling. The ceiling error names any `repeat` that fills a
-quarter of the budget or more, so the fix reads as "lower this count" rather
-than "fewer instructions".
-
-Every loop that reaches a GPU is therefore bounded by a constant: `repeat` is
-unrolled, fbm's octaves are a constant 1 to 4, the helper loops in the noise
-and Voronoi functions have fixed trip counts. No program can hang a GPU today,
-so the compiled backends carry no loop cap. A data dependent loop (the
-raymarching tier) would need one emitted into every loop it prints, since a GPU
-reset takes the whole page's device, Unity's included.
-
-## See also
-
-- `Specs/SHADER_LANG.md`, sections 3 and 4, and section 5.4 for the Phase 0
-  measurements that decided the VM's shape
-- `Tools/shader-vm-spike/`, the harness behind those numbers
-- `../fx/`, the image pipeline this becomes a source and an operand for
-
-## What a program is given
-
-`uv`, `fragCoord`, `resolution`, `time` and `aspect`, and the last three are the
-**target's**, not the window's. A program is drawn with `Graphics.Blit` into the
-element's own render texture, and Unity sets `_ScreenParams` per camera and
-leaves it alone for a blit: reading it from a 64x256 target answers with the
-game view's size. Both backends read the same wrong thing, so they agreed with
-each other and the eject test, which compares them, saw nothing. What saw it was
-a picture, because aspect correction, the one thing `aspect` exists for,
-stretched every circle by the shape of whatever window it was in. The host now
-sets `_Res` from the target and both backends read that.
-
-`fx` had already learned this: `ShaderEffectElement` sets `_Aspect` from the
-render texture with a comment saying why. The lesson did not travel.
-
-## Colours
-
-A hex colour is sRGB as written, the way CSS reads it, and the target holds
-linear light. `sl.ramp` mixes its stops in sRGB, which is what reads as an even
-ramp, and converts the result once through `TO_LINEAR`; `sl.color("#hex")` is
-`parseColor` plus that conversion, and `sl.toLinear` is the conversion on its
-own for a vec4 built from raw components. Both backends implement it gamma
-aware (`sl_toLinear` in `SLCommon.cginc`), so a Gamma project gets the value as
-written. Alpha is coverage and is never converted. Same rule as `fx`.
-
-## Noise
-
-`sl.noise`, `sl.simplex`, `sl.fbm(p, octaves, base)`, `sl.turbulence` and
-`sl.ridged` are the fields `fx.noise` draws, from the same `Noise2D.cginc`, so
-a simplex here is the simplex there. Octaves are 1 to 4. A program has no seed;
-offset the input for a different field. `sl.simplex` used to be value noise on
-a rotated lattice, and `sl.fbm` had its own value noise; both changed on
-2026-09-06 when the fields were unified.
+`onejs-sl` is a peer dependency (`^0.1.0`), installed with this package by npm,
+and a `file:../onejs-sl` dev dependency here, so the container always builds
+against the checkout beside it. Run `npm install` here after pulling a change
+to that link.

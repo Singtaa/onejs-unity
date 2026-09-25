@@ -4,9 +4,7 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 import { slPlugin } from "./sl.mjs"
-import { parse } from "../sl/lang"
-import { encode } from "../sl/encode"
-import { manifest } from "../sl/manifest"
+import { encode, manifest, parse } from "../sl/compiler"
 
 /**
  * The loader, end to end through a real esbuild.
