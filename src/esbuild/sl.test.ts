@@ -211,7 +211,7 @@ describe("a parse error is an esbuild error", () => {
         const { errors } = await bundle(root, "index.ts")
         expect(errors).toHaveLength(1)
         expect(errors[0]).toContain("2:18")
-        expect(errors[0]).toContain("is component 3 of a vec2")
+        expect(errors[0]).toContain("is component 3 of a float2")
         // The location prefix belongs to esbuild's marker, not to the text.
         expect(errors[0]).not.toContain("bad.sl:2:18:")
     })

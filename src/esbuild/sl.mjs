@@ -155,7 +155,8 @@ function esbuildError(error, file, source) {
     if (line === undefined) {
         return { text: error instanceof Error ? error.message : String(error), location: { file } }
     }
-    const text = String(error.message).replace(/^\[onejs sl] [^\s]*?:\d+:\d+: /, "")
+    // The message alone; the place is esbuild's to print, from `location`.
+    const text = String(error.text)
     return {
         text,
         location: {
