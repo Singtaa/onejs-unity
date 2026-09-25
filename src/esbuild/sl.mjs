@@ -11,12 +11,15 @@
  * the program printed as WGSL and GLSL ES for a browser to compile. A parse error is an esbuild error with the `.sl` file, line and
  * column, which the Play editor surfaces and every terminal editor links.
  *
- * On the way out it writes `app.sl.json` beside the bundle, the manifest
- * `SLShaderGenerator` already watches for. That is what the file format makes
- * possible and the EDSL cannot: a program in a file is known statically, so an
- * ejected game is compiled from its FIRST frame rather than from its second.
- * Runtime recording stays for EDSL programs and for a build older than this
- * plugin; the editor reads every `*.sl.json` it can find.
+ * On the way out it writes `app.sl.json` beside the bundle. The editor
+ * generates a shader from it before every load of the bundle
+ * (`SLShaderGenerator.GenerateBeside`, through `JSRunner.EditorLoadingBundle`),
+ * rather than waiting for Unity to import it, which after a watcher rebuild
+ * nothing did; a player build generates from every `*.sl.json` in the project.
+ * That is what the file format makes possible and the EDSL cannot: a program
+ * in a file is known statically, so it is compiled from its FIRST frame. An
+ * EDSL program is recorded the first time the editor sees it and draws nothing
+ * until its shader is generated, on the next editor update.
  *
  * WHY THE PARSER IS COMPILED HERE RATHER THAN IMPORTED.
  *
