@@ -15,8 +15,8 @@
  *     writeFileSync("app.sl.json", JSON.stringify(manifest([plasma, glow])))
  */
 
-import type { Program } from "./ir"
-import { emitShader } from "./hlsl"
+import type { Program } from "onejs-sl/core"
+import { emitShader } from "onejs-sl/emit/unity"
 
 export interface ManifestEntry {
     hash: string

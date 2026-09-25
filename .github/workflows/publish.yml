@@ -31,10 +31,24 @@ jobs:
     name: publish to npm
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: onejs-unity
+
     steps:
-      # A single checkout, unlike the sibling packages: onejs-unity has no
-      # "file:../" dependencies, so nothing has to sit beside it.
+      # Same two-checkout layout as ci.yml: onejs-unity depends on onejs-sl
+      # through a "file:../" dev specifier, so a lone checkout fails npm ci
+      # before any gate runs. The published package names onejs-sl as a peer
+      # range instead, which npm installs from the registry.
       - uses: actions/checkout@v4
+        with:
+          path: onejs-unity
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Singtaa/onejs-sl
+          ref: main
+          path: onejs-sl
 
       - uses: actions/setup-node@v4
         with:

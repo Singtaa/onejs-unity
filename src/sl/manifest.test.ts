@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { sl } from "./index"
 import { manifest } from "./manifest"
+import { parse } from "./compiler"
 
 const a = () => sl.program(({ uv }) => sl.vec4(uv, 0, 1))
 const b = () => sl.program(({ uv }) => sl.vec4(uv.yx, 1, 1))
@@ -32,5 +33,14 @@ describe("the program manifest", () => {
             return t.mul(k) as any
         })
         expect(manifest([p]).programs[0].uniforms).toEqual(["intensity", "tint"])
+    })
+
+    it("takes a program parsed from a file like any other", () => {
+        const p = parse(`texture2D grain;
+uniform float warp = 1;
+float4 main() { return tex2D(grain, uv * warp); }`, { file: "grain.sl" })
+        const m = manifest([p])
+        expect(m.programs[0].hash).toBe(p.hash)
+        expect(m.programs[0].uniforms).toEqual(["warp"])
     })
 })

@@ -25,13 +25,30 @@ jobs:
         # Windows is deliberate, not symmetry. This suite has already had a failure that reproduced only on Windows (a virtual-filesystem test keyed on POSIX paths while the walk joins with path.sep); a Linux-only gate would not have caught it.
         os: [ubuntu-latest, windows-latest]
 
+    defaults:
+      run:
+        working-directory: onejs-unity
+
     steps:
+      # Checked out into a named folder so onejs-sl sits beside it: the shader
+      # language is a "file:../onejs-sl" dev dependency, the layout the
+      # packages are developed in inside the container repo, and a lone
+      # checkout fails npm ci before any test runs.
       - uses: actions/checkout@v4
+        with:
+          path: onejs-unity
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Singtaa/onejs-sl
+          ref: main
+          path: onejs-sl
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: onejs-unity/package-lock.json
 
       - run: npm ci
 

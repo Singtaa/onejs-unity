@@ -1,45 +1,32 @@
 /**
  * `onejs-unity/sl`: write a per pixel program in TypeScript.
  *
- * Phase 1 of `Specs/SHADER_LANG.md`: the IR, the types, the EDSL and the hash.
- * Pure TypeScript with no GPU anywhere in it, which is why it is testable on its
- * own and why it lands before either backend.
+ * The shader language lives in its own package, `onejs-sl`, which has no
+ * Unity in it so another host can run it. This barrel re-exports the parts a
+ * game uses, by name, so every import that worked before still does, plus
+ * `manifest`, which is OneJS's own.
  *
- * The two backends it exists to feed:
- *   - a bytecode VM, for anywhere a shader cannot be compiled at runtime, which
- *     includes every game on play.onejs.com
- *   - generated HLSL, compiled at build time, for a project that has an editor
- *
- * Same source, interpreted in the browser and compiled after an eject, with no
- * edit in between. Both backends exist: `encode.ts` feeds the VM in
- * `Runtime/SL/SLProgramBridge.cs`, and `hlsl.ts` feeds `SLShaderGenerator.cs`,
- * which an editor runs for every program it sees interpreted.
- *
- * THE PARSER IS NOT HERE. `.sl` files are parsed at build time, by the esbuild
- * loader, and a played game never needs a line of it. `onejs-unity/sl/compiler`
- * is that surface; this one is what a game imports and what the eject scaffold
- * vendors into a downloaded project.
+ * Built on `onejs-sl/core` and the backend entries, never on `onejs-sl`
+ * itself: that one carries the `.sl` parser, which runs while a game is built
+ * and never while one is played, and the Play eject scaffold vendors every
+ * file this barrel reaches. `onejs-unity/sl/compiler` is the build time
+ * surface, parser included.
  */
-export * as sl from "./sl"
-export { SLOP, SL_ARITY, SL_NAME, SL_WIRE_VERSION, INPUT_ID, isSampling } from "./ops"
-export { REGISTERS, MAX_INSTRUCTIONS, TEXELS_PER_INSTRUCTION, encode, reachable, liveRanges } from "./encode"
-export type { Encoded } from "./encode"
-export { SL_IR_VERSION } from "./ir"
-export { toJSON, fromJSON } from "./serial"
-export type { ProgramJSON } from "./serial"
-export { emitShader, emitFragmentBody, uniformProperty } from "./hlsl"
-export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "./web"
-export type { WebLanguage } from "./web"
-export type { EmitOptions } from "./hlsl"
-export { manifest } from "./manifest"
-export { SL_SDF_SHAPES } from "./shapes"
-export type { SlSdfKind } from "./shapes"
-export type { ProgramManifest, ManifestEntry } from "./manifest"
-export type { SLOpCode } from "./ops"
 export {
+    sl, SLOP, SL_ARITY, SL_NAME, INPUT_ID, isSampling, SL_IR_VERSION, toJSON, fromJSON, SL_SDF_SHAPES,
     TYPE, INPUTS, MAX_TEXTURES, MAX_NODES, SLError, hashProgram, widthName,
-} from "./ir"
+} from "onejs-sl/core"
 export type {
-    SLType, InputName, NodeRef, SLNode, Program, UniformDecl, TextureDecl,
-} from "./ir"
-export type { Float, Vec2, Vec3, Vec4, Num, ProgramInputs, Texture } from "./sl"
+    ProgramJSON, SlSdfKind, SLOpCode, SLType, InputName, NodeRef, SLNode, Program, UniformDecl, TextureDecl,
+    Float, Vec2, Vec3, Vec4, Num, ProgramInputs, Texture,
+} from "onejs-sl/core"
+export {
+    SL_WIRE_VERSION, REGISTERS, MAX_INSTRUCTIONS, TEXELS_PER_INSTRUCTION, encode, reachable, liveRanges,
+} from "onejs-sl/vm"
+export type { Encoded } from "onejs-sl/vm"
+export { emitShader, emitFragmentBody, uniformProperty } from "onejs-sl/emit/unity"
+export type { EmitOptions } from "onejs-sl/emit/unity"
+export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "onejs-sl/emit/web"
+export type { WebLanguage } from "onejs-sl/emit/web"
+export { manifest } from "./manifest"
+export type { ProgramManifest, ManifestEntry } from "./manifest"

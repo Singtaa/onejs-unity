@@ -186,7 +186,7 @@ changed opacity would surprise everywhere it is used.
 `ramp` is Spark2D's `dye`. It colours by luminance, which is what turns a
 greyscale field (a `noise` or `sdf` source, say) into an image. Its stops are
 written like `gradient`'s: hex strings or rgba tuples, positioned or spread
-evenly, readonly or not. The hex parser is `src/color.ts`, shared with `sl`.
+evenly, readonly or not. The hex parser is `onejs-sl`'s `parseColor`, shared with `sl` through `src/color.ts`.
 
 The blend modes are the PDF blend spec's, not an approximation. `softLight` uses
 the spec's `D(b)` rather than the cheap two branch version, which has a visible
