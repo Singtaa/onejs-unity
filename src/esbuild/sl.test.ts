@@ -106,7 +106,12 @@ describe("importing a .sl file", () => {
         // weight in a game that is downloaded before it is played.
         expect(code).not.toContain("uniform float warp")
         expect(code).not.toContain("SLParseError")
-        expect(code.length).toBeLessThan(4000)
+        // The two web sources DO ride along, emitted at build time so a game
+        // carries no emitter. They are the only thing allowed past the bound.
+        expect(code).toContain(`"wgsl":`)
+        expect(code).toContain(`"glsl":`)
+        const web = JSON.stringify(twin.wgsl).length + JSON.stringify(twin.glsl).length
+        expect(code.length).toBeLessThan(4000 + web)
     })
 
     it("carries the declared defaults, so the VM starts where the compiled shader starts", async () => {

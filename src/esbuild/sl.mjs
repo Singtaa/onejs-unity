@@ -7,8 +7,8 @@
  *     <ShaderProgram program={plasma} uniforms={{ warp: 0.3 }} />
  *
  * The file is parsed, checked and encoded AT BUILD TIME, so the bundle carries
- * neither the parser nor the source: an import resolves to a small object of
- * numbers. A parse error is an esbuild error with the `.sl` file, line and
+ * neither the parser nor the source: an import resolves to the VM's numbers and
+ * the program printed as WGSL and GLSL ES for a browser to compile. A parse error is an esbuild error with the `.sl` file, line and
  * column, which the Play editor surfaces and every terminal editor links.
  *
  * On the way out it writes `app.sl.json` beside the bundle, the manifest
@@ -112,7 +112,10 @@ export const source: string
 `
 }
 
-/** What an import of a `.sl` file resolves to. Numbers only: no parser, no source. */
+/**
+ * What an import of a `.sl` file resolves to: the VM's numbers plus the program
+ * compiled to the two web languages. No parser and no `.sl` source.
+ */
 function moduleFor(encoded, relativePath, source) {
     const payload = {
         data: [...encoded.data],
@@ -122,9 +125,13 @@ function moduleFor(encoded, relativePath, source) {
         defaults: encoded.defaults,
         textures: encoded.textures,
         hash: encoded.hash,
+        // Emitted here, at build time, so a played game carries no emitter:
+        // the web host compiles whichever one its backend speaks.
+        wgsl: encoded.wgsl,
+        glsl: encoded.glsl,
     }
     // The source is a NAMED export, so esbuild drops it from any bundle that
-    // does not ask for it: the default import stays numbers only. Something
+    // does not ask for it: the default import carries no `.sl` text. Something
     // showing a shader beside its own output can then show the file rather
     // than a copy of it, which is the only way that copy cannot drift.
     return `// Shader program: ${relativePath}
