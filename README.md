@@ -9,9 +9,9 @@ npm install onejs-unity
 ```
 
 onejs-unity 0.6 and newer needs OneJS 3.7 or newer, and onejs-react 0.1.60 or
-newer. A `.sl` import is now a compiled program with no VM buffer, which an
-older OneJS cannot draw; onejs-react says so in the console rather than drawing
-nothing. On an older OneJS, stay on onejs-unity 0.5.
+newer. A `.sl` import is a compiled program, which an older OneJS cannot draw;
+onejs-react says so in the console rather than drawing nothing. On an older
+OneJS, stay on onejs-unity 0.5.
 
 ## Features
 

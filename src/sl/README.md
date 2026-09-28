@@ -2,7 +2,7 @@
 
 The shader language is its own package, [`onejs-sl`](https://github.com/Singtaa/onejs-sl),
 checked out beside this one at `JSModules/onejs-sl`. Its README is the design:
-the IR, the hash, versions, the VM and every emitter. It has no Unity in it,
+the IR, the hash, versions and every emitter. It has no Unity in it,
 so Magerie runs the same compiler.
 
 This folder keeps OneJS's two import paths working, and the one piece that is
@@ -14,16 +14,19 @@ OneJS's own:
 | `compiler.ts` | `onejs-unity/sl/compiler`, what a build imports: the esbuild loader and the Play worker. Parser included |
 | `manifest.ts` | `app.sl.json` for `SLShaderGenerator` in the Unity editor |
 | `shapes.test.ts` | Pins `onejs-sl`'s shape table to `fx`'s, since both index `SDF2D.cginc` |
+| `surface.test.ts` | Pins what both barrels leave out: nothing only the VM had |
 
 Both barrels name every export rather than `export *`, so each one's surface is
 exactly what it was before the move, and a name `onejs-sl` adds does not appear
 here until somebody decides it should.
 
 `encode` is `compile` under its old name in both barrels, so code written
-against it still builds; neither builds the VM's buffer any more, since OneJS
-3.7 and newer never read one. The VM's constants stay until the VM is deleted.
+against it still builds. Neither re-exports anything only the VM had
+(`surface.test.ts`), so this package works on onejs-sl 0.2.1, which still has
+the VM's entries, and on 0.3.0, which removed them. The caps are
+`UNIFORM_SLOTS` and `TEXTURE_SLOTS`.
 
-`onejs-sl` is a peer dependency (`^0.2.0`), installed with this package by npm,
+`onejs-sl` is a peer dependency (`^0.2.1 || ^0.3.0`), installed with this package by npm,
 and a `file:../onejs-sl` dev dependency here, so the container always builds
 against the checkout beside it. Run `npm install` here after pulling a change
 to that link.

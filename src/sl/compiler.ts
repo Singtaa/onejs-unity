@@ -13,7 +13,7 @@
 
 export {
     analyze, classify, diagnose, parse, parseUnit, preludeFunctions, tokenize, PRELUDE_SOURCE, SLParseError,
-    INPUTS, SL_IR_VERSION, TYPE, widthName, toJSON, fromJSON, SL_SDF_SHAPES,
+    INPUTS, SL_IR_VERSION, TYPE, widthName, toJSON, fromJSON, SL_SDF_SHAPES, UNIFORM_SLOTS, TEXTURE_SLOTS,
 } from "onejs-sl"
 export type {
     Checked, Expr, FuncDecl, ParseOptions, Stmt, Unit, ProgramJSON, Program, SLType, SlSdfKind,
@@ -29,6 +29,5 @@ export {
     SL_KEYWORDS, SL_TYPES, BUILTIN_DOCS, INPUT_DOCS, PRELUDE_DOCS,
 } from "onejs-sl/tables"
 export type { SLSurface } from "onejs-sl/tables"
-export { VM_TEXTURES, VM_UNIFORMS } from "onejs-sl/vm"
 export { manifest } from "./manifest"
 export type { ManifestEntry, ProgramManifest } from "./manifest"

@@ -19,8 +19,8 @@ import { compile, manifest, parse } from "../sl/compiler"
  * **The manifest lands where the editor looks.** `SLShaderGenerator` walks
  * Assets and Packages for `*.sl.json` and skips `~` folders, so a manifest
  * written inside the app's source folder would be invisible and an ejected
- * game would silently interpret. That failure looks exactly like success, only
- * slower, which is why it is asserted rather than assumed.
+ * game would draw nothing in a native player, which is why it is asserted
+ * rather than assumed.
  */
 
 const PLASMA = `
@@ -104,7 +104,7 @@ describe("importing a .sl file", () => {
         // weight in a game that is downloaded before it is played.
         expect(code).not.toContain("uniform float warp")
         expect(code).not.toContain("SLParseError")
-        // Nor the VM's buffer, which OneJS 3.7 and newer never read.
+        // Nor an instruction buffer: a program is compiled, never interpreted.
         expect(code).not.toContain(`"instructions"`)
         expect(code).not.toContain(`"data"`)
         // The two web sources DO ride along, emitted at build time so a game
@@ -115,7 +115,7 @@ describe("importing a .sl file", () => {
         expect(code.length).toBeLessThan(4000 + web)
     })
 
-    it("builds a program longer than the VM could run, since nothing has a budget now", async () => {
+    it("builds a program of a few hundred operations, since nothing has a budget", async () => {
         const body = Array.from({ length: 300 }, (_, i) => `    v = v + sin(uv.x * ${i + 1});`).join("\n")
         const root = makeApp({
             "long.sl": `float4 main() {\n    float v = 0;\n${body}\n    return float4(v, 0, 0, 1);\n}`,
