@@ -39,14 +39,29 @@ function loadTypeScript() {
         // builds app code (or a bundler tracing the barrel) does not pay for
         // or require it.
         tsModulePromise = import("typescript").then(
-            (m) => m.default ?? m,
+            (m) => {
+                const ts = m.default ?? m
+                // TypeScript 7 exposes no compiler API to JavaScript, only its
+                // version, so reading ts.ScriptKind.TSX would crash with a
+                // message naming neither package. onejs-unity depends on 5.x
+                // for exactly this reason; say so if a 7 resolved anyway.
+                if (typeof ts.createSourceFile !== "function") {
+                    tsModulePromise = null
+                    throw new Error(
+                        "[onejs] import-transform needs the TypeScript compiler API, but the " +
+                        "\"typescript\" that resolved (" + ts.version + ") has none; TypeScript 7 " +
+                        "no longer exposes it. onejs-unity depends on typescript 5, so " +
+                        "`npm update onejs-unity` restores the version it needs.")
+                }
+                return ts
+            },
             (e) => {
                 tsModulePromise = null
                 throw new Error(
                     "[onejs] import-transform parses source files with the \"typescript\" " +
-                    "package, which did not resolve from this project. Every OneJS app " +
-                    "template ships it in devDependencies; `npm install -D typescript` " +
-                    "restores it. (Original error: " + (e && e.message ? e.message : e) + ")")
+                    "package, which did not resolve. onejs-unity depends on it, so " +
+                    "reinstalling (`npm install`) restores it. (Original error: " +
+                    (e && e.message ? e.message : e) + ")")
             })
     }
     return tsModulePromise
