@@ -178,6 +178,50 @@ describe("importing a .sl file", () => {
         expect(dts).toContain(`EncodedProgram<"warp" | "hue">`)
     })
 
+    it("describes each uniform and the control its attributes ask for, for a hover on the import", async () => {
+        const root = makeApp({
+            "look.sl": [
+                "[Header(\"Shape\")] [Range(0, 2)] [Label(\"Warp amount\")] uniform float warp = 1;",
+                "[Range(1, 16, 1)] uniform float petals = 5;",
+                "[Toggle] uniform float invert = 0;",
+                "[Header(\"Look\")] [Enum(Soft, Hard, Glow)] uniform float edge = 2;",
+                "uniform float4 tint = #ff8040;",
+                "[Hide] uniform float seed = 0.25;",
+                "uniform float2 offset = float2(0.5, 0);",
+                "[Label(\"a */ b\")] uniform float odd = 0;",
+                "float4 main() { return tint * warp * petals * invert * edge * seed * odd + float4(offset, 0, 0); }",
+            ].join("\n"),
+            "index.ts": `import look from "./look.sl"\nexport default look`,
+        })
+        await bundle(root, "index.ts", { generateTypes: true })
+        const dts = fs.readFileSync(path.join(root, "look.sl.d.ts"), "utf8")
+        expect(dts).toBe([
+            "// Generated from the .sl file beside this one. Do not edit.",
+            "/**",
+            " * The uniforms, set through `uniforms={{ ... }}`:",
+            " *",
+            " * **Shape**",
+            " *",
+            " * - `warp` \"Warp amount\": a slider from 0 to 2, starting at 1",
+            " * - `petals`: a slider from 1 to 16 in steps of 1, starting at 5",
+            " * - `invert`: a checkbox, 0 or 1, starting at 0",
+            " *",
+            " * **Look**",
+            " *",
+            " * - `edge`: one of Soft (0), Hard (1), Glow (2), starting at 2",
+            " * - `tint`: a colour, as written, starting at #ff8040",
+            " * - `seed`: set from code, with no control, starting at 0.25",
+            " * - `offset`: a float2, starting at (0.5, 0)",
+            " * - `odd` \"a *\\/ b\": a float, starting at 0",
+            " */",
+            `declare const program: import("onejs-react").EncodedProgram<"warp" | "petals" | "invert" | "edge" | "tint" | "seed" | "offset" | "odd">`,
+            "export default program",
+            "/** The file's own text, for showing a program beside what it draws. */",
+            "export const source: string",
+            "",
+        ].join("\n"))
+    })
+
     it("gives a program with no uniforms a .d.ts that refuses every name", async () => {
         const root = makeApp({
             "flat.sl": `float4 main() { return #ff8040; }`,

@@ -101,18 +101,56 @@ function loadCompiler(esbuild) {
  *
  * The uniform names ride in the type, so `uniforms={{ wrap: 1 }}` is a type
  * error at the call site rather than the console warning it would otherwise be
- * at runtime, on a frame nobody is looking at.
+ * at runtime, on a frame nobody is looking at. What each uniform is, its
+ * default and the control its attributes ask for (`[Range(0, 2)]` and the
+ * rest), ride in the doc comment, so hovering the import says what to set.
  */
-function generateDts(uniformNames) {
-    const names = uniformNames.length === 0
+function generateDts(uniforms) {
+    const names = uniforms.length === 0
         ? "never"
-        : uniformNames.map((n) => JSON.stringify(n)).join(" | ")
+        : uniforms.map((u) => JSON.stringify(u.name)).join(" | ")
+    const doc = uniforms.length === 0 ? "" : `/**
+ * The uniforms, set through \`uniforms={{ ... }}\`:
+ *
+${describeUniforms(uniforms).map((l) => ` * ${l}`.trimEnd()).join("\n")}
+ */
+`
     return `// Generated from the .sl file beside this one. Do not edit.
-declare const program: import("onejs-react").EncodedProgram<${names}>
+${doc}declare const program: import("onejs-react").EncodedProgram<${names}>
 export default program
 /** The file's own text, for showing a program beside what it draws. */
 export const source: string
 `
+}
+
+/** The width a uniform's slot holds, as the file spells it. */
+const TYPE_NAME = { 1: "float", 2: "float2", 3: "float3", 4: "float4" }
+
+/** The doc comment's lines: per uniform, a heading when it starts a group, then what it is. */
+function describeUniforms(uniforms) {
+    const lines = uniforms.flatMap(describeUniform)
+    while (lines[0] === "") lines.shift()
+    return lines
+}
+
+function describeUniform(u) {
+    const text = (s) => s.replace(/\*\//g, "*\\/")
+    const n = (v) => String(Math.round(v * 1e6) / 1e6)
+    // A colour's default is sRGB as written, so it reads back as the hex it
+    // almost always was; alpha only when it is not opaque.
+    const hex = (c) => "#" + c.slice(0, c[3] === undefined || c[3] === 1 ? 3 : 4)
+        .map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0")).join("")
+    const value = u.colour ? hex(u.value) : u.value.length === 1 ? n(u.value[0]) : `(${u.value.map(n).join(", ")})`
+    let what
+    if (u.hide) what = "set from code, with no control"
+    else if (u.range) what = `a slider from ${n(u.range.min)} to ${n(u.range.max)}${u.range.step === undefined ? "" : ` in steps of ${n(u.range.step)}`}`
+    else if (u.toggle) what = "a checkbox, 0 or 1"
+    else if (u.options) what = `one of ${u.options.map((o, i) => `${text(o)} (${i})`).join(", ")}`
+    else if (u.colour) what = "a colour, as written"
+    else what = `a ${TYPE_NAME[u.type]}`
+    const label = u.label === undefined ? "" : ` "${text(u.label)}"`
+    const lines = u.header === undefined ? [] : ["", `**${text(u.header)}**`, ""]
+    return [...lines, `- \`${u.name}\`${label}: ${what}, starting at ${value}`]
 }
 
 /**
@@ -252,7 +290,7 @@ export function slPlugin(options = {}) {
                 programs.set(program.hash, program)
 
                 if (generateTypes) {
-                    await getFs().promises.writeFile(absolutePath + ".d.ts", generateDts(encoded.uniforms))
+                    await getFs().promises.writeFile(absolutePath + ".d.ts", generateDts(program.uniforms))
                 }
 
                 return { contents: moduleFor(encoded, args.path, source), loader: "js", watchFiles }
