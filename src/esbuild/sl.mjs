@@ -215,13 +215,18 @@ export function slPlugin(options = {}) {
                 // carriage return on every line. It also makes the parser's
                 // error columns the same on both.
                 const source = (await getFs().promises.readFile(absolutePath, "utf8")).replace(/\r\n/g, "\n")
+                // esbuild watches only what it loaded itself, and the plugin
+                // read this file under its own namespace, so every return
+                // names it. The error returns most of all: a program that
+                // failed to parse has to rebuild when the mistake is fixed.
+                const watchFiles = [absolutePath]
                 const sl = compiler ?? await loadCompiler(build.esbuild)
 
                 let program
                 try {
                     program = sl.parse(source, { file: args.path })
                 } catch (e) {
-                    return { errors: [esbuildError(e, args.path, source)] }
+                    return { errors: [esbuildError(e, args.path, source)], watchFiles }
                 }
 
                 let encoded
@@ -232,7 +237,7 @@ export function slPlugin(options = {}) {
                     // encoder, not the parser, so they arrive here. There is no
                     // one line to blame for "this program is too long", so the
                     // marker goes on the file.
-                    return { errors: [{ text: String(e?.message ?? e), location: { file: args.path } }] }
+                    return { errors: [{ text: String(e?.message ?? e), location: { file: args.path } }], watchFiles }
                 }
 
                 programs.set(program.hash, program)
@@ -241,7 +246,7 @@ export function slPlugin(options = {}) {
                     await getFs().promises.writeFile(absolutePath + ".d.ts", generateDts(encoded.uniforms))
                 }
 
-                return { contents: moduleFor(encoded, args.path, source), loader: "js" }
+                return { contents: moduleFor(encoded, args.path, source), loader: "js", watchFiles }
             })
 
             build.onEnd(async () => {

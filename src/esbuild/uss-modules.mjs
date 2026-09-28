@@ -287,7 +287,12 @@ export default styles
 
                 return {
                     contents: jsContent,
-                    loader: "js"
+                    loader: "js",
+                    // esbuild watches only what it loaded itself, and this file
+                    // was read by the plugin under its own namespace. Without
+                    // this, editing a .module.uss rebuilds nothing until some
+                    // TS file changes too.
+                    watchFiles: [absolutePath],
                 }
             })
         }
