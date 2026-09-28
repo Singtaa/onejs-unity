@@ -158,7 +158,7 @@ import "onejs:tailwind"
 ```
 
 **Options:**
-- `content`: Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`)
+- `content`: Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`). In watch mode an edit to any scanned file rebuilds, including one the bundle does not import.
 
 **Features:**
 - JIT-style generation: only includes classes actually used in your source files. Every string literal in a scanned file is a candidate (variant maps and variables included, comment-safe), so only classes assembled at runtime (`"bg-" + color`) need `safelist`.

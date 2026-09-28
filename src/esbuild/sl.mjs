@@ -214,12 +214,18 @@ export function slPlugin(options = {}) {
                 // panel showing the file then splits on "\n" and keeps a
                 // carriage return on every line. It also makes the parser's
                 // error columns the same on both.
-                const source = (await getFs().promises.readFile(absolutePath, "utf8")).replace(/\r\n/g, "\n")
                 // esbuild watches only what it loaded itself, and the plugin
-                // read this file under its own namespace, so every return
+                // reads this file under its own namespace, so every return
                 // names it. The error returns most of all: a program that
-                // failed to parse has to rebuild when the mistake is fixed.
+                // failed to parse has to rebuild when the mistake is fixed, and
+                // an import saved before its file exists when the file appears.
                 const watchFiles = [absolutePath]
+                let source
+                try {
+                    source = (await getFs().promises.readFile(absolutePath, "utf8")).replace(/\r\n/g, "\n")
+                } catch (e) {
+                    return { errors: [{ text: String(e?.message ?? e), location: { file: args.path } }], watchFiles }
+                }
                 const sl = compiler ?? await loadCompiler(build.esbuild)
 
                 let program

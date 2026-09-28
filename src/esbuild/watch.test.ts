@@ -5,6 +5,7 @@ import os from "os"
 import path from "path"
 import { ussModulesPlugin } from "./uss-modules.mjs"
 import { slPlugin } from "./sl.mjs"
+import { tailwindPlugin } from "./tailwind.mjs"
 
 /**
  * Watch mode has to rebuild when a file a plugin read changes.
@@ -97,8 +98,38 @@ async function editWhileWatching(
     }
 }
 
+/**
+ * How many builds a watch context runs, untouched, in `ms` after it starts.
+ * One is right; more means each build changes a file it watches.
+ *
+ * A one-off build runs first, so its output is already on disk when watching
+ * starts, as it is in any project built before. Without it the scan runs before
+ * the output exists, never watches it, and a loop could not show.
+ */
+async function buildsWhileIdle(root: string, options: esbuild.BuildOptions, ms: number): Promise<number> {
+    let count = 0
+    const counter: esbuild.Plugin = { name: "count", setup(build) { build.onEnd(() => { count++ }) } }
+    const prevCwd = process.cwd()
+    process.chdir(root)
+    await esbuild.build({ ...options, logLevel: "silent" })
+    const ctx = await esbuild.context({ ...options, logLevel: "silent", plugins: [...(options.plugins ?? []), counter] })
+    try {
+        await ctx.watch()
+        await new Promise((r) => setTimeout(r, ms))
+        return count
+    } finally {
+        await ctx.dispose()
+        process.chdir(prevCwd)
+    }
+}
+
 const PLAIN = "float4 main() {\n    return float4(uv, 0, 1);\n}\n"
 const BROKEN = "float4 main() {\n    float z = uv.z;\n    return float4(z, 0, 0, 1);\n}\n"
+// Parses, then fails in the encoder: 100 dependent steps are past the VM's
+// instruction ceiling, which only `encode` enforces.
+const TOO_LONG = "float4 main() {\n    float a = uv.x;\n"
+    + "    a = sin(a * 1.5 + 0.25);\n".repeat(100)
+    + "    return float4(a, 0, 0, 1);\n}\n"
 
 describe("watch mode", () => {
     it("rebuilds when a .module.uss file changes", async () => {
@@ -135,7 +166,83 @@ describe("watch mode", () => {
         })
         const { first, rebuild } = await editWhileWatching(
             root, slPlugin({ generateTypes: false }), "plasma.sl", PLAIN)
+        // The parser's own words, so an error from anywhere else (a compiler
+        // that failed to load, say) does not pass for the one this is about.
         expect(first.errors).toHaveLength(1)
+        expect(first.errors[0]).toMatch(/"z" is component 3 of a float2/)
         expect(rebuild?.errors).toEqual([])
+    }, 15000)
+
+    it("rebuilds when a .sl file past the VM's limits is cut back", async () => {
+        const root = makeApp({
+            "plasma.sl": TOO_LONG,
+            "index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
+        })
+        const { first, rebuild } = await editWhileWatching(
+            root, slPlugin({ generateTypes: false }), "plasma.sl", PLAIN)
+        expect(first.errors).toHaveLength(1)
+        expect(first.errors[0]).toMatch(/the VM runs at most 256/)
+        expect(rebuild?.errors).toEqual([])
+    }, 15000)
+
+    // Saving the import before the file is the ordinary order to write them
+    // in. The failed build has to go on watching the path it could not read,
+    // or creating the file rebuilds nothing.
+    it("rebuilds when an imported .module.uss file is created after the import", async () => {
+        const root = makeApp({
+            "package.json": "{}",
+            "index.ts": `import styles from "./button.module.uss"\nexport default styles`,
+        })
+        const { first, rebuild } = await editWhileWatching(
+            root, ussModulesPlugin({ generateTypes: false }),
+            "button.module.uss", ".button { color: blue; }\n")
+        expect(first.errors).toHaveLength(1)
+        expect(first.errors[0]).toMatch(/button\.module\.uss/)
+        expect(rebuild?.errors).toEqual([])
+        expect(rebuild?.code).toContain("color: blue")
+    }, 15000)
+
+    it("rebuilds when an imported .sl file is created after the import", async () => {
+        const root = makeApp({
+            "index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
+        })
+        const { first, rebuild } = await editWhileWatching(
+            root, slPlugin({ generateTypes: false }), "plasma.sl", PLAIN)
+        expect(first.errors).toHaveLength(1)
+        expect(first.errors[0]).toMatch(/plasma\.sl/)
+        expect(rebuild?.errors).toEqual([])
+    }, 15000)
+
+    // `content` can name files the bundle never imports, and their classes
+    // still belong in the stylesheet.
+    it("rebuilds the Tailwind stylesheet when a scanned file outside the bundle changes", async () => {
+        const root = makeApp({
+            "app.tsx": `export const A = <div className="p-4" />`,
+            "extra.tsx": `export const B = <div className="p-4" />`,
+            "index.ts": `import "onejs:tailwind"\nimport { A } from "./app"\nexport default A`,
+        })
+        const { first, rebuild } = await editWhileWatching(
+            root, tailwindPlugin({ content: ["./**/*.{tsx,ts}"] }),
+            "extra.tsx", `export const B = <div className="p-4 mt-8" />`)
+        expect(first.code).not.toContain(".mt-8")
+        expect(rebuild?.code).toContain(".mt-8")
+    }, 15000)
+
+    // The scan watches every file it reads, so a bundle written inside the
+    // scanned folder is watched too. esbuild compares contents, so that is
+    // fine while a build is deterministic; a stylesheet that changed on every
+    // build (a timestamp in it, say) would rebuild forever.
+    it("settles after one build when the bundle is written inside the scanned folder", async () => {
+        const root = makeApp({
+            "index.tsx": `import "onejs:tailwind"\nexport default <div className="p-4" />`,
+        })
+        const builds = await buildsWhileIdle(root, {
+            entryPoints: [path.join(root, "index.tsx")],
+            bundle: true,
+            outfile: path.join(root, "dist/app.js"),
+            plugins: [tailwindPlugin({ content: ["./**/*.{tsx,ts,jsx,js}"] })],
+        }, 4000)
+        expect(fs.readFileSync(path.join(root, "dist/app.js"), "utf8")).toContain(".p-4")
+        expect(builds).toBe(1)
     }, 15000)
 })

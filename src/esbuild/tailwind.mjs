@@ -41,12 +41,19 @@ export function tailwindPlugin(options = {}) {
 
             // Generate USS for the virtual module
             build.onLoad({ filter: /.*/, namespace: "onejs-tailwind" }, async () => {
+                // Every file the scan read. esbuild watches only what it loaded
+                // itself, and a file `content` names need not be in the bundle
+                // (markup the bundle never imports, say), so without these an
+                // edit to one leaves the stylesheet stale until something the
+                // bundle does import changes.
+                const files = new Set()
                 try {
                     // Scan source files and generate USS
                     const ussContent = await generateFromFiles(content, {
                         includeReset: true,
                         preflight,
                         safelist,
+                        files,
                     })
 
                     // Escape USS for JavaScript string embedding
@@ -70,11 +77,13 @@ export default css
                     return {
                         contents: jsContent,
                         loader: "js",
+                        watchFiles: [...files],
                     }
                 } catch (error) {
                     console.error(`[tailwind-uss] Error:`, error.message)
                     return {
                         errors: [{ text: error.message }],
+                        watchFiles: [...files],
                     }
                 }
             })

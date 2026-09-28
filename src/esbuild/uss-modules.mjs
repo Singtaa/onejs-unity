@@ -236,7 +236,16 @@ export function ussModulesPlugin(options = {}) {
                 // read through the absolute path carried on pluginData.
                 const absolutePath = args.pluginData?.absolutePath
                     ?? path.resolve(process.cwd(), args.path)
-                const ussContent = await getFs().promises.readFile(absolutePath, "utf8")
+                // esbuild watches only what it loaded itself, so every return
+                // names the file, the failed read most of all: an import saved
+                // before its file exists has to rebuild when the file appears.
+                const watchFiles = [absolutePath]
+                let ussContent
+                try {
+                    ussContent = await getFs().promises.readFile(absolutePath, "utf8")
+                } catch (e) {
+                    return { errors: [{ text: String(e?.message ?? e), location: { file: args.path } }], watchFiles }
+                }
                 // Identity from the absolute path, so it anchors to the project
                 // rather than to wherever the build was started, and comes back
                 // forward-slashed so Windows and macOS agree. Hashing the plain
@@ -288,11 +297,9 @@ export default styles
                 return {
                     contents: jsContent,
                     loader: "js",
-                    // esbuild watches only what it loaded itself, and this file
-                    // was read by the plugin under its own namespace. Without
-                    // this, editing a .module.uss rebuilds nothing until some
-                    // TS file changes too.
-                    watchFiles: [absolutePath],
+                    // Without this, editing a .module.uss rebuilds nothing
+                    // until some TS file changes too.
+                    watchFiles,
                 }
             })
         }

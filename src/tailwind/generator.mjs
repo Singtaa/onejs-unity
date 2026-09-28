@@ -258,8 +258,11 @@ function addCandidates(text, candidates) {
 
 /**
  * Scan multiple files and extract all class names
+ *
+ * @param {Set<string>} [files] Receives the absolute path of every file read,
+ *   so a build in watch mode can watch the files its classes came from.
  */
-export async function scanFiles(patterns, cwd = process.cwd()) {
+export async function scanFiles(patterns, cwd = process.cwd(), files = undefined) {
     const classNames = new Set()
 
     // Simple glob implementation for common patterns
@@ -281,6 +284,7 @@ export async function scanFiles(patterns, cwd = process.cwd()) {
                 if (matchesPattern(relativePath, pattern)) {
                     try {
                         const content = await getFs().promises.readFile(fullPath, "utf8")
+                        files?.add(fullPath)
                         const fileClasses = extractClassNames(content)
                         fileClasses.forEach(c => classNames.add(c))
                     } catch (err) {
@@ -306,6 +310,9 @@ export async function scanFiles(patterns, cwd = process.cwd()) {
         } else {
             // Direct file path
             const filePath = path.join(cwd, pattern.replace(/^\.\//, ""))
+            // Watched whether or not it exists yet: a pattern names this file
+            // outright, so creating it has to rebuild.
+            files?.add(filePath)
             try {
                 const content = await getFs().promises.readFile(filePath, "utf8")
                 const fileClasses = extractClassNames(content)
@@ -987,9 +994,11 @@ function defaultUnsupportedWarning(families) {
 
 /**
  * Main function: scan files and generate USS
+ *
+ * `options.files`, a Set, receives every file scanned (see scanFiles).
  */
 export async function generateFromFiles(contentPatterns, options = {}) {
-    const classNames = await scanFiles(contentPatterns)
+    const classNames = await scanFiles(contentPatterns, process.cwd(), options.files)
 
     // Merge safelist classes
     const { safelist = [] } = options
