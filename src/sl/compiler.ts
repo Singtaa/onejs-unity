@@ -2,8 +2,8 @@
  * `onejs-unity/sl/compiler`: the BUILD TIME surface of the shader language.
  *
  * Everything here runs while a game is being built and nothing runs while one
- * is being played: the `.sl` parser, the encoder that turns a program into the
- * buffer the VM reads, and the manifest an editor turns into compiled shaders.
+ * is being played: the `.sl` parser, `compile`, which turns a program into what
+ * a host draws it from, and the manifest an editor turns into compiled shaders.
  * The esbuild plugin and the Play worker import this; a game imports
  * `onejs-unity/sl`, which leaves the parser out.
  *
@@ -19,8 +19,8 @@ export type {
     Checked, Expr, FuncDecl, ParseOptions, Stmt, Unit, ProgramJSON, Program, SLType, SlSdfKind,
     SLClassifiedToken, SLFix, SLTokenClass,
 } from "onejs-sl"
-export { encode } from "onejs-sl/vm"
-export type { Encoded } from "onejs-sl/vm"
+export { compile, compile as encode } from "onejs-sl/compile"
+export type { Compiled, Compiled as Encoded } from "onejs-sl/compile"
 export { emitShader, emitFragmentBody, uniformProperty } from "onejs-sl/emit/unity"
 export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "onejs-sl/emit/web"
 export type { WebLanguage } from "onejs-sl/emit/web"

@@ -19,7 +19,11 @@ Both barrels name every export rather than `export *`, so each one's surface is
 exactly what it was before the move, and a name `onejs-sl` adds does not appear
 here until somebody decides it should.
 
-`onejs-sl` is a peer dependency (`^0.1.0`), installed with this package by npm,
+`encode` is `compile` under its old name in both barrels, so code written
+against it still builds; neither builds the VM's buffer any more, since OneJS
+3.7 and newer never read one. The VM's constants stay until the VM is deleted.
+
+`onejs-sl` is a peer dependency (`^0.2.0`), installed with this package by npm,
 and a `file:../onejs-sl` dev dependency here, so the container always builds
 against the checkout beside it. Run `npm install` here after pulling a change
 to that link.

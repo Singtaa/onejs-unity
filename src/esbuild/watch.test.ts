@@ -125,11 +125,6 @@ async function buildsWhileIdle(root: string, options: esbuild.BuildOptions, ms: 
 
 const PLAIN = "float4 main() {\n    return float4(uv, 0, 1);\n}\n"
 const BROKEN = "float4 main() {\n    float z = uv.z;\n    return float4(z, 0, 0, 1);\n}\n"
-// Parses, then fails in the encoder: 100 dependent steps are past the VM's
-// instruction ceiling, which only `encode` enforces.
-const TOO_LONG = "float4 main() {\n    float a = uv.x;\n"
-    + "    a = sin(a * 1.5 + 0.25);\n".repeat(100)
-    + "    return float4(a, 0, 0, 1);\n}\n"
 
 describe("watch mode", () => {
     it("rebuilds when a .module.uss file changes", async () => {
@@ -170,18 +165,6 @@ describe("watch mode", () => {
         // that failed to load, say) does not pass for the one this is about.
         expect(first.errors).toHaveLength(1)
         expect(first.errors[0]).toMatch(/"z" is component 3 of a float2/)
-        expect(rebuild?.errors).toEqual([])
-    }, 15000)
-
-    it("rebuilds when a .sl file past the VM's limits is cut back", async () => {
-        const root = makeApp({
-            "plasma.sl": TOO_LONG,
-            "index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
-        })
-        const { first, rebuild } = await editWhileWatching(
-            root, slPlugin({ generateTypes: false }), "plasma.sl", PLAIN)
-        expect(first.errors).toHaveLength(1)
-        expect(first.errors[0]).toMatch(/the VM runs at most 256/)
         expect(rebuild?.errors).toEqual([])
     }, 15000)
 

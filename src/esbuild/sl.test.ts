@@ -4,7 +4,7 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 import { slPlugin } from "./sl.mjs"
-import { encode, manifest, parse } from "../sl/compiler"
+import { compile, manifest, parse } from "../sl/compiler"
 
 /**
  * The loader, end to end through a real esbuild.
@@ -90,20 +90,23 @@ async function bundle(
 }
 
 describe("importing a .sl file", () => {
-    it("resolves to the program, encoded, with nothing else along for the ride", async () => {
+    it("resolves to the program, compiled, with nothing else along for the ride", async () => {
         const root = makeApp({
             "plasma.sl": PLASMA,
             "index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
         })
         const { code } = await bundle(root, "index.ts")
 
-        const twin = encode(parse(PLASMA, { file: "plasma.sl" }))
+        const twin = compile(parse(PLASMA, { file: "plasma.sl" }))
         expect(code).toContain(`"hash": "${twin.hash}"`)
         expect(code).toContain(`"uniforms": ["warp", "hue"]`)
         // The parser and the source stay out of the bundle. Both would be dead
         // weight in a game that is downloaded before it is played.
         expect(code).not.toContain("uniform float warp")
         expect(code).not.toContain("SLParseError")
+        // Nor the VM's buffer, which OneJS 3.7 and newer never read.
+        expect(code).not.toContain(`"instructions"`)
+        expect(code).not.toContain(`"data"`)
         // The two web sources DO ride along, emitted at build time so a game
         // carries no emitter. They are the only thing allowed past the bound.
         expect(code).toContain(`"wgsl":`)
@@ -112,7 +115,19 @@ describe("importing a .sl file", () => {
         expect(code.length).toBeLessThan(4000 + web)
     })
 
-    it("carries the declared defaults, so the VM starts where the compiled shader starts", async () => {
+    it("builds a program longer than the VM could run, since nothing has a budget now", async () => {
+        const body = Array.from({ length: 300 }, (_, i) => `    v = v + sin(uv.x * ${i + 1});`).join("\n")
+        const root = makeApp({
+            "long.sl": `float4 main() {\n    float v = 0;\n${body}\n    return float4(v, 0, 0, 1);\n}`,
+            "index.ts": `import long from "./long.sl"\nexport default long`,
+        })
+        const { code, errors } = await bundle(root, "index.ts")
+        expect(errors).toEqual([])
+        // All 300 terms, in each of the two web languages.
+        expect(code.match(/sin\(/g)?.length).toBeGreaterThanOrEqual(600)
+    })
+
+    it("carries the declared defaults, so a web host starts where the compiled shader starts", async () => {
         const root = makeApp({
             "plasma.sl": PLASMA,
             "index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
@@ -175,7 +190,7 @@ describe("importing a .sl file", () => {
         })
         await bundle(root, "index.ts", { generateTypes: true })
         const dts = fs.readFileSync(path.join(root, "plasma.sl.d.ts"), "utf8")
-        expect(dts).toContain(`EncodedProgram<"warp" | "hue">`)
+        expect(dts).toContain(`CompiledProgram<"warp" | "hue">`)
     })
 
     it("describes each uniform and the control its attributes ask for, for a hover on the import", async () => {
@@ -214,7 +229,7 @@ describe("importing a .sl file", () => {
             " * - `offset`: a float2, starting at (0.5, 0)",
             " * - `odd` \"a *\\/ b\": a float, starting at 0",
             " */",
-            `declare const program: import("onejs-react").EncodedProgram<"warp" | "petals" | "invert" | "edge" | "tint" | "seed" | "offset" | "odd">`,
+            `declare const program: import("onejs-react").CompiledProgram<"warp" | "petals" | "invert" | "edge" | "tint" | "seed" | "offset" | "odd">`,
             "export default program",
             "/** The file's own text, for showing a program beside what it draws. */",
             "export const source: string",
@@ -229,7 +244,7 @@ describe("importing a .sl file", () => {
         })
         await bundle(root, "index.ts", { generateTypes: true })
         expect(fs.readFileSync(path.join(root, "flat.sl.d.ts"), "utf8"))
-            .toContain("EncodedProgram<never>")
+            .toContain("CompiledProgram<never>")
     })
 
     it("does not put the builder's home directory in the bundle", async () => {
@@ -260,15 +275,6 @@ describe("a parse error is an esbuild error", () => {
         expect(errors[0]).not.toContain("bad.sl:2:18:")
     })
 
-    it("reports a program the VM cannot run, since no single line is to blame", async () => {
-        const body = Array.from({ length: 300 }, (_, i) => `    v = v + sin(uv.x * ${i + 1});`).join("\n")
-        const root = makeApp({
-            "long.sl": `float4 main() {\n    float v = 0;\n${body}\n    return float4(v, 0, 0, 1);\n}`,
-            "index.ts": `import long from "./long.sl"\nexport default long`,
-        })
-        const { errors } = await bundle(root, "index.ts")
-        expect(errors[0]).toContain("runs at most 256")
-    })
 })
 
 describe("the manifest", () => {
@@ -332,7 +338,7 @@ describe("the manifest", () => {
         })
         const seen: Array<{ programs: Array<{ hash: string }> }> = []
         await bundle(root, "index.ts", { onManifest: (m) => { seen.push(m as never) } })
-        expect(seen[0]!.programs[0]!.hash).toBe(encode(parse(PLASMA, { file: "plasma.sl" })).hash)
+        expect(seen[0]!.programs[0]!.hash).toBe(compile(parse(PLASMA, { file: "plasma.sl" })).hash)
         // Nothing was written: there is no outfile to be beside.
         expect(fs.existsSync(path.join(root, "app.sl.json"))).toBe(false)
     })

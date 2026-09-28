@@ -6,10 +6,12 @@
  *     import plasma from "./plasma.sl"
  *     <ShaderProgram program={plasma} uniforms={{ warp: 0.3 }} />
  *
- * The file is parsed, checked and encoded AT BUILD TIME, so the bundle carries
- * neither the parser nor the source: an import resolves to the VM's numbers and
- * the program printed as WGSL and GLSL ES for a browser to compile. A parse error is an esbuild error with the `.sl` file, line and
- * column, which the Play editor surfaces and every terminal editor links.
+ * The file is parsed, checked and compiled AT BUILD TIME, so the bundle carries
+ * neither the parser nor the source: an import resolves to the program's hash,
+ * its uniform and texture names, its defaults, and the program printed as WGSL
+ * and GLSL ES for a browser to compile. A parse error is an esbuild error with
+ * the `.sl` file, line and column, which the Play editor surfaces and every
+ * terminal editor links.
  *
  * On the way out it writes `app.sl.json` beside the bundle. The editor
  * generates a shader from it before every load of the bundle
@@ -64,7 +66,7 @@ function exists(file) {
 }
 
 /**
- * `{ parse, encode, manifest }`, as JavaScript this Node process can load.
+ * `{ parse, compile, manifest }`, as JavaScript this Node process can load.
  *
  * `build.esbuild` is the exact esbuild running the build, so there is no second
  * copy to resolve and no version to disagree with. A data URL rather than a
@@ -116,7 +118,7 @@ ${describeUniforms(uniforms).map((l) => ` * ${l}`.trimEnd()).join("\n")}
  */
 `
     return `// Generated from the .sl file beside this one. Do not edit.
-${doc}declare const program: import("onejs-react").EncodedProgram<${names}>
+${doc}declare const program: import("onejs-react").CompiledProgram<${names}>
 export default program
 /** The file's own text, for showing a program beside what it draws. */
 export const source: string
@@ -154,24 +156,20 @@ function describeUniform(u) {
 }
 
 /**
- * What an import of a `.sl` file resolves to: the VM's numbers plus the program
- * compiled to the two web languages. No parser and no `.sl` source.
+ * What an import of a `.sl` file resolves to: what a host needs to draw the
+ * program, plus the program in the two web languages. No parser and no `.sl`
+ * source.
  */
-function moduleFor(encoded, relativePath, source) {
+function moduleFor(compiled, relativePath, source) {
     const payload = {
-        data: [...encoded.data],
-        instructions: encoded.instructions,
-        resultRegister: encoded.resultRegister,
-        uniforms: encoded.uniforms,
-        defaults: encoded.defaults,
-        textures: encoded.textures,
-        hash: encoded.hash,
-        // Read by the VM, which refuses a program newer than it is.
-        wire: encoded.wire,
+        uniforms: compiled.uniforms,
+        defaults: compiled.defaults,
+        textures: compiled.textures,
+        hash: compiled.hash,
         // Emitted here, at build time, so a played game carries no emitter:
         // the web host compiles whichever one its backend speaks.
-        wgsl: encoded.wgsl,
-        glsl: encoded.glsl,
+        wgsl: compiled.wgsl,
+        glsl: compiled.glsl,
     }
     // The source is a NAMED export, so esbuild drops it from any bundle that
     // does not ask for it: the default import carries no `.sl` text. Something
@@ -215,7 +213,7 @@ function esbuildError(error, file, source) {
  *
  * @param {Object} options
  * @param {boolean} [options.generateTypes] Write a `.d.ts` beside each file. Default true.
- * @param {Object} [options.compiler] `{ parse, encode, manifest }` for a host that
+ * @param {Object} [options.compiler] `{ parse, compile, manifest }` for a host that
  *   cannot evaluate what it builds. A Worker passes this; Node does not need to.
  * @param {string} [options.manifest] Where to write the manifest. Defaults to
  *   `app.sl.json` beside the bundle, and nothing is written when the build has
@@ -276,14 +274,13 @@ export function slPlugin(options = {}) {
                     return { errors: [esbuildError(e, args.path, source)], watchFiles }
                 }
 
-                let encoded
+                let contents
                 try {
-                    encoded = sl.encode(program)
+                    contents = moduleFor(sl.compile(program), args.path, source)
                 } catch (e) {
-                    // The instruction and register ceilings are enforced by the
-                    // encoder, not the parser, so they arrive here. There is no
-                    // one line to blame for "this program is too long", so the
-                    // marker goes on the file.
+                    // A program the parser accepted and an emitter could not
+                    // print is a gap in the emitter, not a line of the
+                    // author's, so the marker goes on the file.
                     return { errors: [{ text: String(e?.message ?? e), location: { file: args.path } }], watchFiles }
                 }
 
@@ -293,7 +290,7 @@ export function slPlugin(options = {}) {
                     await getFs().promises.writeFile(absolutePath + ".d.ts", generateDts(program.uniforms))
                 }
 
-                return { contents: moduleFor(encoded, args.path, source), loader: "js", watchFiles }
+                return { contents, loader: "js", watchFiles }
             })
 
             build.onEnd(async () => {

@@ -20,10 +20,16 @@ export type {
     ProgramJSON, SlSdfKind, SLOpCode, SLType, InputName, NodeRef, SLNode, Program, UniformDecl, TextureDecl,
     Float, Vec2, Vec3, Vec4, Num, ProgramInputs, Texture,
 } from "onejs-sl/core"
+/**
+ * `encode` is `compile` under its old name, so a game written against it
+ * draws unchanged; it no longer builds the VM's buffer, which OneJS 3.7 and
+ * newer never read.
+ */
+export { compile, compile as encode } from "onejs-sl/compile"
+export type { Compiled, Compiled as Encoded } from "onejs-sl/compile"
 export {
-    SL_WIRE_VERSION, REGISTERS, MAX_INSTRUCTIONS, TEXELS_PER_INSTRUCTION, encode, reachable, liveRanges,
+    SL_WIRE_VERSION, REGISTERS, MAX_INSTRUCTIONS, TEXELS_PER_INSTRUCTION, reachable, liveRanges,
 } from "onejs-sl/vm"
-export type { Encoded } from "onejs-sl/vm"
 export { emitShader, emitFragmentBody, uniformProperty } from "onejs-sl/emit/unity"
 export type { EmitOptions } from "onejs-sl/emit/unity"
 export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "onejs-sl/emit/web"

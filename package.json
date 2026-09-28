@@ -1,6 +1,6 @@
 {
   "name": "onejs-unity",
-  "version": "0.5.20",
+  "version": "0.6.0",
   "description": "Unity integration utilities for OneJS - esbuild/PostCSS plugins for USS, GPU compute, and more",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -69,13 +69,17 @@
   },
   "peerDependencies": {
     "esbuild": ">=0.17.0",
-    "onejs-sl": "^0.1.12",
+    "onejs-sl": "^0.2.0",
+    "onejs-react": "^0.1.60",
     "postcss": ">=8.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "tailwindcss": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "onejs-react": {
       "optional": true
     },
     "esbuild": {
