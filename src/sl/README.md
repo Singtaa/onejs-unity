@@ -24,8 +24,9 @@ here until somebody decides it should.
 against it still builds. Neither re-exports anything only the VM had
 (`surface.test.ts`). The caps are `UNIFORM_SLOTS` and `TEXTURE_SLOTS`.
 
-`onejs-sl` is a peer dependency (`^0.4.0 || ^0.5.0`, whose core names the hash
-scheme the manifest carries; 0.5.0 adds control flow and keeps that scheme),
+`onejs-sl` is a peer dependency (`^0.4.0 || ^0.5.0 || ^0.6.0`, whose core names
+the hash scheme the manifest carries; 0.5.0 adds control flow and 0.6.0 an int
+uniform's kind, both keeping that scheme),
 installed with this package by npm,
 and a `file:../onejs-sl` dev dependency here, so the container always builds
 against the checkout beside it. Run `npm install` here after pulling a change
