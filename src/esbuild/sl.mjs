@@ -168,6 +168,10 @@ function moduleFor(compiled, relativePath, source) {
         defaults: compiled.defaults,
         textures: compiled.textures,
         hash: compiled.hash,
+        // What the host keeps between frames for this program: the previous
+        // frame, the frame count, the step. A host that never hears this draws
+        // a program that reads the previous frame as if nothing came before.
+        reads: compiled.reads,
         // Emitted here, at build time, so a played game carries no emitter:
         // the web host compiles whichever one its backend speaks.
         wgsl: compiled.wgsl,

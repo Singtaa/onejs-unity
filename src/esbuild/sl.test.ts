@@ -138,6 +138,18 @@ describe("importing a .sl file", () => {
         expect(code).toContain("[0.5, 0, 0, 1, 0.25, 0, 0, 1]")
     })
 
+    it("carries what the program needs kept between frames, so a host keeps the previous frame for it", async () => {
+        const root = makeApp({
+            "trail.sl": "float4 main() {\n    return max(tex2D(previous, uv) * 0.9, float4(uv, deltaTime, 1));\n}\n",
+            "plasma.sl": PLASMA,
+            "index.ts": `import trail from "./trail.sl"\nimport plasma from "./plasma.sl"\nexport default [trail, plasma]`,
+        })
+        const { code, errors } = await bundle(root, "index.ts")
+        expect(errors).toEqual([])
+        expect(code).toContain(`"reads": { "previous": true, "frame": false, "deltaTime": true }`)
+        expect(code).toContain(`"reads": { "previous": false, "frame": false, "deltaTime": false }`)
+    })
+
     it("keeps the source out of a bundle that does not ask for it", async () => {
         const root = makeApp({
             "plasma.sl": PLASMA,
