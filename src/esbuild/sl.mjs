@@ -149,6 +149,8 @@ function describeUniform(u) {
     else if (u.toggle) what = "a checkbox, 0 or 1"
     else if (u.options) what = `one of ${u.options.map((o, i) => `${text(o)} (${i})`).join(", ")}`
     else if (u.colour) what = "a colour, as written"
+    // An int's slot is a float, as every host binds it; onejs-sl marks it.
+    else if (u.kind === "int") what = "an int"
     else what = `a ${TYPE_NAME[u.type]}`
     const label = u.label === undefined ? "" : ` "${text(u.label)}"`
     const lines = u.header === undefined ? [] : ["", `**${text(u.header)}**`, ""]

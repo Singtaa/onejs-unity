@@ -194,6 +194,17 @@ describe("importing a .sl file", () => {
         expect(dts).toContain(`CompiledProgram<"warp" | "hue">`)
     })
 
+    it("calls an int uniform an int, not the float its slot is", async () => {
+        const root = makeApp({
+            "count.sl": "uniform int count = 3;\nuniform float scale = 1;\nfloat4 main() { return float4(float(count) * scale, 0, 0, 1); }",
+            "index.ts": `import count from "./count.sl"\nexport default count`,
+        })
+        await bundle(root, "index.ts", { generateTypes: true })
+        const dts = fs.readFileSync(path.join(root, "count.sl.d.ts"), "utf8")
+        expect(dts).toContain(" * - `count`: an int, starting at 3")
+        expect(dts).toContain(" * - `scale`: a float, starting at 1")
+    })
+
     it("describes each uniform and the control its attributes ask for, for a hover on the import", async () => {
         const root = makeApp({
             "look.sl": [
