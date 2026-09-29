@@ -5,6 +5,7 @@ import os from "os"
 import path from "path"
 import { slPlugin } from "./sl.mjs"
 import { compile, manifest, parse } from "../sl/compiler"
+import { SL_HASH_VERSION } from "onejs-sl/core"
 
 /**
  * The loader, end to end through a real esbuild.
@@ -316,7 +317,77 @@ describe("the manifest", () => {
         const root = makeApp({ "index.ts": `export default 1` })
         const seen: Array<Record<string, unknown>> = []
         await bundle(root, "index.ts", { onManifest: (m) => { seen.push(m as never) } })
-        expect(seen[0]).toEqual(manifest([]))
+        const { hashVersion: _, ...empty } = manifest([])
+        expect(seen[0]).toEqual(empty)
+    })
+
+    it("names the hash scheme of the programs it lists", async () => {
+        const root = makeApp({
+            "app/~/plasma.sl": PLASMA,
+            "app/~/index.ts": `import plasma from "./plasma.sl"\nexport default plasma`,
+        })
+        await bundle(root, "app/~/index.ts", {}, "app/app.js.txt")
+        const written = JSON.parse(fs.readFileSync(path.join(root, "app/app.sl.json"), "utf8"))
+        expect(written.hashVersion).toBe(SL_HASH_VERSION)
+        expect(written.programs[0].hlsl.split("\n")).toContain(`// SL_HASH_VERSION ${SL_HASH_VERSION}`)
+    })
+
+    /**
+     * A bundle that carries onejs-sl builds programs in code, whose hashes the
+     * editor records. The build compares what it recorded with the scheme the
+     * app produces, so the app has to say it even with no .sl file, and say the
+     * scheme of the onejs-sl it bundled: that is the one its programs are
+     * hashed under, whatever compiled its .sl files.
+     */
+    describe("beside a bundle that carries onejs-sl", () => {
+        const withSL = (scheme: string, index: string, more: Record<string, string> = {}) => makeApp({
+            "app/~/node_modules/onejs-sl/package.json": JSON.stringify({ name: "onejs-sl", exports: { "./core": "./src/core.ts" } }),
+            "app/~/node_modules/onejs-sl/src/core.ts": `export { hashOf } from "./ir"`,
+            "app/~/node_modules/onejs-sl/src/ir.ts": `${scheme}\nexport const hashOf = (s: string) => s.length`,
+            "app/~/index.ts": index,
+            ...more,
+        })
+        const read = (root: string) => JSON.parse(fs.readFileSync(path.join(root, "app/app.sl.json"), "utf8"))
+        const CODE_ONLY = `import { hashOf } from "onejs-sl/core"\nexport default hashOf("x")`
+
+        it("writes one with no programs and the bundled scheme, where there was none", async () => {
+            const root = withSL("export const SL_HASH_VERSION = 7", CODE_ONLY)
+            await bundle(root, "app/~/index.ts", {}, "app/app.js.txt")
+            expect(read(root)).toEqual({ version: 1, hashVersion: 7, programs: [] })
+        })
+
+        it("reads an onejs-sl from before the constant as scheme 1", async () => {
+            const root = withSL("// no scheme named", CODE_ONLY)
+            await bundle(root, "app/~/index.ts", {}, "app/app.js.txt")
+            expect(read(root).hashVersion).toBe(1)
+        })
+
+        it("names the bundled scheme beside .sl programs compiled by another copy", async () => {
+            const root = withSL("export const SL_HASH_VERSION = 7",
+                `import plasma from "./plasma.sl"\nimport { hashOf } from "onejs-sl/core"\nexport default [plasma, hashOf("x")]`,
+                { "app/~/plasma.sl": PLASMA })
+            await bundle(root, "app/~/index.ts", {}, "app/app.js.txt")
+            const written = read(root)
+            expect(written.hashVersion).toBe(7)
+            expect(written.programs[0].hlsl.split("\n")).toContain(`// SL_HASH_VERSION ${SL_HASH_VERSION}`)
+        })
+
+        it("keeps saying it on every rebuild of a watch", async () => {
+            const root = withSL("export const SL_HASH_VERSION = 7", CODE_ONLY)
+            const ctx = await esbuild.context({
+                entryPoints: [path.join(root, "app/~/index.ts")], bundle: true, write: true, format: "esm",
+                outfile: path.join(root, "app/app.js.txt"), logLevel: "silent", plugins: [slPlugin({ generateTypes: false })],
+            })
+            try {
+                await ctx.rebuild()
+                fs.rmSync(path.join(root, "app/app.sl.json"))
+                fs.writeFileSync(path.join(root, "app/~/index.ts"), CODE_ONLY + "\nexport const again = 1")
+                await ctx.rebuild()
+                expect(read(root).hashVersion).toBe(7)
+            } finally {
+                await ctx.dispose()
+            }
+        })
     })
 
     it("collapses two imports of one program, because the hash is the identity", async () => {

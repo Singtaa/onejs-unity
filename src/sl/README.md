@@ -12,7 +12,7 @@ OneJS's own:
 |---|---|
 | `index.ts` | `onejs-unity/sl`, what a game imports. Built on `onejs-sl/core` and the backend entries, never on the parser |
 | `compiler.ts` | `onejs-unity/sl/compiler`, what a build imports: the esbuild loader and the Play worker. Parser included |
-| `manifest.ts` | `app.sl.json` for `SLShaderGenerator` in the Unity editor |
+| `manifest.ts` | `app.sl.json` for `SLShaderGenerator` in the Unity editor, naming the hash scheme (`hashVersion`) a build checks recorded programs against. The esbuild plugin writes one with no programs beside any bundle that carries onejs-sl |
 | `shapes.test.ts` | Pins `onejs-sl`'s shape table to `fx`'s, since both index `SDF2D.cginc` |
 | `surface.test.ts` | Pins what both barrels leave out: nothing only the VM had |
 

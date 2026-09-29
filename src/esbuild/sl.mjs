@@ -231,7 +231,24 @@ export function slPlugin(options = {}) {
             /** Programs seen in this build, by hash. Cleared per build so a watch rebuild is not cumulative. */
             const programs = new Map()
 
-            build.onStart(() => { programs.clear() })
+            /**
+             * `SL_HASH_VERSION` of the onejs-sl this bundle carries, or null
+             * when it carries none. Read from the file itself as esbuild
+             * loads it, so it is the scheme the app's programs built in code
+             * are hashed under, whatever copy compiled its .sl files. An
+             * onejs-sl from before the constant is scheme 1.
+             */
+            let bundledScheme = null
+
+            build.onStart(() => { programs.clear(); bundledScheme = null })
+
+            build.onLoad({ filter: /[\\/]onejs-sl[\\/]src[\\/]ir\.ts$/, namespace: "file" }, async (args) => {
+                const text = await getFs().promises.readFile(args.path, "utf8")
+                const named = /export const SL_HASH_VERSION = (\d+)/.exec(text)
+                bundledScheme = named === null ? 1 : Number(named[1])
+                // Nothing returned, so esbuild loads the file as it would have.
+                return undefined
+            })
 
             build.onResolve({ filter: /\.sl$/ }, (args) => {
                 const resolved = path.resolve(args.resolveDir, args.path)
@@ -296,19 +313,24 @@ export function slPlugin(options = {}) {
             build.onEnd(async () => {
                 const where = manifestPath(options, build.initialOptions)
                 if (programs.size === 0) {
-                    // An empty manifest is written only over one that is
-                    // already there: deleting the last `.sl` file has to stop
-                    // its shaders being generated, but a project that has never
-                    // had one should not find a new file beside its bundle.
-                    // Built without the parser, so a project with no shaders
-                    // pays nothing for having the plugin in its config.
-                    if (onManifest !== null) onManifest(EMPTY_MANIFEST)
-                    if (where === null || !exists(where)) return
-                    await getFs().promises.writeFile(where, JSON.stringify(EMPTY_MANIFEST, null, 1))
+                    // An empty manifest is written over one that is already
+                    // there, since deleting the last `.sl` file has to stop its
+                    // shaders being generated, and beside a bundle carrying
+                    // onejs-sl, which builds programs in code and has to name
+                    // their scheme. A project that uses no shader language
+                    // finds no new file beside its bundle. Built without the
+                    // parser, so a project with no shaders pays nothing for
+                    // having the plugin in its config.
+                    const empty = bundledScheme === null ? EMPTY_MANIFEST
+                        : { version: 1, hashVersion: bundledScheme, programs: [] }
+                    if (onManifest !== null) onManifest(empty)
+                    if (where === null || (bundledScheme === null && !exists(where))) return
+                    await getFs().promises.writeFile(where, JSON.stringify(empty, null, 1))
                     return
                 }
                 const sl = compiler ?? await loadCompiler(build.esbuild)
                 const written = sl.manifest([...programs.values()])
+                if (bundledScheme !== null) written.hashVersion = bundledScheme
                 if (onManifest !== null) onManifest(written)
                 if (where === null) return
                 await getFs().promises.writeFile(where, JSON.stringify(written, null, 1))

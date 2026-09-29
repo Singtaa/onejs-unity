@@ -15,7 +15,7 @@
  *     writeFileSync("app.sl.json", JSON.stringify(manifest([plasma, glow])))
  */
 
-import type { Program } from "onejs-sl/core"
+import { SL_HASH_VERSION, type Program } from "onejs-sl/core"
 import { emitShader } from "onejs-sl/emit/unity"
 
 export interface ManifestEntry {
@@ -27,6 +27,12 @@ export interface ManifestEntry {
 
 export interface ProgramManifest {
     version: 1
+    /**
+     * `SL_HASH_VERSION` of the app's programs. A build fails when a recorded
+     * program was made under a scheme no app manifest names, since no app can
+     * produce its hash any more (`SLShaderBuildStep`).
+     */
+    hashVersion?: number
     programs: ManifestEntry[]
 }
 
@@ -51,5 +57,9 @@ export function manifest(programs: Program[]): ProgramManifest {
     // Sorted by hash so the file does not churn when declaration order changes.
     // A manifest that rewrote itself on every build would dirty the generated
     // shaders and make Unity recompile all of them for nothing.
-    return { version: 1, programs: [...seen.values()].sort((a, b) => a.hash.localeCompare(b.hash)) }
+    return {
+        version: 1,
+        hashVersion: SL_HASH_VERSION,
+        programs: [...seen.values()].sort((a, b) => a.hash.localeCompare(b.hash)),
+    }
 }
