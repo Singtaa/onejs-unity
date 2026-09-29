@@ -22,11 +22,10 @@ here until somebody decides it should.
 
 `encode` is `compile` under its old name in both barrels, so code written
 against it still builds. Neither re-exports anything only the VM had
-(`surface.test.ts`), so this package works on onejs-sl 0.2.1, which still has
-the VM's entries, and on 0.3.0, which removed them. The caps are
-`UNIFORM_SLOTS` and `TEXTURE_SLOTS`.
+(`surface.test.ts`). The caps are `UNIFORM_SLOTS` and `TEXTURE_SLOTS`.
 
-`onejs-sl` is a peer dependency (`^0.2.1 || ^0.3.0`), installed with this package by npm,
+`onejs-sl` is a peer dependency (`^0.4.0`, whose core names the hash scheme the
+manifest carries), installed with this package by npm,
 and a `file:../onejs-sl` dev dependency here, so the container always builds
 against the checkout beside it. Run `npm install` here after pulling a change
 to that link.
