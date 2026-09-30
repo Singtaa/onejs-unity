@@ -177,7 +177,7 @@ import "onejs:themes"
 
 At build time the plugin scans the working directory's `@cartridges/` folder for files matching `*Theme.ts` / `*Theme.tsx` (the naming convention every OneJS premade theme follows), emits a side-effect import for each, and logs what it registered. In watch mode a newly extracted cartridge triggers a rebuild automatically. With nothing extracted yet it emits an empty module and a console warning, not an error. Explicit relative imports keep working when you want a strict subset.
 
-No package declares `onejs:themes` for TypeScript, and TypeScript 6 and newer check side-effect imports, so declare it once in a `.d.ts` (the OneJS scaffold's `types/global.d.ts` declares only `onejs:tailwind`): `declare module "onejs:themes"`.
+No package declares `onejs:themes` for TypeScript, and TypeScript 6 and newer check side-effect imports, so a project needs `declare module "onejs:themes"` in a `.d.ts`. A scaffold from after OneJS 3.9.2 has it in `types/global.d.ts`; an older one declares only `onejs:tailwind`, so add the line.
 
 **Options:**
 - `dir`: Cartridges folder relative to the working directory (default: `"@cartridges"`)
