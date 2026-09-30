@@ -5,7 +5,7 @@
  * No external dependencies: generates USS directly from utility definitions.
  *
  * Usage:
- *   import { generateUSS, generateFromFiles } from "onejs-unity/tailwind"
+ *   import { generateUSS, generateFromFiles } from "./tailwind/index.mjs"   // internal: not a package subpath
  */
 
 export { allUtilities, staticUtilities } from "./utilities.mjs"

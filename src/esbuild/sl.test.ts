@@ -11,7 +11,7 @@ import { SL_HASH_VERSION } from "onejs-sl/core"
  * The loader, end to end through a real esbuild.
  *
  * Two things this has to hold, and neither is about parsing, which
- * `sl/lang/parity.test.ts` covers:
+ * `onejs-sl`'s `src/lang/parity.test.ts` covers:
  *
  * **The bundle carries numbers, not a parser and not the source.** That is the
  * whole reason the file format is worth having on a platform where a game is

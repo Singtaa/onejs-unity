@@ -4,9 +4,8 @@ import * as compiler from "./compiler"
 
 /**
  * What `onejs-unity/sl` and `onejs-unity/sl/compiler` export about the
- * shader language's machinery. The VM went in onejs-sl 0.3.0, and this
- * package works on 0.2.1 and 0.3.0 alike, so it re-exports nothing that only
- * the VM had and nothing 0.3.0 removed.
+ * shader language's machinery. The VM went in onejs-sl 0.3.0, so this package
+ * re-exports nothing that only the VM had and nothing 0.3.0 removed.
  */
 const VM_ONLY = [
     "SL_WIRE_VERSION", "REGISTERS", "MAX_INSTRUCTIONS", "TEXELS_PER_INSTRUCTION", "liveRanges", "reachable",

@@ -54,7 +54,7 @@ expects when nothing is plugged in.
 
 `setInputBackend(null)` returns to the CS bridge.
 
-This is what OneJS Play uses. Its container evaluates game bundles with the
+This is what OJPlay uses. Its container evaluates game bundles with the
 runtime's globals shadowed, so `CS` is undefined there, and game code still
 calls this same API. `resolveKeyName` and `keyNameFromDomCode` are exported for
 backends fed by browser events: DOM `KeyboardEvent.code` is layout-independent,

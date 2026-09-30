@@ -2,7 +2,7 @@
  * The filesystem the build plugins read through.
  *
  * The plugins normally read real files, which is right for a Unity project and
- * impossible in a Cloudflare Worker: OneJS Play accepts a game as source and
+ * impossible in a Cloudflare Worker: OJPlay accepts a game as source and
  * bundles it server-side, where there is no disk and the "files" are an
  * uploaded tree held in memory.
  *
