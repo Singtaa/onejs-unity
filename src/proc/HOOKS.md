@@ -13,7 +13,7 @@ React hooks for noise generation, mesh creation, and procedural textures.
 | `useMeshInstance` | Instantiate mesh in scene |
 | `useMaterial` | Create material |
 | `useMeshFactory` | Access mesh namespace |
-| `useProcCleanup` | Cleanup on unmount |
+| `useProcCleanup` | Dispose tracked resources on unmount |
 
 ## Noise Hooks
 
@@ -67,7 +67,7 @@ const cells = useNoise({
     type: "worley",
     frequency: 5,
     worley: {
-        distanceFunction: "euclidean",  // | "manhattan" | "chebyshev"
+        distance: "euclidean",  // | "manhattan" | "chebyshev"
         returnType: "f1"                 // | "f2" | "f2-f1"
     }
 })
@@ -79,6 +79,7 @@ Create a 3D noise source for animated effects.
 
 ```tsx
 import { useNoise3D } from "onejs-unity/proc"
+import { useAnimationFrame } from "onejs-unity/gpu"
 
 function AnimatedEffect() {
     const noise = useNoise3D({
@@ -87,8 +88,10 @@ function AnimatedEffect() {
         fbm: { octaves: 4 }
     })
 
+    const time = useRef(0)
     useAnimationFrame((dt) => {
-        const value = noise.sample(x, y, time)  // z = time for animation
+        time.current += dt
+        const value = noise.sample(x, y, time.current)  // z = time for animation
     })
 }
 ```
@@ -102,7 +105,7 @@ import { useNoiseTexture } from "onejs-unity/proc"
 import { useComputeTexture } from "onejs-unity/gpu"
 
 function NoiseBackground() {
-    const texture = useComputeTexture({ width: 512, height: 512 })
+    const texture = useComputeTexture({ autoResize: false, width: 512, height: 512 })
     const { available, ready, dispatch } = useNoiseTexture({
         type: "fbm",
         baseType: "simplex",
@@ -117,10 +120,10 @@ function NoiseBackground() {
     }, [ready, texture])
 
     if (!available) {
-        return <Text>GPU compute not available</Text>
+        return <Label text="GPU compute not available" />
     }
 
-    return <RawImage texture={texture} />
+    return <View style={{ width: 512, height: 512, backgroundImage: texture }} />
 }
 ```
 
@@ -128,20 +131,23 @@ function NoiseBackground() {
 
 ```tsx
 function AnimatedNoise() {
-    const texture = useComputeTexture({ width: 256, height: 256 })
-    const { ready, dispatch, time } = useNoiseTexture({
+    const texture = useComputeTexture({ autoResize: false, width: 256, height: 256 })
+    const { ready, dispatch } = useNoiseTexture({
         type: "perlin",
         animated: true,
         frequency: 2
     })
 
+    // With animated: true, dispatch reads the hook's own clock unless you
+    // pass { time }. The `time` field is a getter: destructured at render,
+    // it would be the time of that render, not of this frame.
     useAnimationFrame(() => {
         if (ready && texture) {
-            dispatch(texture, { time })
+            dispatch(texture)
         }
     })
 
-    return <RawImage texture={texture} />
+    return <View style={{ width: 256, height: 256, backgroundImage: texture }} />
 }
 ```
 
@@ -152,7 +158,7 @@ interface UseNoiseTextureResult {
     available: boolean  // GPU compute available
     ready: boolean      // Shader loaded
     dispatch: (texture: unknown, options?: GPUNoiseOptions) => void
-    time: number        // Current animation time
+    readonly time: number  // Current animation time (a getter)
 }
 ```
 
@@ -176,9 +182,9 @@ function MySphere() {
     })
 
     useEffect(() => {
-        if (mesh) {
-            mesh.instantiate("MySphere")
-        }
+        if (!mesh) return
+        const obj = mesh.instantiate("MySphere")
+        return () => obj.dispose()
     }, [mesh])
 }
 ```
@@ -225,10 +231,10 @@ function CustomMesh() {
     const mesh = useMesh({ type: "custom", data: meshData })
 
     useEffect(() => {
-        if (mesh) {
-            mesh.recalculateNormals()
-            mesh.instantiate("Triangle")
-        }
+        if (!mesh) return
+        const obj = mesh.instantiate("Triangle")
+        mesh.recalculateNormals()  // after instantiate, once the Unity mesh exists
+        return () => obj.dispose()
     }, [mesh])
 }
 ```
@@ -281,16 +287,19 @@ const blueMat = useMaterial({
     color: { r: 0, g: 0, b: 1, a: 1 }
 })
 
-// Custom shader with properties
+// Custom shader with properties (the default shader is "Standard")
 const metalMat = useMaterial({
     shader: "Standard",
     color: "#888888",
     floats: {
         _Metallic: 0.9,
-        _Smoothness: 0.8
+        _Glossiness: 0.8
     }
 })
 ```
+
+It returns the `UnityEngine.Material`, or null until it exists (and when the
+shader is not found). The material is destroyed on unmount.
 
 ### useMeshFactory
 
@@ -309,27 +318,30 @@ function MeshCreator() {
         instance.setPosition(0, 2, 0)
     }
 
-    return <Button onClick={handleCreate}>Create Sphere</Button>
+    return <Button text="Create Sphere" onClick={handleCreate} />
 }
 ```
 
 ### useProcCleanup
 
-Clean up all procedural resources when component unmounts.
+Dispose resources you create imperatively when the component unmounts.
+`useMesh`, `useMeshInstance` and `useMaterial` already clean up after
+themselves; this is for everything else. It returns `{ track, untrack }`.
 
 ```tsx
-import { useProcCleanup, useMesh, useMeshInstance } from "onejs-unity/proc"
+import { useProcCleanup, useMeshFactory } from "onejs-unity/proc"
 
 function ProceduralScene() {
-    // Register cleanup for all proc resources
-    useProcCleanup()
+    const { track } = useProcCleanup()
+    const mesh = useMeshFactory()
 
-    const sphere = useMesh({ type: "sphere" })
-    const cube = useMesh({ type: "cube" })
-    useMeshInstance(sphere, { name: "Sphere" })
-    useMeshInstance(cube, { name: "Cube" })
+    const spawn = () => {
+        const sphere = mesh.sphere()
+        track(sphere)
+        track(sphere.instantiate("Sphere"))
+    }
 
-    // All meshes, instances, materials cleaned up on unmount
+    return <Button text="Spawn" onClick={spawn} />
 }
 ```
 
@@ -339,7 +351,7 @@ function ProceduralScene() {
 
 ```tsx
 import { useNoise, useMesh, useMeshInstance, useMaterial } from "onejs-unity/proc"
-import { useAnimationFrame } from "onejs-unity/gpu"
+import { useEffect } from "react"
 
 function NoiseTerrain() {
     const noise = useNoise({
@@ -358,10 +370,15 @@ function NoiseTerrain() {
 
     const mat = useMaterial({ color: "#4a8c4a" })
 
-    useEffect(() => {
-        if (!terrainMesh) return
+    const terrain = useMeshInstance(terrainMesh, {
+        name: "Terrain",
+        material: mat
+    })
 
-        const data = terrainMesh.getData()
+    useEffect(() => {
+        if (!terrainMesh || !terrain) return
+
+        const data = terrainMesh.data
 
         // Apply noise displacement
         for (let i = 0; i < data.vertices.length; i += 3) {
@@ -370,14 +387,10 @@ function NoiseTerrain() {
             data.vertices[i + 1] = noise.sample(x * 0.1, z * 0.1) * 3
         }
 
+        // The instance exists, so the Unity mesh does too
         terrainMesh.setData(data)
         terrainMesh.recalculateNormals()
-    }, [terrainMesh, noise])
-
-    useMeshInstance(terrainMesh, {
-        name: "Terrain",
-        material: mat
-    })
+    }, [terrainMesh, terrain, noise])
 
     return null
 }
@@ -391,6 +404,7 @@ import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
 
 function AnimatedNoiseBackground() {
     const texture = useComputeTexture({
+        autoResize: false,
         width: 512,
         height: 512,
         enableRandomWrite: true
@@ -404,17 +418,13 @@ function AnimatedNoiseBackground() {
         octaves: 5
     })
 
-    useAnimationFrame((dt) => {
+    useAnimationFrame(() => {
         if (ready && texture) {
             dispatch(texture)
         }
     })
 
-    return (
-        <View style={{ width: "100%", height: "100%" }}>
-            <RawImage texture={texture} style={{ flex: 1 }} />
-        </View>
-    )
+    return <View style={{ width: "100%", height: "100%", backgroundImage: texture }} />
 }
 ```
 
@@ -455,8 +465,8 @@ function ObjectSpawner() {
 
     return (
         <View>
-            <Button onClick={spawn}>Spawn Random Object</Button>
-            <Text>Objects: {objects.length}</Text>
+            <Button text="Spawn Random Object" onClick={spawn} />
+            <Label text={`Objects: ${objects.length}`} />
         </View>
     )
 }
@@ -478,7 +488,7 @@ interface UseNoiseOptions {
     }
     turbulence?: boolean
     worley?: {
-        distanceFunction?: "euclidean" | "manhattan" | "chebyshev"
+        distance?: "euclidean" | "manhattan" | "chebyshev"
         returnType?: "f1" | "f2" | "f2-f1"
     }
 }
@@ -487,16 +497,13 @@ interface UseNoiseOptions {
 ### UseNoiseTextureOptions
 
 ```typescript
-interface UseNoiseTextureOptions {
+interface UseNoiseTextureOptions extends GPUNoiseOptions {
     type?: "perlin" | "simplex" | "value" | "worley" | "fbm" | "turbulence"
     baseType?: "perlin" | "simplex"
     animated?: boolean
-    frequency?: number
-    seed?: number
-    octaves?: number
-    lacunarity?: number
-    persistence?: number
 }
+
+// GPUNoiseOptions: frequency, seed, time, octaves, lacunarity, persistence
 ```
 
 ### UseMeshOptions
@@ -521,7 +528,9 @@ interface UseMeshInstanceOptions {
     position?: { x: number; y: number; z: number }
     rotation?: { x: number; y: number; z: number }
     scale?: { x: number; y: number; z: number }
-    material?: Material
+    color?: string | Color
+    material?: unknown   // a UnityEngine.Material, e.g. from useMaterial
+    shader?: string      // applied before material and color
 }
 ```
 

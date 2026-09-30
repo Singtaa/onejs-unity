@@ -7,10 +7,10 @@ Procedural mesh generation for OneJS with fluent APIs for creating and manipulat
 The geometry module provides:
 
 - **Primitive Meshes**: One-liner creation of cubes, spheres, cylinders, etc.
-- **MeshBuilder**: Fluent API for custom geometry construction
-- **Materials**: Simple material creation and assignment
+- **MeshBuilder**: Custom geometry, vertex by vertex
+- **Mesh Objects**: A GameObject per instance, with transform, colour and material setters
 - **Mesh Operations**: Clone, combine, modify vertex data
-- **Handle-Based**: C# objects managed via integer handles
+- **Plain Unity objects**: A `ProceduralMesh` holds its data in JS and builds a `UnityEngine.Mesh` on first use
 
 ## Quick Start
 
@@ -21,15 +21,14 @@ import { mesh } from "onejs-unity/proc"
 const sphere = mesh.sphere({ radius: 1 })
 sphere.instantiate("MySphere").setPosition(0, 2, 0)
 
-// Create with material
+// Create with a colour
 const cube = mesh.cube({ size: 1 })
-const mat = mesh.material().setColor("#ff5500")
-cube.instantiate("MyCube").setMaterial(mat)
+cube.instantiate("MyCube").setColor("#ff5500")
 ```
 
 ## Primitives
 
-All primitives return a `Mesh` handle that can be instantiated in the scene.
+All primitives return a `ProceduralMesh` that can be instantiated in the scene.
 
 ### Cube
 
@@ -118,18 +117,21 @@ const quad = mesh.quad({
 
 ## Custom Geometry with MeshBuilder
 
-The `MeshBuilder` provides a fluent API for constructing custom meshes:
+`vertex()` adds a vertex and returns its index, so it cannot be chained into:
+call `normal`, `uv` or `color` after it to set that vertex's attributes. The
+other methods return the builder.
 
 ```typescript
-const pyramid = mesh.builder()
-    // Apex
-    .vertex(0, 1, 0).uv(0.5, 1)
-    // Base corners
-    .vertex(-1, 0, -1).uv(0, 0)
-    .vertex(1, 0, -1).uv(1, 0)
-    .vertex(1, 0, 1).uv(1, 1)
-    .vertex(-1, 0, 1).uv(0, 1)
-    // Faces (counter-clockwise winding)
+const b = mesh.builder()
+// Apex
+b.vertex(0, 1, 0); b.uv(0.5, 1)
+// Base corners
+b.vertex(-1, 0, -1); b.uv(0, 0)
+b.vertex(1, 0, -1); b.uv(1, 0)
+b.vertex(1, 0, 1); b.uv(1, 1)
+b.vertex(-1, 0, 1); b.uv(0, 1)
+// Faces (counter-clockwise winding)
+const pyramid = b
     .triangle(0, 2, 1)  // Front
     .triangle(0, 3, 2)  // Right
     .triangle(0, 4, 3)  // Back
@@ -137,18 +139,21 @@ const pyramid = mesh.builder()
     .quad(1, 2, 3, 4)   // Base
     .build()
 
-pyramid.recalculateNormals()
 pyramid.instantiate("Pyramid")
+pyramid.recalculateNormals()  // after instantiate: see below
 ```
+
+A vertex's normal defaults to up (0, 1, 0), so a builder mesh needs either
+`normal()` per vertex or `recalculateNormals()`.
 
 ### Builder Methods
 
 | Method | Description |
 |--------|-------------|
-| `.vertex(x, y, z)` | Add vertex, returns index |
+| `.vertex(x, y, z)` | Add vertex, returns its index (not the builder) |
 | `.normal(x, y, z)` | Set normal for last vertex |
 | `.uv(u, v)` | Set UV for last vertex |
-| `.color(r, g, b, a?)` | Set color for last vertex |
+| `.color(r, g, b, a?)` | Set color for last vertex (kept in `data.colors`; not applied to the Unity mesh) |
 | `.triangle(a, b, c)` | Add triangle by indices |
 | `.quad(a, b, c, d)` | Add quad (two triangles) |
 | `.build()` | Create the Mesh |
@@ -159,12 +164,11 @@ Triangles use **counter-clockwise** winding for front-facing surfaces.
 
 ```typescript
 // This triangle faces towards +Z
-const tri = mesh.builder()
-    .vertex(0, 1, 0)   // 0: top
-    .vertex(-1, 0, 0)  // 1: bottom-left
-    .vertex(1, 0, 0)   // 2: bottom-right
-    .triangle(0, 1, 2) // CCW from front
-    .build()
+const b = mesh.builder()
+b.vertex(0, 1, 0)   // 0: top
+b.vertex(-1, 0, 0)  // 1: bottom-left
+b.vertex(1, 0, 0)   // 2: bottom-right
+const tri = b.triangle(0, 1, 2).build()  // CCW from front
 ```
 
 ## Mesh Operations
@@ -173,7 +177,7 @@ const tri = mesh.builder()
 
 ```typescript
 const plane = mesh.plane({ segmentsX: 16, segmentsZ: 16 })
-const data = plane.getData()
+const data = plane.data  // the mesh's own arrays, not a copy
 
 // data.vertices: Float32Array (xyz triplets)
 // data.normals: Float32Array (xyz triplets)
@@ -186,7 +190,7 @@ const data = plane.getData()
 ```typescript
 // Displace vertices for terrain
 const terrain = mesh.plane({ width: 10, height: 10, segmentsX: 64, segmentsZ: 64 })
-const data = terrain.getData()
+const data = terrain.data
 
 // Apply heightmap
 for (let i = 0; i < data.vertices.length; i += 3) {
@@ -197,8 +201,13 @@ for (let i = 0; i < data.vertices.length; i += 3) {
 
 // Push changes back
 terrain.setData(data)
+terrain.instantiate("Terrain")
 terrain.recalculateNormals()
 ```
+
+`setData()` rebuilds the Unity mesh when one exists. `recalculateNormals()`
+works on the Unity mesh, which is created by `instantiate()` (or
+`getUnityMesh()`); called before that it does nothing.
 
 ### Combining Meshes
 
@@ -223,44 +232,54 @@ const data = {
 }
 
 const triangle = mesh.fromData(data)
+triangle.instantiate("Triangle")
 triangle.recalculateNormals()
 ```
 
 ## Materials
 
-### Basic Material
+Materials are set on an instance. `instantiate()` gives each object a new
+material on the `Standard` shader.
+
+### Colour
 
 ```typescript
-// Default Standard shader
-const mat = mesh.material()
-mat.setColor("#ff5500")  // Hex color
-
-// Or with Color object
-mat.setColor({ r: 1, g: 0.3, b: 0, a: 1 })
+const obj = mesh.sphere().instantiate("Ball")
+obj.setColor("#ff5500")                     // Hex (#rrggbb or #rrggbbaa)
+obj.setColor({ r: 1, g: 0.3, b: 0, a: 1 })  // Or a Color object
 ```
 
-### Shader Properties
+### Texture and PBR settings
+
+`material(options)` replaces the object's material:
 
 ```typescript
-const mat = mesh.material("Standard")
-    .setColor("#ffffff")
-    .setFloat("_Metallic", 0.8)
-    .setFloat("_Smoothness", 0.9)
+import { mesh, texture } from "onejs-unity/proc"
+
+mesh.plane({ width: 100, height: 100 })
+    .instantiate("Ground")
+    .material({
+        texture: texture.checker({ colors: ["#e5e5e5", "#333"] }),
+        tiling: 10,
+        smoothness: 0.3,
+    })
 ```
 
-### Custom Shader
+| Option | Meaning |
+|---|---|
+| `shader` | `"Lit"` (URP Lit, the default), `"Standard"`, `"Unlit"` (`Unlit/Texture`), or any shader name; falls back to `Standard` when not found |
+| `texture` | A `ProceduralTexture` from `onejs-unity/proc`'s `texture` |
+| `tiling` | A number, or `[x, y]` |
+| `offset` | `[x, y]` |
+| `color` | Hex string |
+| `metallic` | Sets `_Metallic` |
+| `smoothness` | Sets `_Glossiness` |
+
+### Custom shader or an existing Material
 
 ```typescript
-const mat = mesh.material("Unlit/Color")
-    .setColor("#00ff00")
-```
-
-### Registering External Materials
-
-```typescript
-// Register a Unity Material object from C#
-const mat = mesh.registerMaterial(unityMaterialReference)
-instance.setMaterial(mat)
+obj.useShader("Unlit/Color")      // new material on that shader
+obj.setMaterial(unityMaterial)     // any UnityEngine.Material you hold
 ```
 
 ## Mesh Instance
@@ -277,15 +296,12 @@ instance
     .setRotation(45, 0, 0)
     .setScale(1, 1, 1)
 
-// Access transform properties
-console.log(instance.position)  // { x: 0, y: 2, z: 0 }
+// Colour
+instance.setColor("#ff0000")
 
-// Apply material
-const mat = mesh.material().setColor("#ff0000")
-instance.setMaterial(mat)
-
-// Get underlying Unity GameObject
-const go = instance.getGameObject()
+// The underlying Unity objects
+const go = instance.gameObject
+const t = instance.transform
 ```
 
 ## Resource Management
@@ -293,72 +309,52 @@ const go = instance.getGameObject()
 ### Disposing Individual Resources
 
 ```typescript
-// Dispose mesh (removes from memory)
+// Dispose mesh (destroys the Unity Mesh)
 sphere.dispose()
 
-// Dispose instance (removes GameObject from scene)
+// Dispose instance (destroys the GameObject)
 instance.dispose()
-
-// Dispose material
-mat.dispose()
 ```
 
-### Global Cleanup
-
-```typescript
-// Clean up all proc module resources
-mesh.cleanup()
-```
+There is no global cleanup. In React, `useMesh` and `useMeshInstance` dispose
+what they create on unmount, and `useProcCleanup().track(resource)` disposes
+anything else you hand it.
 
 ## API Reference
 
-### Mesh Interface
+### ProceduralMesh
 
 ```typescript
-interface Mesh {
-    readonly __handle: number
+class ProceduralMesh {
+    readonly data: MeshData
     readonly vertexCount: number
     readonly triangleCount: number
 
-    getData(): MeshData
-    setData(data: MeshData): void
-    clone(): Mesh
-    recalculateNormals(): void
-    recalculateBounds(): void
-    optimize(): void
-    instantiate(name?: string): MeshInstance
+    getUnityMesh(): UnityEngine.Mesh          // created on first call
+    setData(data: MeshData): this
+    recalculateNormals(): this                // no-op until the Unity mesh exists
+    clone(): ProceduralMesh
+    instantiate(name?: string): MeshObject    // default name "ProceduralMesh"
     dispose(): void
 }
 ```
 
-### MeshInstance Interface
+### MeshObject
 
 ```typescript
-interface MeshInstance {
-    readonly __handle: number
-    readonly mesh: Mesh
-    position: Vector3
-    rotation: Vector3
-    scale: Vector3
+class MeshObject {
+    readonly mesh: ProceduralMesh
+    readonly gameObject: UnityEngine.GameObject
+    readonly transform: UnityEngine.Transform
 
-    setPosition(x: number, y: number, z: number): MeshInstance
-    setRotation(x: number, y: number, z: number): MeshInstance
-    setScale(x: number, y: number, z: number): MeshInstance
-    setMaterial(material: Material): MeshInstance
-    getGameObject(): unknown
-    dispose(): void
-}
-```
-
-### Material Interface
-
-```typescript
-interface Material {
-    readonly __handle: number
-
-    setColor(color: Color | string): Material
-    setFloat(name: string, value: number): Material
-    setTexture(name: string, texture: unknown): Material
+    setPosition(x: number, y: number, z: number): this
+    setRotation(x: number, y: number, z: number): this  // euler degrees
+    setScale(x: number, y: number, z: number): this
+    setUniformScale(s: number): this
+    setColor(color: string | Color): this
+    setMaterial(material: UnityEngine.Material): this
+    useShader(shaderName: string): this
+    material(options: MaterialOptions): this
     dispose(): void
 }
 ```
@@ -370,6 +366,7 @@ interface MeshData {
     vertices: Float32Array    // xyz triplets
     normals?: Float32Array    // xyz triplets
     uvs?: Float32Array        // uv pairs
+    uv2s?: Float32Array       // secondary uv pairs
     colors?: Float32Array     // rgba quads
     indices: Uint32Array      // triangle indices
 }
@@ -436,7 +433,7 @@ const terrain = mesh.plane({
 })
 
 // Get vertex data
-const data = terrain.getData()
+const data = terrain.data
 
 // Create noise source
 const heightNoise = noise.perlin2D({ seed: 12345 }).fbm({
@@ -452,13 +449,10 @@ for (let i = 0; i < data.vertices.length; i += 3) {
     data.vertices[i + 1] = height * 10  // Scale height
 }
 
-// Update mesh
+// Update mesh, instantiate, then recalculate normals on the Unity mesh
 terrain.setData(data)
+terrain.instantiate("Terrain").setColor("#4a8c4a")
 terrain.recalculateNormals()
-
-// Instantiate with material
-const mat = mesh.material().setColor("#4a8c4a")
-terrain.instantiate("Terrain").setMaterial(mat)
 ```
 
 ### Animated Mesh
@@ -467,7 +461,8 @@ terrain.instantiate("Terrain").setMaterial(mat)
 import { mesh } from "onejs-unity/proc"
 
 const sphere = mesh.sphere({ radius: 1, longitudeSegments: 32, latitudeSegments: 16 })
-const originalData = sphere.getData()
+sphere.instantiate("Blob")
+const originalData = sphere.data
 const data = { ...originalData, vertices: new Float32Array(originalData.vertices) }
 
 function animate(time: number) {
@@ -497,11 +492,9 @@ import { mesh } from "onejs-unity/proc"
 
 // Trunk
 const trunk = mesh.cylinder({ radius: 0.2, height: 1.5, segments: 8 })
-const trunkMat = mesh.material().setColor("#8B4513")
-trunk.instantiate("Trunk").setMaterial(trunkMat)
+trunk.instantiate("Trunk").setColor("#8B4513")
 
 // Foliage (stacked cones)
-const foliageMat = mesh.material().setColor("#228B22")
 
 for (let i = 0; i < 3; i++) {
     const cone = mesh.cone({
@@ -511,20 +504,15 @@ for (let i = 0; i < 3; i++) {
     })
     cone.instantiate(`Foliage${i}`)
         .setPosition(0, 1 + i * 0.6, 0)
-        .setMaterial(foliageMat)
+        .setColor("#228B22")
 }
 ```
 
-## C# Bridge
+## Unity side
 
-The geometry module uses `MeshBridge.cs` located at:
-```
-Assets/Singtaa/OneJS/Unity/Proc/MeshBridge.cs
-```
-
-The bridge manages:
-- **Mesh handles**: `_meshes` dictionary
-- **Instance handles**: `_instances` dictionary (GameObjects)
-- **Material handles**: `_materials` dictionary
-
-All operations go through static methods on `MeshBridge` that manage the handle tables.
+There is no C# bridge. `ProceduralMesh` sets `vertices`, `normals`, `uv` and
+`triangles` on a `new UnityEngine.Mesh()` through the `CS` proxy, and
+`MeshObject` works on the GameObject, Transform and MeshRenderer directly. Of
+`MeshData`, `uv2s` and `colors` are carried in JS but not written to the Unity
+mesh. OneJS's `CS.OneJS.Proc.MeshGenerator` is a separate, C#-side way to build
+the same primitives (`Runtime/Proc/README.md` in the OneJS package).

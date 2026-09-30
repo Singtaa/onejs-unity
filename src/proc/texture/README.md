@@ -28,18 +28,37 @@ const marbleData = texture.marble({
     turbulence: 3
 })
 
-// GPU texture generation
-import { useComputeTexture } from "onejs-unity/gpu"
+// A texture for a material
+const floor = texture.checker({ colors: ["#e5e5e5", "#333333"] })
 
+// GPU texture generation (rt from useComputeTexture, see below)
 if (texture.gpu.available) {
-    const rt = useComputeTexture({ width: 512, height: 512 })
     await texture.gpu.voronoi(rt, { cellCount: 16 })
 }
 ```
 
+## Textures for materials
+
+`checker`, `gradient`, `solid` and `fromData` return a `ProceduralTexture`: a
+`Texture2D` built on first use, which `MeshObject.material({ texture })` in the
+geometry module takes directly.
+
+```typescript
+texture.checker({ colors: ["#e5e5e5", "#333"], size: 2 })          // size default 2
+texture.gradient({ colors: ["#000", "#fff"], direction: "radial" }) // size default 256
+texture.solid({ color: "#ff5500" })                                  // size default 1
+texture.fromData({ data: rgbaPixels, width: 256, height: 256 })
+
+// Filter ("point" by default, "bilinear", "trilinear") and wrap ("repeat" or "clamp")
+texture.checker({ colors: ["#fff", "#000"] }).filter("point").wrap("repeat")
+```
+
+Colours are hex strings or `[r, g, b, a]` tuples. `getUnityTexture()` returns
+the `Texture2D`; `dispose()` destroys it.
+
 ## CPU Generators
 
-All CPU generators return `Uint8ClampedArray` with RGBA pixel data.
+These return a `Uint8ClampedArray` of RGBA pixel data. `texture.fromData({ data, width, height })` turns one into a `ProceduralTexture`.
 
 ### Noise Texture
 
@@ -70,7 +89,7 @@ const voronoi = texture.voronoi({
     seed: 42,
     frequency: 8,
     returnType: "f1",         // "f1" | "f2" | "f2-f1"
-    distanceFunction: "euclidean"  // | "manhattan" | "chebyshev"
+    distance: "euclidean"     // | "manhattan" | "chebyshev"
 })
 ```
 
@@ -117,8 +136,10 @@ const checker = texture.checkerboard({
 
 ### Gradient Texture
 
+`texture.gradient` is the `ProceduralTexture` form above; the pixel form is `rawGradient`:
+
 ```typescript
-const gradient = texture.gradient({
+const gradient = texture.rawGradient({
     width: 256,
     height: 256,
     direction: "horizontal",  // | "vertical" | "diagonal" | "radial"
@@ -162,7 +183,8 @@ import { texture } from "onejs-unity/proc"
 import { useComputeTexture } from "onejs-unity/gpu"
 
 function TexturedBackground() {
-    const rt = useComputeTexture({ width: 1024, height: 1024 })
+    // autoResize: false, or the texture is screen sized and width/height are ignored
+    const rt = useComputeTexture({ autoResize: false, width: 1024, height: 1024 })
 
     useEffect(() => {
         if (!texture.gpu.available || !rt) return
@@ -176,7 +198,7 @@ function TexturedBackground() {
         })
     }, [rt])
 
-    return <RawImage texture={rt} />
+    return <View style={{ width: "100%", height: "100%", backgroundImage: rt }} />
 }
 ```
 
@@ -217,8 +239,9 @@ import { texture } from "onejs-unity/proc"
 import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
 
 function AnimatedMarble() {
-    const rt = useComputeTexture({ width: 512, height: 512 })
+    const rt = useComputeTexture({ autoResize: false, width: 512, height: 512 })
     const [ready, setReady] = useState(false)
+    const time = useRef(0)
 
     useEffect(() => {
         if (texture.gpu.available) {
@@ -226,17 +249,18 @@ function AnimatedMarble() {
         }
     }, [])
 
-    useAnimationFrame((dt, time) => {
+    useAnimationFrame((dt) => {
+        time.current += dt
         if (ready && rt) {
             texture.gpu.dispatchSync(rt, "marble", {
                 frequency: 5,
-                time: time,
-                turbulence: 3 + Math.sin(time) * 2
+                time: time.current,
+                turbulence: 3 + Math.sin(time.current) * 2
             })
         }
     })
 
-    return <RawImage texture={rt} />
+    return <View style={{ width: 512, height: 512, backgroundImage: rt }} />
 }
 ```
 
@@ -276,7 +300,7 @@ interface VoronoiTextureOptions {
     seed?: number
     frequency?: number
     returnType?: "f1" | "f2" | "f2-f1"
-    distanceFunction?: "euclidean" | "manhattan" | "chebyshev"
+    distance?: "euclidean" | "manhattan" | "chebyshev"
     colorMap?: ColorMap
 }
 
@@ -362,7 +386,7 @@ import { texture } from "onejs-unity/proc"
 import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
 
 function AnimatedBackground() {
-    const rt = useComputeTexture({ width: 512, height: 512 })
+    const rt = useComputeTexture({ autoResize: false, width: 512, height: 512 })
     const timeRef = useRef(0)
 
     useEffect(() => {
@@ -381,10 +405,6 @@ function AnimatedBackground() {
         })
     })
 
-    return (
-        <View style={{ width: "100%", height: "100%" }}>
-            <RawImage texture={rt} style={{ flex: 1 }} />
-        </View>
-    )
+    return <View style={{ width: "100%", height: "100%", backgroundImage: rt }} />
 }
 ```

@@ -33,7 +33,7 @@ if (gp?.wasButtonPressed("South")) {
 
 ## Backends
 
-By default every device reads UnityEngine's InputBridge through `CS`. A host
+By default every device reads OneJS's `InputBridge` (`CS.OneJS.Input.InputBridge`). A host
 where `CS` is not reachable can supply the same methods itself instead of
 forking a second input API:
 
@@ -76,9 +76,15 @@ input.keyboard.meta: boolean    // Meta/Command/Windows held
 
 input.keyboard.anyKeyDown: boolean    // Any key held
 input.keyboard.anyKeyPressed: boolean // Any key pressed this frame
+
+// Movement helpers, each -1 to 1 per axis
+input.keyboard.wasd(): Vector2
+input.keyboard.arrows(): Vector2
+input.keyboard.axis2D({ up, down, left, right }): Vector2  // each a key or an array of keys
+input.keyboard.axis({ negative, positive }): number
 ```
 
-**Key Names:** `Space`, `Enter`, `Escape`, `Tab`, `A`-`Z`, `0`-`9`, `F1`-`F12`, `LeftArrow`, `Up`, etc.
+**Key Names:** `Space`, `Enter`, `Escape`, `Tab`, `A`-`Z`, `0`-`9`, `F1`-`F12`, `LeftArrow`, `UpArrow`, etc.
 
 ### Mouse
 
@@ -155,7 +161,7 @@ gp.rumblePulse(intensity: number, duration: number): void
 gp.stopRumble(): void
 ```
 
-**Button Names:** `South`, `East`, `West`, `North`, `A`, `B`, `X`, `Y`, `Cross`, `Circle`, `Square`, `Triangle`, `LeftShoulder`, `LB`, `L1`, `RightShoulder`, `RB`, `R1`, `Start`, `Select`, `Up`, `Down`, `Left`, `Right`
+**Button Names:** `South`, `East`, `West`, `North`, `A`, `B`, `X`, `Y`, `Cross`, `Circle`, `Square`, `Triangle`, `LeftShoulder`, `LB`, `RightShoulder`, `RB`, `LeftTrigger`, `LT`, `RightTrigger`, `RT`, `LeftStick`, `L3`, `RightStick`, `R3`, `Start`, `Menu`, `Select`, `Back`, `DpadUp`, `DpadDown`, `DpadLeft`, `DpadRight`. Any other name (`L1`, `R1`, `Up`) logs a warning and reads as `South`.
 
 ### Touch
 
@@ -235,7 +241,7 @@ The input module provides React hooks for cleaner integration:
 ```typescript
 import {
     useKeyboard, useMouse, useGamepad, useTouch, useInput,
-    useKeyPress, useKeyDown, useMouseClick, useGamepadButton,
+    useKeyPress, useKeyHeld, useMouseClick, useGamepadButton,
     useAction, useActionValue, useActionCallback
 } from "onejs-unity/input"
 ```
@@ -268,7 +274,9 @@ It is the wrong tool for game logic. Read `input` directly inside your frame
 loop instead, where the same values cost no render at all:
 
 ```typescript
-useFrame(() => {
+import { useAnimationFrame } from "onejs-unity/gpu"
+
+useAnimationFrame(() => {
     if (input.keyboard.isKeyDown("Space")) jump()
 })
 ```
@@ -285,8 +293,8 @@ function Game() {
         player.jump()
     })
 
-    // Fire callback while key is held
-    useKeyDown("W", () => {
+    // Fire callback every frame while key is held
+    useKeyHeld("W", () => {
         player.moveForward()
     })
 
@@ -351,10 +359,11 @@ function Game() {
 | `useTouch()` | Touch state (touches array, count) |
 | `useInput()` | Combined state for all devices |
 | `useKeyPress(key, cb)` | Callback on key press |
-| `useKeyDown(key, cb)` | Callback while key held |
+| `useKeyHeld(key, cb)` | Callback every frame while key held |
+| `useKeyDown(key, cb)` | Deprecated name for `useKeyHeld`; warns once |
 | `useKeyRelease(key, cb)` | Callback on key release |
-| `useMouseClick(btn, cb)` | Callback on mouse button click |
-| `useGamepadButton(btn, cb)` | Callback on gamepad button press |
+| `useMouseClick(btn, cb)` | Callback on mouse button click (`"left"`, `"right"`, `"middle"`) |
+| `useGamepadButton(btn, cb, index?)` | Callback on gamepad button press |
 | `useAction(path, actions)` | InputAction state |
 | `useActionValue<T>(path, actions)` | InputAction value |
 | `useActionCallback(path, event, cb, actions)` | InputAction event callback |
@@ -428,7 +437,7 @@ const reader = createReader()
     .gamepadFloat("leftTrigger", "leftTrigger")
     .build()
 
-// In game loop - call tick() once per frame
+// In the game loop, call tick() once per frame
 function update() {
     reader.tick()  // Updates all bindings
 
@@ -531,7 +540,7 @@ function Game() {
 │    input.keyboard / mouse / gamepad     │
 ├─────────────────────────────────────────┤
 │  Lazy Bridge Access                     │
-│    getInputBridge() → CS proxy          │
+│    getInputBridge() → backend or CS     │
 ├─────────────────────────────────────────┤
 │  C# InputBridge (static methods)        │
 │    OneJS.Input.InputBridge              │
@@ -543,7 +552,7 @@ function Game() {
 
 ## Design Decisions
 
-1. **Lazy Bridge Access**: Uses `getInputBridge()` function instead of direct `CS.OneJS.Input.InputBridge` to avoid issues during module load when CS proxy may not be ready.
+1. **Lazy Bridge Access**: Every device calls `getInputBridge()` (`backend.ts`) instead of `CS.OneJS.Input.InputBridge` directly, which avoids touching the CS proxy at module load and lets `setInputBackend` swap the source.
 
 2. **Cached Vector Objects**: Reuses Vector2 objects (`{ x, y }`) to reduce allocations in hot paths.
 

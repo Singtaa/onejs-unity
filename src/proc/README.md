@@ -9,8 +9,8 @@ The proc module provides procedural generation capabilities with both pure JavaS
 | Module | Description | CPU | GPU |
 |--------|-------------|-----|-----|
 | **noise** | Perlin, Simplex, Value, Worley noise with FBM | Yes | Yes |
-| **geometry** | Primitives, mesh builder, materials | Yes | - |
-| **texture** | Voronoi, marble, wood, gradients | Yes | Yes |
+| **geometry** | Primitives, mesh builder, mesh objects with materials | Yes | No |
+| **texture** | Voronoi, marble, wood, gradients, textures for materials | Yes | Yes |
 
 ## Installation
 
@@ -56,17 +56,15 @@ import { mesh } from "onejs-unity/proc"
 const sphere = mesh.sphere({ radius: 1 })
 sphere.instantiate("MySphere").setPosition(0, 2, 0)
 
-// Custom geometry
-const pyramid = mesh.builder()
-    .vertex(0, 1, 0).uv(0.5, 1)
-    .vertex(-1, 0, -1).uv(0, 0)
-    .vertex(1, 0, -1).uv(1, 0)
-    .triangle(0, 1, 2)
-    .build()
+// Custom geometry. vertex() returns the new vertex's index, so it ends a chain
+const b = mesh.builder()
+b.vertex(0, 1, 0); b.uv(0.5, 1)
+b.vertex(-1, 0, -1); b.uv(0, 0)
+b.vertex(1, 0, -1); b.uv(1, 0)
+const tri = b.triangle(0, 1, 2).build()
 
-// Materials
-const mat = mesh.material().setColor("#ff5500")
-sphere.instantiate("RedSphere").setMaterial(mat)
+// Colour and material are set on the instance
+sphere.instantiate("RedSphere").setColor("#ff5500")
 ```
 
 ### Procedural Textures
@@ -74,7 +72,7 @@ sphere.instantiate("RedSphere").setMaterial(mat)
 ```typescript
 import { texture } from "onejs-unity/proc"
 
-// CPU texture
+// CPU texture: RGBA pixel data
 const marble = texture.marble({
     width: 512,
     height: 512,
@@ -165,21 +163,25 @@ proc/
 | `mesh.plane()` | Create plane |
 | `mesh.torus()` | Create torus |
 | `mesh.quad()` | Create quad |
+| `mesh.fromData()` | Mesh from raw `MeshData` |
 | `mesh.builder()` | Custom geometry builder |
 | `mesh.combine()` | Combine multiple meshes |
-| `mesh.material()` | Create material |
-| `mesh.cleanup()` | Dispose all resources |
+| `mesh.generators.*` | The same primitives as plain `MeshData`, no Unity needed |
 
 ### Texture
 
 | Function | Description |
 |----------|-------------|
-| `texture.noise()` | Noise-based texture (CPU) |
+| `texture.checker()` | Checkerboard as a `ProceduralTexture` |
+| `texture.gradient()` | Two colour gradient as a `ProceduralTexture` |
+| `texture.solid()` | Solid colour as a `ProceduralTexture` |
+| `texture.fromData()` | `ProceduralTexture` from RGBA pixel data |
+| `texture.noise()` | Noise-based pixels (CPU) |
 | `texture.voronoi()` | Voronoi cells (CPU) |
 | `texture.marble()` | Marble veins (CPU) |
 | `texture.wood()` | Wood grain (CPU) |
 | `texture.checkerboard()` | Alternating cells (CPU) |
-| `texture.gradient()` | Linear/radial gradients (CPU) |
+| `texture.rawGradient()` | Linear/radial gradient pixels (CPU) |
 | `texture.colorMaps` | Built-in color mappings |
 | `texture.gpu.*` | GPU pattern generation |
 
@@ -194,7 +196,7 @@ proc/
 | `useMeshInstance()` | Instantiate mesh in scene |
 | `useMaterial()` | Create material |
 | `useMeshFactory()` | Access mesh namespace |
-| `useProcCleanup()` | Cleanup on unmount |
+| `useProcCleanup()` | Dispose tracked resources on unmount |
 
 ## Submodule Documentation
 
@@ -205,12 +207,9 @@ proc/
 
 ## Unity Integration
 
-### C# Bridge
+### Meshes
 
-The geometry module uses `MeshBridge.cs` located at:
-```
-Assets/Singtaa/OneJS/Unity/Proc/MeshBridge.cs
-```
+The geometry module has no C# bridge of its own: `ProceduralMesh` builds a `UnityEngine.Mesh` through the `CS` proxy when first instantiated, and `instantiate()` adds a `MeshFilter` and a `MeshRenderer` to a new GameObject.
 
 ### Compute Shaders
 
@@ -243,7 +242,7 @@ For animation loops, preload shaders and use sync dispatch:
 await noise.gpu.preload()
 await texture.gpu.preload()
 
-// In animation loop - no allocations
+// In the animation loop: no allocations
 noise.gpu.dispatchSync(noiseTexture, "perlin", { time: t })
 texture.gpu.dispatchSync(patternTexture, "marble", { time: t })
 ```
@@ -254,15 +253,13 @@ Always clean up procedural meshes when done:
 
 ```typescript
 // Manual cleanup
-mesh.dispose()
-instance.dispose()
-material.dispose()
+sphere.dispose()    // the Unity Mesh
+instance.dispose()  // the GameObject
 
-// Or global cleanup
-mesh.cleanup()
-
-// Or use hook (automatic on unmount)
-useProcCleanup()
+// In React, useMesh and useMeshInstance dispose their own on unmount.
+// useProcCleanup disposes anything else you hand it:
+const { track } = useProcCleanup()
+track(sphere)
 ```
 
 ## Examples
@@ -274,7 +271,7 @@ import { noise, mesh } from "onejs-unity/proc"
 
 // Create plane
 const terrain = mesh.plane({ width: 20, height: 20, segmentsX: 64, segmentsZ: 64 })
-const data = terrain.getData()
+const data = terrain.data
 
 // Create noise source
 const heightNoise = noise.perlin2D({ seed: 12345 }).fbm({ octaves: 6 })
@@ -286,10 +283,11 @@ for (let i = 0; i < data.vertices.length; i += 3) {
     data.vertices[i + 1] = heightNoise.sample(x * 0.1, z * 0.1) * 5
 }
 
-// Apply changes
+// Apply changes. recalculateNormals() acts on the Unity mesh, which exists
+// once the mesh is instantiated
 terrain.setData(data)
-terrain.recalculateNormals()
 terrain.instantiate("Terrain")
+terrain.recalculateNormals()
 ```
 
 ### Animated GPU Background
@@ -299,7 +297,7 @@ import { noise } from "onejs-unity/proc"
 import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
 
 function AnimatedBackground() {
-    const texture = useComputeTexture({ width: 512, height: 512 })
+    const texture = useComputeTexture({ autoResize: false, width: 512, height: 512 })
     const [ready, setReady] = useState(false)
     const timeRef = useRef(0)
 
@@ -329,26 +327,25 @@ function AnimatedBackground() {
 ### Procedural Object Grid
 
 ```typescript
-import { useMesh, useMaterial, useProcCleanup } from "onejs-unity/proc"
+import { useMesh } from "onejs-unity/proc"
 import { useEffect } from "react"
 
 function ObjectGrid({ count = 5 }) {
-    useProcCleanup()
-
     const cubeMesh = useMesh({ type: "cube", size: 0.8 })
-    const mat = useMaterial({ color: "#4488ff" })
 
     useEffect(() => {
-        if (!cubeMesh || !mat) return
+        if (!cubeMesh) return
 
+        const cubes = []
         for (let x = 0; x < count; x++) {
             for (let z = 0; z < count; z++) {
-                cubeMesh.instantiate(`Cube_${x}_${z}`)
+                cubes.push(cubeMesh.instantiate(`Cube_${x}_${z}`)
                     .setPosition(x * 2 - count, 0, z * 2 - count)
-                    .setMaterial(mat)
+                    .setColor("#4488ff"))
             }
         }
-    }, [cubeMesh, mat, count])
+        return () => cubes.forEach(c => c.dispose())
+    }, [cubeMesh, count])
 
     return null
 }

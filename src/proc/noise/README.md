@@ -90,7 +90,7 @@ const stone = noise.worley2D({
 
 // Distance function options
 const manhattan = noise.worley2D({
-    distanceFunction: "manhattan"  // "euclidean" | "manhattan" | "chebyshev"
+    distance: "manhattan"  // "euclidean" | "manhattan" | "chebyshev"
 })
 ```
 
@@ -163,10 +163,12 @@ For high-performance texture generation, use the GPU path:
 import { noise } from "onejs-unity/proc"
 import { useComputeTexture } from "onejs-unity/gpu"
 
-// Check if GPU compute is available
-if (noise.gpu.available) {
-    const texture = useComputeTexture({ width: 512, height: 512 })
+// A 512x512 target (inside a component). autoResize defaults to true, which
+// sizes the texture to the screen and ignores width and height
+const texture = useComputeTexture({ autoResize: false, width: 512, height: 512 })
 
+// Check if GPU compute is available
+if (noise.gpu.available && texture) {
     // Async generation (loads shader on first call)
     await noise.gpu.perlin(texture, { frequency: 4 })
     await noise.gpu.simplex(texture, { frequency: 2 })
@@ -194,6 +196,7 @@ interface GPUNoiseOptions {
     frequency?: number     // Scale factor (default: 1)
     seed?: number         // Random seed (default: 0)
     time?: number         // Animation time (default: 0)
+    z?: number            // Declared, but no kernel reads it
     octaves?: number      // FBM octaves (default: 4)
     lacunarity?: number   // Frequency multiplier (default: 2)
     persistence?: number  // Amplitude multiplier (default: 0.5)
@@ -228,9 +231,9 @@ All kernels use `[numthreads(8, 8, 1)]`: the dispatcher automatically calculates
 
 ### Output Modes
 
-The shader supports three output modes:
+The shader supports three output modes; the JS dispatch always uses 1:
 - **0**: Raw grayscale (values as-is)
-- **1**: Normalized [0, 1] grayscale (default)
+- **1**: Normalized [0, 1] grayscale
 - **2**: Color ramp (lerp between low/high colors)
 
 ## Performance Considerations
@@ -243,7 +246,7 @@ The shader supports three output modes:
 | Per-frame updates | GPU with `dispatchSync()` |
 | Small samples (< 64x64) | CPU (no shader dispatch overhead) |
 | Large textures (512+) | GPU |
-| WebGL platform | CPU (more consistent) |
+| WebGL platform | CPU: compute shaders are unavailable there, so guard on `noise.gpu.available` |
 
 ### Zero-Allocation Pattern
 
@@ -253,7 +256,7 @@ For animation loops, preload the shader and use sync dispatch:
 // At startup
 await noise.gpu.preload()
 
-// In animation loop - no allocations
+// In the animation loop: no allocations
 noise.gpu.dispatchSync(texture, "perlin", {
     frequency: freq,
     time: time,
@@ -274,7 +277,7 @@ interface NoiseConfig {
 }
 
 interface WorleyConfig extends NoiseConfig {
-    distanceFunction?: "euclidean" | "manhattan" | "chebyshev"
+    distance?: "euclidean" | "manhattan" | "chebyshev"
     returnType?: "f1" | "f2" | "f2-f1"
 }
 
@@ -349,22 +352,18 @@ import { noise } from "onejs-unity/proc"
 import { useComputeTexture } from "onejs-unity/gpu"
 
 function NoiseTexture() {
-    const texture = useComputeTexture({
-        width: 512,
-        height: 512,
-        format: "RFloat"
-    })
+    const texture = useComputeTexture({ autoResize: false, width: 512, height: 512 })
 
     useEffect(() => {
-        if (noise.gpu.available) {
-            noise.gpu.fbm(texture.current, {
+        if (noise.gpu.available && texture) {
+            noise.gpu.fbm(texture, {
                 type: "simplex",
                 frequency: 3,
                 octaves: 6
             })
         }
-    }, [])
+    }, [texture])
 
-    return <RawImage texture={texture.current} />
+    return <View style={{ width: 512, height: 512, backgroundImage: texture }} />
 }
 ```

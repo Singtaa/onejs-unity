@@ -1,6 +1,6 @@
 # onejs-unity
 
-Unity integration utilities for OneJS. Provides asset loading, build plugins for USS transformation, and GPU compute APIs.
+Unity integration utilities for OneJS: build plugins, asset loading, input, audio, 2D physics, textures, the shader language, GPU compute and procedural generation.
 
 ## Installation
 
@@ -13,11 +13,27 @@ newer. A `.sl` import is a compiled program, which an older OneJS cannot draw;
 onejs-react says so in the console rather than drawing nothing. On an older
 OneJS, stay on onejs-unity 0.5.
 
-## Features
+## Modules
 
-- **Asset Loading**: Load images, fonts, and data from disk with Editor/Build path resolution
-- **Build Plugins**: esbuild and PostCSS plugins for USS transformation
-- **GPU Compute**: Access Unity compute shaders from JavaScript
+Each module is its own subpath, so a bundle carries only what it imports. The root entry, `onejs-unity`, re-exports `onejs-unity/gpu` and nothing else.
+
+| Import | What it is | Docs |
+|---|---|---|
+| `onejs-unity/esbuild` | esbuild plugins: C# imports, Tailwind, USS modules, themes, `.sl` files, asset manifest | [below](#esbuild-plugins) |
+| `onejs-unity/postcss` | PostCSS plugins for a Tailwind v3 pipeline | [below](#postcss-plugins) |
+| `onejs-unity/assets` | Load images, fonts, text and JSON with Editor/Build path resolution | [below](#asset-loading) |
+| `onejs-unity/input` | Keyboard, mouse, gamepad, touch, InputActions, a zero allocation reader, React hooks | [`src/input/README.md`](src/input/README.md), [guide](https://onejs.com/docs/guides/input) |
+| `onejs-unity/audio` | `audio.load(path)`, then `play` and `loop`, on Unity's AudioSource | [guide](https://onejs.com/docs/guides/audio) |
+| `onejs-unity/physics2d` | `createPhysicsWorld`: 2D physics whose bodies move VisualElements, simulated in C# | [guide](https://onejs.com/docs/guides/physics) |
+| `onejs-unity/fx` | Textures as values: fused image operation chains, sources, `useTexture` hooks | [`src/fx/README.md`](src/fx/README.md), [guide](https://onejs.com/docs/guides/image-fx) |
+| `onejs-unity/sl` | The shader language a game imports (re-exported from `onejs-sl`) | [`src/sl/README.md`](src/sl/README.md), [guide](https://onejs.com/docs/guides/shader-language) |
+| `onejs-unity/sl/compiler` | The shader language at build time, parser included | [`src/sl/README.md`](src/sl/README.md) |
+| `onejs-unity/gpu` | Compute shaders from JavaScript, with a zero allocation dispatcher | [below](#gpu-compute), [guide](https://onejs.com/docs/guides/gpu-compute) |
+| `onejs-unity/interop` | Zero allocation bindings to C# static methods (`za`) | [below](#zero-allocation-interop), [guide](https://onejs.com/docs/guides/zero-alloc) |
+| `onejs-unity/proc` | Noise, procedural meshes and procedural textures; also `proc/noise`, `proc/geometry`, `proc/texture` | [`src/proc/README.md`](src/proc/README.md), [guide](https://onejs.com/docs/guides/procedural) |
+| `onejs-unity/fs-provider` | The filesystem the build plugins read through, replaceable by a host with no disk (a Cloudflare Worker) | `src/fs-provider.mjs` |
+
+Each esbuild plugin is also importable on its own (`onejs-unity/esbuild/tailwind`, `/uss-modules`, `/themes`, `/sl`, `/copy-assets`, `/import-transform`), which is how a Worker uses them without pulling in `node:fs`.
 
 ## Asset Loading
 
@@ -83,7 +99,7 @@ During Unity builds, these are copied flat to `StreamingAssets/onejs/assets/@my-
 ### esbuild Plugins
 
 ```javascript
-import { importTransformPlugin, ussModulesPlugin, tailwindPlugin, themesPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
+import { importTransformPlugin, ussModulesPlugin, tailwindPlugin, themesPlugin, slPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
 
 const config = {
     plugins: [
@@ -98,6 +114,9 @@ const config = {
 
         // CSS Modules for .module.uss files
         ussModulesPlugin({ generateTypes: true }),
+
+        // Shader programs: import plasma from "./plasma.sl"
+        slPlugin({ generateTypes: true }),
 
         // Copy assets to StreamingAssets
         copyAssetsPlugin({ verbose: true }),
@@ -163,7 +182,8 @@ import "onejs:tailwind"
 ```
 
 **Options:**
-- `content`: Array of glob patterns to scan for class names (default: `["./**/*.{tsx,ts,jsx,js}"]`). In watch mode an edit to any scanned file rebuilds, including one the bundle does not import.
+- `content`: Array of glob patterns to scan for class names (default: `["./index.tsx", "./**/*.{tsx,ts,jsx,js}"]`). In watch mode an edit to any scanned file rebuilds, including one the bundle does not import.
+- `safelist`: Class names to always include, for classes assembled at runtime (default: `[]`)
 
 **Features:**
 - JIT-style generation: only includes classes actually used in your source files. Every string literal in a scanned file is a candidate (variant maps and variables included, comment-safe), so only classes assembled at runtime (`"bg-" + color`) need `safelist`.
@@ -184,7 +204,7 @@ import "onejs:tailwind"
 - No numeric `font-weight` (100-900): only `font-normal`/`font-bold` via `-unity-font-style`
 - No `text-transform`: use rich text tags or C# string methods
 - No `currentColor`: use explicit color values
-- `letter-spacing` uses px values (USS doesn't support em/rem)
+- `letter-spacing` is written in px, but USS applies it as hundredths of an em, so `tracking-wide` (0.025em) is `2.5px` at any font size
 
 **Transformations:**
 - Escapes special characters (`:` → `_c_`, `/` → `_s_`, `[` → `_lb_`, etc.)
@@ -202,6 +222,13 @@ import styles from "./Button.module.uss"
 
 <View className={styles.container} />
 ```
+
+#### `slPlugin(options)`
+
+Compiles `.sl` shader programs at build time, so `import plasma from "./plasma.sl"` resolves to the compiled program and the bundle carries neither the parser nor the source. A parse error is an esbuild error with the file, line and column. It writes `app.sl.json` beside the bundle, from which the editor generates the program's shaders.
+
+- `generateTypes`: Write a `.d.ts` beside each `.sl` file, naming its uniforms (default: `true`)
+- `manifest`: Where to write `app.sl.json` (default: beside the bundle)
 
 #### `copyAssetsPlugin(options)`
 
@@ -235,11 +262,12 @@ Core USS transformation:
 
 #### `ussCleanup(options)`
 
-Removes CSS features unsupported by USS:
-- CSS custom properties (`--var`)
-- `var()` references
+Removes CSS the plugin treats as unsupported by USS:
+- CSS custom properties (`--var`) and any declaration using `var()`. USS itself supports both; this plugin strips them anyway
 - Unsupported properties (filter, box-shadow, animation, grid, etc.)
-- Unsupported at-rules (@keyframes, @font-face, @supports)
+- Unsupported at-rules (@keyframes, @font-face, @supports, @layer, @container)
+
+Options: `removeEmpty` (drop rules left empty, default `true`), `warn` (log what was removed, default `false`).
 
 #### `ussUnwrapIs()`
 
@@ -331,7 +359,7 @@ function ZeroAllocEffect({ shaderGlobal }) {
     useAnimationFrame(() => {
         if (!dispatch || !texture) return
 
-        // Zero work on first frame - all IDs already cached!
+        // No lookups on the first frame: every ID is already cached
         dispatch
             .float("_Time", performance.now() / 1000)
             .vec2("_Resolution", texture.width, texture.height)
@@ -367,7 +395,10 @@ function ZeroAllocEffect({ shaderGlobal }) {
 
 ## Zero-Allocation Interop
 
-For custom C# method calls in performance-critical code, use the `za` module to create zero-allocation bindings.
+For custom C# method calls in performance-critical code, use the `za` module. Every `za` call goes through fixed-arity native functions (`__zaInvokeN`) with no argument array on the JS side. What happens in C# depends on how the binding was made:
+
+- `za.static` and `za.method` look the method up by name once, at bind time. Each call then invokes it through reflection, which boxes the arguments into an `object[]`. Cheaper than `CS.Type.Method()`, since nothing is resolved per call, but not allocation free.
+- `za.fromId` calls a delegate C# registered ahead of time with `QuickJSNative.Bind`. That path is typed end to end and allocates nothing.
 
 ### Static Methods
 
@@ -381,7 +412,7 @@ const Physics = za.static("UnityEngine.Physics", {
     OverlapSphereNonAlloc: 4,
 })
 
-// Per-frame usage - zero allocations after first call!
+// Per-frame usage: the lookup happened once, above
 function update() {
     if (Physics.Raycast(origin, direction, maxDistance, layerMask)) {
         // hit something
@@ -398,8 +429,8 @@ const getTime = za.method("UnityEngine.Time", "get_time", 0)
 const getDeltaTime = za.method("UnityEngine.Time", "get_deltaTime", 0)
 
 function update() {
-    const t = getTime()      // zero-alloc
-    const dt = getDeltaTime() // zero-alloc
+    const t = getTime()
+    const dt = getDeltaTime()
 }
 ```
 
@@ -419,13 +450,12 @@ doSomething(arg1, arg2, arg3) // zero-alloc
 
 ### Instance Methods
 
-For instance methods, create static wrappers in C#:
+For instance methods, create static wrappers in C#. A C# object passed from JS arrives as the object itself, so the wrapper takes it as its first parameter:
 
 ```csharp
-// C# side - create static wrapper that takes handle as first arg
+// C# side: a static wrapper that takes the instance first
 public static class CharacterControllerExt {
-    public static void MoveStatic(int handle, float x, float y, float z) {
-        var cc = ObjectRegistry.Get<CharacterController>(handle);
+    public static void MoveStatic(CharacterController cc, float x, float y, float z) {
         cc.Move(new Vector3(x, y, z));
     }
 }
@@ -434,21 +464,21 @@ public static class CharacterControllerExt {
 ```typescript
 // JS side
 const CharacterController = za.static("CharacterControllerExt", {
-    MoveStatic: 4,  // handle + x, y, z
+    MoveStatic: 4,  // instance + x, y, z
 })
 
-CharacterController.MoveStatic(ccHandle, velocity.x, velocity.y, velocity.z)
+CharacterController.MoveStatic(cc, velocity.x, velocity.y, velocity.z)
 ```
 
 ### How It Works
 
 | API | First Call | Subsequent Calls |
 |-----|-----------|------------------|
-| `CS.Type.Method()` | Reflection lookup | Reflection (allocates) |
-| `za.static/method` | Registers binding | Direct invoke (zero-alloc) |
-| `za.fromId` | None | Direct invoke (zero-alloc) |
+| `CS.Type.Method()` | Reflection lookup | Reflection lookup and invoke (allocates) |
+| `za.static/method` | Registers binding (reflection lookup) | Reflection invoke, arguments boxed (allocates) |
+| `za.fromId` | None | Typed delegate invoke (zero-alloc) |
 
-The `za` module uses `__zaInvokeN` native functions that pass primitives directly to C# without boxing or array allocation.
+Arguments cross as primitives, strings, `{ x, y, z }` / `{ x, y, z, w }` / `{ r, g, b, a }` values and C# objects, up to 8 per call.
 
 ## Peer Dependencies
 

@@ -1,7 +1,7 @@
 # fx: textures as values
 
 `onejs-unity/fx` makes a texture something you can hold, chain operations on,
-and hand to an element. Phases 2a to 2c of `Specs/GPU_2D.md`.
+and hand to an element. Phases 2a to 2c and 3 of `Specs/GPU_2D.md`.
 
 ```ts
 import { image } from "onejs-unity/fx"
@@ -97,6 +97,7 @@ A chain starts from one of these.
 | `image.gradient(w, h, stops, direction)` | Up to 8 stops, sorted for you; colours as hex or rgba with an optional `alpha`, or a bare colour list spread evenly; direction as a word or degrees |
 | `image.sdf(w, h, kind, opts)` | Any of the 42 signed distance shapes, as a mask |
 | `canvas(w, h?)` | The same sources with the size decided once: `canvas(512).noise(opts)` |
+| `image.target(w, h)` | A `RenderTarget` you keep and render into, for animation |
 
 `noise`, `gradient` and `sdf` run through `OneJS/FxSources`, a separate shader
 from the fused op pass because they read only uv and take no input texture.
@@ -115,13 +116,15 @@ the `sdfDistance` switch in each of the two shaders.
 
 | File | Purpose |
 |---|---|
+| `index.ts` | `onejs-unity/fx`: what the module exports |
 | `ops.ts` | The wire contract: opcodes, operand modes, the window size |
-| `image.ts` | The `Image` node and the `image` source factory |
+| `image.ts` | The `Image` node, `RenderTarget`, the `image` source factory and `canvas` |
+| `hooks.ts` | `useTexture`, `useImage`, `useAnimatedTexture` |
 | `sdf.ts` | Shape ids and parameter packing for the sdf source |
 | `fx.test.ts` | Encoding tests |
 
 The other half is `Assets/Singtaa/OneJS/Runtime/Fx/FxBridge.cs` and
-`Resources/OneJS/{FxOps,FxSources,FxSpatial}.shader`. **The opcode numbers appear
+`Resources/OneJS/{FxOps,FxSources,FxSpatial,FxFilter}.shader`. **The opcode numbers appear
 on both sides**;
 change them together. `WIRE_VERSION` guards the pairing: a newer package against
 an older runtime fails loudly rather than silently dropping operations, which is
@@ -186,7 +189,7 @@ changed opacity would surprise everywhere it is used.
 `ramp` is Spark2D's `dye`. It colours by luminance, which is what turns a
 greyscale field (a `noise` or `sdf` source, say) into an image. Its stops are
 written like `gradient`'s: hex strings or rgba tuples, positioned or spread
-evenly, readonly or not. The hex parser is `onejs-sl`'s `parseColor`, shared with `sl` through `src/color.ts`.
+evenly, readonly or not. The hex parser is `onejs-sl`'s `parseColor`, which `fx` reads through `src/color.ts`, so a colour is written the same way in a chain and in a shader program.
 
 The blend modes are the PDF blend spec's, not an approximation. `softLight` uses
 the spec's `D(b)` rather than the cheap two branch version, which has a visible
