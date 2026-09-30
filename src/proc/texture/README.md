@@ -44,16 +44,16 @@ if (texture.gpu.available) {
 geometry module takes directly.
 
 ```typescript
-texture.checker({ colors: ["#e5e5e5", "#333"], size: 2 })          // size default 2
-texture.gradient({ colors: ["#000", "#fff"], direction: "radial" }) // size default 256
+texture.checker({ colors: ["#e5e5e5", "#333333"], size: 2 })      // size default 2
+texture.gradient({ colors: ["#000000", "#ffffff"], direction: "radial" }) // size default 256
 texture.solid({ color: "#ff5500" })                                  // size default 1
 texture.fromData({ data: rgbaPixels, width: 256, height: 256 })
 
 // Filter ("point" by default, "bilinear", "trilinear") and wrap ("repeat" or "clamp")
-texture.checker({ colors: ["#fff", "#000"] }).filter("point").wrap("repeat")
+texture.checker({ colors: ["#ffffff", "#000000"] }).filter("point").wrap("repeat")
 ```
 
-Colours are hex strings or `[r, g, b, a]` tuples. `getUnityTexture()` returns
+Colours are `#rrggbb` or `#rrggbbaa` strings, or `[r, g, b, a]` tuples (0 to 1). `getUnityTexture()` returns
 the `Texture2D`; `dispose()` destroys it.
 
 ## CPU Generators

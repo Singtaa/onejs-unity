@@ -259,7 +259,7 @@ import { mesh, texture } from "onejs-unity/proc"
 mesh.plane({ width: 100, height: 100 })
     .instantiate("Ground")
     .material({
-        texture: texture.checker({ colors: ["#e5e5e5", "#333"] }),
+        texture: texture.checker({ colors: ["#e5e5e5", "#333333"] }),
         tiling: 10,
         smoothness: 0.3,
     })

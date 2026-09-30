@@ -161,7 +161,7 @@ gp.rumblePulse(intensity: number, duration: number): void
 gp.stopRumble(): void
 ```
 
-**Button Names:** `South`, `East`, `West`, `North`, `A`, `B`, `X`, `Y`, `Cross`, `Circle`, `Square`, `Triangle`, `LeftShoulder`, `LB`, `RightShoulder`, `RB`, `LeftTrigger`, `LT`, `RightTrigger`, `RT`, `LeftStick`, `L3`, `RightStick`, `R3`, `Start`, `Menu`, `Select`, `Back`, `DpadUp`, `DpadDown`, `DpadLeft`, `DpadRight`. Any other name (`L1`, `R1`, `Up`) logs a warning and reads as `South`.
+**Button Names** (case-insensitive): `South`, `East`, `West`, `North`, `A`, `B`, `X`, `Y`, `Cross`, `Circle`, `Square`, `Triangle`, `LeftShoulder`, `LB`, `L1`, `RightShoulder`, `RB`, `R1`, `LeftStick`, `L3`, `RightStick`, `R3`, `Start`, `Menu`, `Select`, `Back`, `View`, `Up`, `Down`, `Left`, `Right`, `DpadUp`, `DpadDown`, `DpadLeft`, `DpadRight`. Triggers are analog: read `gp.leftTrigger` and `gp.rightTrigger`. An unrecognised name reads false.
 
 ### Touch
 
