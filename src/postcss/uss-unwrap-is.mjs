@@ -12,9 +12,12 @@
  */
 
 /**
- * Parse the contents of :is() and return array of alternatives
+ * Split a selector list on its top-level commas, leaving the commas inside
+ * :is(...) or [...] alone. Used for the contents of an :is() and for a rule's
+ * whole selector: splitting either on every comma cuts an :is() in half, and
+ * the half with no closing paren could never expand.
  */
-function parseIsContents(contents) {
+function splitTopLevel(contents) {
     const alternatives = []
     let current = ""
     let depth = 0
@@ -71,7 +74,7 @@ function expandIsOnce(selector) {
     const contents = selector.slice(parenStart, endIdx - 1)
     const after = selector.slice(endIdx)
 
-    const alternatives = parseIsContents(contents)
+    const alternatives = splitTopLevel(contents)
 
     return alternatives.map(alt => before + alt + after)
 }
@@ -83,18 +86,17 @@ function expandIsSelector(selector) {
     let current = [selector]
     let hasIs = true
 
-    // Keep expanding until no more :is() remain
+    // Keep expanding until no more :is() remain, or until a pass changes
+    // nothing: a malformed :is() comes back from expandIsOnce as it went in,
+    // and expanding it again would spin forever.
     while (hasIs) {
         hasIs = false
         const next = []
 
         for (const sel of current) {
-            if (sel.includes(":is(")) {
-                hasIs = true
-                next.push(...expandIsOnce(sel))
-            } else {
-                next.push(sel)
-            }
+            const expanded = sel.includes(":is(") ? expandIsOnce(sel) : [sel]
+            if (expanded.length !== 1 || expanded[0] !== sel) hasIs = true
+            next.push(...expanded)
         }
 
         current = next
@@ -119,8 +121,8 @@ export function ussUnwrapIs() {
                 return
             }
 
-            // Split by comma to handle multiple selectors
-            const selectors = rule.selector.split(",").map(s => s.trim())
+            // Split on top-level commas only, so an :is() stays whole
+            const selectors = splitTopLevel(rule.selector)
             const expanded = []
 
             for (const selector of selectors) {
