@@ -177,7 +177,7 @@ import "onejs:themes"
 
 At build time the plugin scans the working directory's `@cartridges/` folder for files matching `*Theme.ts` / `*Theme.tsx` (the naming convention every OneJS premade theme follows), emits a side-effect import for each, and logs what it registered. In watch mode a newly extracted cartridge triggers a rebuild automatically. With nothing extracted yet it emits an empty module and a console warning, not an error. Explicit relative imports keep working when you want a strict subset.
 
-No package declares `onejs:themes` for TypeScript, and TypeScript 7 checks side-effect imports, so declare it once in a `.d.ts` (the OneJS scaffold's `types/global.d.ts` declares only `onejs:tailwind`): `declare module "onejs:themes"`.
+No package declares `onejs:themes` for TypeScript, and TypeScript 6 and newer check side-effect imports, so declare it once in a `.d.ts` (the OneJS scaffold's `types/global.d.ts` declares only `onejs:tailwind`): `declare module "onejs:themes"`.
 
 **Options:**
 - `dir`: Cartridges folder relative to the working directory (default: `"@cartridges"`)
@@ -195,7 +195,7 @@ import "onejs:tailwind"
 <View className="p-4 bg-gray-900 hover:bg-gray-800 sm:p-6" />
 ```
 
-The OneJS scaffold's `types/global.d.ts` declares `onejs:tailwind` for TypeScript. Outside it, declare it once in a `.d.ts`, `declare module "onejs:tailwind"`, or TypeScript 7 reports the side-effect import.
+The OneJS scaffold's `types/global.d.ts` declares `onejs:tailwind` for TypeScript. Outside it, declare it once in a `.d.ts`, `declare module "onejs:tailwind"`, or TypeScript 6 and newer report the side-effect import.
 
 **Options:**
 - `content`: Array of glob patterns to scan for class names (default: `["./index.tsx", "./**/*.{tsx,ts,jsx,js}"]`). In watch mode an edit to any scanned file rebuilds, including one the bundle does not import.
