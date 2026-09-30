@@ -501,7 +501,7 @@ export type WrapMode = "repeat" | "clamp"
  *
  * @example
  * ```typescript
- * const tex = texture.checker({ colors: ["#fff", "#333"] })
+ * const tex = texture.checker({ colors: ["#ffffff", "#333333"] })
  *     .filter("point")
  *     .wrap("repeat")
  *

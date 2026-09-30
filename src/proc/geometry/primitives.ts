@@ -579,7 +579,7 @@ declare const CS: any
  * @example
  * ```typescript
  * meshObject.material({
- *     texture: texture.checker({ colors: ["#e5e5e5", "#333"] }),
+ *     texture: texture.checker({ colors: ["#e5e5e5", "#333333"] }),
  *     tiling: 10,
  *     smoothness: 0.3
  * })
@@ -836,7 +836,7 @@ export class MeshObject {
      * mesh.plane({ width: 100, height: 100 })
      *     .instantiate("Ground")
      *     .material({
-     *         texture: texture.checker({ colors: ["#e5e5e5", "#333"] }),
+     *         texture: texture.checker({ colors: ["#e5e5e5", "#333333"] }),
      *         tiling: 10,
      *         smoothness: 0.3
      *     })

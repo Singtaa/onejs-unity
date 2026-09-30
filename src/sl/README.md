@@ -18,8 +18,8 @@ OneJS's own:
 | `surface.test.ts` | Pins what both barrels leave out: nothing only the VM had |
 
 Both barrels name every export rather than `export *`, so each one's surface is
-exactly what it was before the move, and a name `onejs-sl` adds does not appear
-here until somebody decides it should.
+what it was before the move less the VM's names, and a name `onejs-sl` adds does
+not appear here until somebody decides it should.
 
 `encode` is `compile` under its old name in both barrels, so code written
 against it still builds. Neither re-exports anything only the VM had

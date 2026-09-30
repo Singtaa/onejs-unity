@@ -165,9 +165,10 @@ pixel really does give you 2.0, which is what makes the maths ops composable.
 Call `saturate()` before handing the result to something that expects 0..1.
 
 **`dispose()` returns the target to the pool; it does not free it.** That is the
-point. The pool is emptied on context teardown by `FxBridge.DisposeAll`, which
-is wired into `QuickJSUIBridge.Dispose` alongside the particle and shader effect
-safety nets.
+point. The pool is emptied when the last context tears down
+(`FxBridge.DisposeAll`); each context's own teardown releases only the handles
+it made (`FxBridge.DisposeOwnedBy`). Both are wired into `QuickJSUIBridge.Dispose`
+alongside the particle and shader effect safety nets.
 
 **An `Image` used as an operand renders when the chain that uses it is built,**
 not when that chain renders. The result is cached on the node, so sharing one

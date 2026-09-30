@@ -13,6 +13,12 @@ newer. A `.sl` import is a compiled program, which an older OneJS cannot draw;
 onejs-react says so in the console rather than drawing nothing. On an older
 OneJS, stay on onejs-unity 0.5.
 
+onejs-react is an optional peer, so the line above does not install it. A OneJS
+project already has it; elsewhere, `npm install onejs-react react`. The `.d.ts`
+written beside each `.sl` file imports its type from onejs-react, and
+onejs-react brings `unity-types`, which types `import ... from "UnityEngine"`
+(without onejs-react, `npm install -D unity-types`).
+
 ## Modules
 
 Each module is its own subpath, so a bundle carries only what it imports. The root entry, `onejs-unity`, re-exports `onejs-unity/gpu` and nothing else.
@@ -131,12 +137,18 @@ Transforms ES6 imports from C# namespaces (modules starting with uppercase) into
 ```typescript
 // Input (your source code)
 import { Texture2D, Material, Shader } from "UnityEngine"
-import { List, Dictionary } from "System.Collections.Generic"
+import { Button } from "UnityEngine/UIElements"
 
 // Output (after transform)
 const { Texture2D, Material, Shader } = CS.UnityEngine
-const { List, Dictionary } = CS.System.Collections.Generic
+const { Button } = CS.UnityEngine.UIElements
 ```
+
+TypeScript types these imports from `unity-types`, which declares the modules
+`UnityEngine`, `UnityEngine/UIElements`, `UnityEngine/SceneManagement`,
+`System` and `OneJS`. Any other namespace, such as
+`System.Collections.Generic`, transforms the same way
+(`CS.System.Collections.Generic`), but `tsc` reports `Cannot find module` for it.
 
 This allows you to write idiomatic ES6 imports instead of manual destructuring:
 
@@ -165,6 +177,8 @@ import "onejs:themes"
 
 At build time the plugin scans the working directory's `@cartridges/` folder for files matching `*Theme.ts` / `*Theme.tsx` (the naming convention every OneJS premade theme follows), emits a side-effect import for each, and logs what it registered. In watch mode a newly extracted cartridge triggers a rebuild automatically. With nothing extracted yet it emits an empty module and a console warning, not an error. Explicit relative imports keep working when you want a strict subset.
 
+No package declares `onejs:themes` for TypeScript, and TypeScript 7 checks side-effect imports, so declare it once in a `.d.ts` (the OneJS scaffold's `types/global.d.ts` declares only `onejs:tailwind`): `declare module "onejs:themes"`.
+
 **Options:**
 - `dir`: Cartridges folder relative to the working directory (default: `"@cartridges"`)
 - `pattern`: RegExp identifying a theme module by file name (default: `/Theme\.(ts|tsx)$/`)
@@ -180,6 +194,8 @@ import "onejs:tailwind"
 // Then use Tailwind classes as usual
 <View className="p-4 bg-gray-900 hover:bg-gray-800 sm:p-6" />
 ```
+
+The OneJS scaffold's `types/global.d.ts` declares `onejs:tailwind` for TypeScript. Outside it, declare it once in a `.d.ts`, `declare module "onejs:tailwind"`, or TypeScript 7 reports the side-effect import.
 
 **Options:**
 - `content`: Array of glob patterns to scan for class names (default: `["./index.tsx", "./**/*.{tsx,ts,jsx,js}"]`). In watch mode an edit to any scanned file rebuilds, including one the bundle does not import.
@@ -242,7 +258,10 @@ Asset copying to `StreamingAssets` is handled by Unity's `JSRunnerBuildProcessor
 
 ### PostCSS Plugins
 
+These need `postcss` (`npm install -D postcss`).
+
 ```javascript
+import postcss from "postcss"
 import { ussTransform, ussCleanup, ussUnwrapIs } from "onejs-unity/postcss"
 
 const result = await postcss([
@@ -274,12 +293,15 @@ Options: `removeEmpty` (drop rules left empty, default `true`), `warn` (log what
 Flattens `:is()` and `:where()` selectors (used by Tailwind v3):
 ```css
 /* Input */
-.button:is(.primary, .secondary) { color: blue; }
+.button:is(.primary) { color: blue; }
+.card :where(.title) { color: red; }
 
 /* Output */
 .button.primary { color: blue; }
-.button.secondary { color: blue; }
+.card .title { color: red; }
 ```
+
+**Known issue (every release so far, 0.9.1 included):** a `:is()` or `:where()` with a comma inside it, such as `.button:is(.primary, .secondary)`, never returns, so the build hangs. Until that is fixed, run `ussUnwrapIs()` only on CSS whose `:is()` and `:where()` each hold one selector.
 
 ## GPU Compute
 
@@ -288,9 +310,10 @@ Access Unity compute shaders from JavaScript with optional zero-allocation dispa
 ### Basic Usage
 
 ```typescript
+import { View } from "onejs-react"
 import { compute, useComputeShader, useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
 
-function BackgroundEffect({ shaderGlobal }) {
+function BackgroundEffect({ shaderGlobal }: { shaderGlobal: unknown }) {
     const shader = useComputeShader(shaderGlobal, "MyEffect")
     const texture = useComputeTexture({ autoResize: true })
 
@@ -340,9 +363,10 @@ Pass a schema to pre-resolve all property IDs at creation time:
 
 ```typescript
 import { useMemo } from "react"
-import { useComputeShader, useComputeTexture, useAnimationFrame, KernelDispatcher } from "onejs-unity/gpu"
+import { View } from "onejs-react"
+import { useComputeShader, useComputeTexture, useAnimationFrame, type KernelDispatcher } from "onejs-unity/gpu"
 
-function ZeroAllocEffect({ shaderGlobal }) {
+function ZeroAllocEffect({ shaderGlobal }: { shaderGlobal: unknown }) {
     const shader = useComputeShader(shaderGlobal)
     const texture = useComputeTexture({ autoResize: true })
 
@@ -488,7 +512,7 @@ When using the build plugins:
 npm install -D esbuild
 ```
 
-Note: `tailwindcss` and `postcss` are **not required**. OneJS includes a built-in Tailwind utility generator.
+Note: `tailwindcss` is **not required**. OneJS includes a built-in Tailwind utility generator. `postcss` is needed only for the [PostCSS plugins](#postcss-plugins).
 
 ## License
 

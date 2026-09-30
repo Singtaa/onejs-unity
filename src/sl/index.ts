@@ -3,8 +3,9 @@
  *
  * The shader language lives in its own package, `onejs-sl`, which has no
  * Unity in it so another host can run it. This barrel re-exports the parts a
- * game uses, by name, so every import that worked before still does, plus
- * `manifest`, which is OneJS's own.
+ * game uses, by name, plus `manifest`, which is OneJS's own. Every import that
+ * worked before still does, except the VM's names, which went with it
+ * (`surface.test.ts`).
  *
  * Built on `onejs-sl/core` and the backend entries, never on `onejs-sl`
  * itself: that one carries the `.sl` parser, which runs while a game is built

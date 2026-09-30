@@ -122,7 +122,7 @@ export { gpuTexture, registerPatternShader } from "./gpu"
  * import { texture } from "onejs-unity/proc"
  *
  * // Create checker texture for tiling
- * const checkerTex = texture.checker({ colors: ["#e5e5e5", "#333"] })
+ * const checkerTex = texture.checker({ colors: ["#e5e5e5", "#333333"] })
  *
  * // Create gradient
  * const gradientTex = texture.gradient({

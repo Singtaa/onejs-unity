@@ -7,8 +7,9 @@
  * The esbuild plugin and the Play worker import this; a game imports
  * `onejs-unity/sl`, which leaves the parser out.
  *
- * A re-export of `onejs-sl`, by name, so every import that worked before the
- * shader language became its own package still does.
+ * A re-export of `onejs-sl`, by name. Every import that worked before the
+ * shader language became its own package still does, except the VM's names
+ * (`surface.test.ts`).
  */
 
 export {
