@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 
 /**
  * Each case runs in a child process with a timeout, because the bug this guards
@@ -8,7 +9,9 @@ import path from "node:path"
  * than fail it.
  */
 function inChild(body: string): unknown {
-    const plugin = path.resolve(import.meta.dirname, "uss-unwrap-is.mjs")
+    // A URL rather than a path: on Windows import() reads "D:\..." as a
+    // URL whose scheme is "d:" and refuses it.
+    const plugin = pathToFileURL(path.resolve(import.meta.dirname, "uss-unwrap-is.mjs")).href
     const script = `
         const { default: postcss } = await import("postcss")
         const { ussUnwrapIs } = await import(${JSON.stringify(plugin)})
