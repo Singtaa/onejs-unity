@@ -36,7 +36,7 @@
  * generated artifact to go stale, and about thirty milliseconds once.
  *
  * A Cloudflare Worker cannot evaluate code it builds, so the caller there
- * (`onejs-play/build/game.mjs`, through `PlaySite`) hands in a `compiler` it
+ * (`ojp/build/game.mjs`, through `PlaySite`) hands in a `compiler` it
  * imported statically and this path never runs.
  */
 
