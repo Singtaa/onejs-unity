@@ -92,6 +92,48 @@ describe("themesPlugin", () => {
         delete (globalThis as any).__registered
     })
 
+    async function registeredBy(root: string): Promise<string[]> {
+        const result = await esbuild.build({
+            absWorkingDir: root,
+            entryPoints: ["index.ts"],
+            bundle: true,
+            write: false,
+            format: "iife",
+            plugins: [themesPlugin()],
+        })
+        const registered: string[] = []
+        ;(globalThis as any).__registered = registered
+        eval(result.outputFiles[0].text)
+        delete (globalThis as any).__registered
+        return registered.sort()
+    }
+
+    it("registers themes a runner extracted to @packs", async () => {
+        const root = makeApp({
+            "index.ts": `import "onejs:themes"`,
+            "@packs/@singtaa/pixel/pixelTheme.ts": REGISTER_STUB + `globalThis.__registered.push("pixel")`,
+        })
+        expect(await registeredBy(root)).toEqual(["pixel"])
+    })
+
+    it("registers from both folders, since a runner made before packs keeps @cartridges", async () => {
+        const root = makeApp({
+            "index.ts": `import "onejs:themes"`,
+            "@packs/@singtaa/pixel/pixelTheme.ts": REGISTER_STUB + `globalThis.__registered.push("pixel")`,
+            "@cartridges/@singtaa/kawaii/kawaiiTheme.ts": REGISTER_STUB + `globalThis.__registered.push("kawaii")`,
+        })
+        expect(await registeredBy(root)).toEqual(["kawaii", "pixel"])
+    })
+
+    it("registers a theme in both folders once, from @packs", async () => {
+        const root = makeApp({
+            "index.ts": `import "onejs:themes"`,
+            "@packs/@singtaa/pixel/pixelTheme.ts": REGISTER_STUB + `globalThis.__registered.push("pixel from packs")`,
+            "@cartridges/@singtaa/pixel/pixelTheme.ts": REGISTER_STUB + `globalThis.__registered.push("pixel from cartridges")`,
+        })
+        expect(await registeredBy(root)).toEqual(["pixel from packs"])
+    })
+
     it("emits an empty module (not an error) when nothing is extracted yet", async () => {
         const root = makeApp({ "index.ts": `import "onejs:themes"` })
 

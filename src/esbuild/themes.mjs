@@ -1,17 +1,19 @@
 /**
- * esbuild plugin for OneJS cartridge theme registration
+ * esbuild plugin for OneJS pack theme registration
  *
  * Usage:
  *   import "onejs:themes"
  *
  * Resolves to a generated module that side-effect-imports every extracted
- * cartridge theme module (files matching *Theme.ts / *Theme.tsx under the
- * working directory's @cartridges/ folder), so each one registers its theme
- * name. One stable import replaces the per-theme relative imports, which were
+ * pack theme module (files matching *Theme.ts / *Theme.tsx under the working
+ * directory's @packs/ and @cartridges/ folders), so each one registers its
+ * theme name. A runner made before cartridges became packs keeps extracting
+ * to @cartridges/, so both are scanned; a theme found in both registers once,
+ * from @packs/. One stable import replaces the per-theme relative imports, which were
  * easy to typo, invisible to autocomplete before extraction, and routinely
  * stripped by unused-import lint fixes.
  *
- * The explicit relative import (`import "./@cartridges/@singtaa/kawaii/kawaiiTheme"`)
+ * The explicit relative import (`import "./@packs/@singtaa/kawaii/kawaiiTheme"`)
  * keeps working and remains the way to register a strict subset.
  */
 
@@ -23,7 +25,7 @@ import path from "path"
  * Returns { files, dirs }: matched file paths and every directory visited
  * (the directories feed esbuild's watch so a new extraction triggers a rebuild).
  *
- * @param {string} rootDir Directory to scan (typically {app}/@cartridges)
+ * @param {string} rootDir Directory to scan (typically {app}/@packs)
  * @param {RegExp} pattern File-name pattern identifying a theme module
  */
 export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
@@ -71,14 +73,16 @@ export function findThemeModules(rootDir, pattern = /Theme\.(ts|tsx)$/) {
  * Create the themes esbuild plugin
  *
  * @param {Object} options
- * @param {string} [options.dir] Cartridges folder relative to the working directory (default "@cartridges")
+ * @param {string[]} [options.dirs] Pack folders relative to the working directory, earlier ones
+ *   winning a theme found in more than one (default ["@packs", "@cartridges"])
+ * @param {string} [options.dir] A single folder, in place of dirs
  * @param {RegExp} [options.pattern] File-name pattern identifying a theme module (default /Theme\.(ts|tsx)$/)
  */
 export function themesPlugin(options = {}) {
     const {
-        dir = "@cartridges",
         pattern = /Theme\.(ts|tsx)$/,
     } = options
+    const dirs = options.dirs ?? (options.dir ? [options.dir] : ["@packs", "@cartridges"])
 
     return {
         name: "onejs-themes",
@@ -91,17 +95,33 @@ export function themesPlugin(options = {}) {
 
             build.onLoad({ filter: /.*/, namespace: "onejs-themes" }, () => {
                 const root = build.initialOptions.absWorkingDir || process.cwd()
-                const cartridgesDir = path.resolve(root, dir)
-                const { files, dirs } = findThemeModules(cartridgesDir, pattern)
+                const files = []
+                const watched = []
+                let aFolderIsMissing = false
+                // Keyed by the path below its folder, so a theme in two folders registers once
+                const seen = new Set()
+                for (const dir of dirs) {
+                    const folder = path.resolve(root, dir)
+                    const found = findThemeModules(folder, pattern)
+                    if (found.dirs.length === 0) aFolderIsMissing = true
+                    watched.push(...found.dirs)
+                    for (const f of found.files) {
+                        const key = path.relative(folder, f).split(path.sep).join("/")
+                        if (seen.has(key)) continue
+                        seen.add(key)
+                        files.push(f)
+                    }
+                }
 
                 const relatives = files.map((f) =>
                     "./" + path.relative(root, f)
                         .split(path.sep).join("/")
                         .replace(/\.(ts|tsx)$/, ""))
 
+                const folders = dirs.map((d) => `${d}/`).join(" or ")
                 const lines = [
-                    "// OneJS cartridge theme registrations",
-                    `// Auto-generated from ${dir}/**/*Theme.ts: do not edit`,
+                    "// OneJS pack theme registrations",
+                    `// Auto-generated from ${dirs.join(", ")} **/*Theme.ts: do not edit`,
                     ...relatives.map((r) => `import "${r}"`),
                     "export {}",
                     "",
@@ -110,7 +130,7 @@ export function themesPlugin(options = {}) {
                 if (files.length > 0) {
                     console.log(`[onejs:themes] registered ${files.length} theme module(s): ${relatives.join(", ")}`)
                 } else {
-                    console.warn(`[onejs:themes] no *Theme.ts modules found under ${dir}/. Assign the theme cartridge to your JSRunner so it extracts, then rebuild.`)
+                    console.warn(`[onejs:themes] no *Theme.ts modules found under ${folders}. Assign the theme pack to your JSRunner so it extracts, then rebuild.`)
                 }
 
                 return {
@@ -118,9 +138,10 @@ export function themesPlugin(options = {}) {
                     loader: "js",
                     // Relative imports in the generated module resolve against the app root
                     resolveDir: root,
-                    // A new extraction (new folder or file) must invalidate this module in watch mode
+                    // A new extraction (new folder or file) must invalidate this module in watch mode.
+                    // The root is watched too while a folder is missing, so creating it rebuilds.
                     watchFiles: files,
-                    watchDirs: dirs.length > 0 ? dirs : [root],
+                    watchDirs: aFolderIsMissing ? [root, ...watched] : watched,
                 }
             })
         },

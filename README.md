@@ -117,7 +117,7 @@ const config = {
         // Tailwind utility classes → USS transformation
         tailwindPlugin({ content: ["./**/*.{tsx,ts,jsx,js}"] }),
 
-        // Cartridge theme registration via import "onejs:themes"
+        // Pack theme registration via import "onejs:themes"
         themesPlugin(),
 
         // CSS Modules for .module.uss files
@@ -168,21 +168,22 @@ import { GameObject, Mesh, Vector3 } from "UnityEngine"
 
 #### `themesPlugin(options)`
 
-Registers every extracted cartridge theme through one stable import, replacing the per-theme relative imports (which lint autofixes love to strip and which have no autocomplete before extraction):
+Registers every extracted pack theme through one stable import, replacing the per-theme relative imports (which lint autofixes love to strip and which have no autocomplete before extraction):
 
 ```tsx
-// One import registers everything extracted under @cartridges/
+// One import registers every theme extracted under @packs/ or @cartridges/
 import "onejs:themes"
 
 <ThemeProvider theme="kawaii">...</ThemeProvider>
 ```
 
-At build time the plugin scans the working directory's `@cartridges/` folder for files matching `*Theme.ts` / `*Theme.tsx` (the naming convention every OneJS premade theme follows), emits a side-effect import for each, and logs what it registered. In watch mode a newly extracted cartridge triggers a rebuild automatically. With nothing extracted yet it emits an empty module and a console warning, not an error. Explicit relative imports keep working when you want a strict subset.
+At build time the plugin scans the working directory's `@packs/` and `@cartridges/` folders for files matching `*Theme.ts` / `*Theme.tsx` (the naming convention every OneJS premade theme follows), emits a side-effect import for each, and logs what it registered. A JSRunner made before cartridges became packs keeps extracting to `@cartridges/`, so both are scanned, and a theme found in both registers once, from `@packs/`. In watch mode a newly extracted pack triggers a rebuild automatically. With nothing extracted yet it emits an empty module and a console warning, not an error. Explicit relative imports keep working when you want a strict subset.
 
 No package declares `onejs:themes` for TypeScript, and TypeScript 6 and newer check side-effect imports, so a project needs `declare module "onejs:themes"` in a `.d.ts`. A scaffold from after OneJS 3.9.2 has it in `types/global.d.ts`; an older one declares only `onejs:tailwind`, so add the line.
 
 **Options:**
-- `dir`: Cartridges folder relative to the working directory (default: `"@cartridges"`)
+- `dirs`: pack folders relative to the working directory, the first winning a theme found in more than one (default: `["@packs", "@cartridges"]`)
+- `dir`: a single folder, in place of `dirs`
 - `pattern`: RegExp identifying a theme module by file name (default: `/Theme\.(ts|tsx)$/`)
 
 #### `tailwindPlugin(options)`
