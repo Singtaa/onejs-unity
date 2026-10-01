@@ -303,7 +303,7 @@ Flattens `:is()` and `:where()` selectors (used by Tailwind v3):
 .card .title { color: red; }
 ```
 
-A `:is()` or `:where()` with a comma inside it expands to one selector per member: `.button:is(.primary, .secondary)` becomes `.button.primary, .button.secondary`. Before 0.10.0 such a rule never returned and the build hung.
+A `:is()` or `:where()` with a comma inside it expands to one selector per member: `.button:is(.primary, .secondary)` becomes `.button.primary, .button.secondary`. Before 0.9.2 such a rule never returned and the build hung.
 
 ## GPU Compute
 

@@ -201,7 +201,12 @@ function esbuildError(error, file, source) {
         return { text: error instanceof Error ? error.message : String(error), location: { file } }
     }
     // The message alone; the place is esbuild's to print, from `location`.
-    const text = String(error.text)
+    let text = String(error.text)
+    // onejs-sl declares previous, frame and deltaTime from 0.7.0. The peer range
+    // still admits older ones, which call them undeclared and name neither package.
+    if (/^"(previous|frame|deltaTime)" is not declared/.test(text)) {
+        text += ". previous, frame and deltaTime need onejs-sl 0.7.0: npm install onejs-sl@^0.7.0"
+    }
     return {
         text,
         location: {

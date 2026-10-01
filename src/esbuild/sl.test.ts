@@ -299,6 +299,31 @@ describe("a parse error is an esbuild error", () => {
         expect(errors[0]).not.toContain("bad.sl:2:18:")
     })
 
+    // What onejs-sl 0.6.0 says of its own corpus/drift.sl, which reads the
+    // previous frame: previous, frame and deltaTime arrived in 0.7.0, and the
+    // peer range still admits older ones, so the message has to name the fix.
+    const DRIFT = "float4 main() {\n    if (frame == 0) return float4(floor(fragCoord / 8) / 8, 0.5, 1);\n    return tex2D(previous, uv - float2(0, texel.y));\n}"
+    const olderSl = (text: string) => ({
+        parse: () => { throw Object.assign(new Error(text), { text, line: 2, column: 9, length: 5 }) },
+        compile,
+        manifest,
+    })
+
+    it("names onejs-sl 0.7.0 when an older one does not know previous, frame or deltaTime", async () => {
+        const root = makeApp({ "drift.sl": DRIFT, "index.ts": `import drift from "./drift.sl"\nexport default drift` })
+        const { errors } = await bundle(root, "index.ts", { compiler: olderSl("\"frame\" is not declared; did you mean frac?") })
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toContain("2:9")
+        expect(errors[0]).toContain("\"frame\" is not declared")
+        expect(errors[0]).toContain("npm install onejs-sl@^0.7.0")
+    })
+
+    it("leaves any other undeclared name as onejs-sl said it", async () => {
+        const root = makeApp({ "drift.sl": DRIFT, "index.ts": `import drift from "./drift.sl"\nexport default drift` })
+        const { errors } = await bundle(root, "index.ts", { compiler: olderSl("\"fram\" is not declared; did you mean frac?") })
+        expect(errors).toEqual(["2:9: \"fram\" is not declared; did you mean frac?"])
+    })
+
 })
 
 describe("the manifest", () => {
