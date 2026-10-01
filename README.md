@@ -64,6 +64,8 @@ const config = loadJson("@my-ui-kit/config.json")
 | **Editor** | `App/node_modules/.../assets/@my-pkg/bg.png` | `App/assets/images/logo.png` |
 | **Build** | `StreamingAssets/onejs/assets/@my-pkg/bg.png` | `StreamingAssets/onejs/assets/images/logo.png` |
 
+If the app has its own `assets/@my-pkg/` folder, that folder is used in place of the package's, in the Editor and in a build alike.
+
 ### Asset Functions
 
 - `loadImage(path)`: Load as Texture2D
@@ -98,7 +100,7 @@ my-ui-kit/
 
 The `@namespace/` folder inside `assets/` is automatically detected. No package.json configuration needed.
 
-During Unity builds, these are copied flat to `StreamingAssets/onejs/assets/@my-ui-kit/...`
+During Unity builds, `JSRunnerBuildProcessor` (OneJS 3.9.3 and newer) copies them flat to `StreamingAssets/onejs/assets/@my-ui-kit/...`. Only top level packages in the app's `node_modules` are scanned, scoped ones included.
 
 ## Build Plugins
 
@@ -248,7 +250,7 @@ Compiles `.sl` shader programs at build time, so `import plasma from "./plasma.s
 
 #### `copyAssetsPlugin(options)`
 
-Generates a manifest file for Editor path resolution. **Does not copy assets** during esbuild runs.
+Generates a manifest file for Editor path resolution. **Does not copy assets** during esbuild runs. Optional: without a manifest, the Editor finds a package's `assets/@namespace/` folder by scanning `node_modules` once.
 
 Asset copying to `StreamingAssets` is handled by Unity's `JSRunnerBuildProcessor` during actual Unity builds. This keeps `StreamingAssets` clean during development and avoids Unity's asset import overhead.
 

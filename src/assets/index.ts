@@ -43,6 +43,9 @@ declare global {
 // Manifest is loaded once and cached
 let manifestCache: AssetManifest | null = null
 
+// Package asset namespaces (@ns -> folder), scanned once and cached
+let packageNamespacesCache: Record<string, string> | null = null
+
 interface NamespaceInfo {
     type: "user" | "package"
     package?: string
@@ -123,6 +126,47 @@ function loadManifest(): AssetManifest {
 }
 
 /**
+ * Find the asset namespaces the app's packages carry: every
+ * node_modules/{pkg}/assets/@{ns}/ and node_modules/@{scope}/{pkg}/assets/@{ns}/,
+ * top level packages only. When two packages claim one namespace the first in
+ * ordinal path order keeps it. Matches JSRunnerBuildProcessor, which copies
+ * the same folders into a player build.
+ */
+function loadPackageNamespaces(workingDir: string): Record<string, string> {
+    if (packageNamespacesCache) return packageNamespacesCache
+    const Path = CS.System.IO.Path
+    const Directory = CS.System.IO.Directory
+    const found: Record<string, string> = {}
+    packageNamespacesCache = found
+
+    const subdirs = (dir: string): string[] => {
+        const list = Directory.GetDirectories(dir)
+        const out: string[] = []
+        for (let i = 0; i < list.Length; i++) out.push(list[i])
+        // Default sort compares UTF-16 code units, which is C#'s ordinal order
+        return out.sort()
+    }
+
+    const modules = Path.Combine(workingDir, "node_modules")
+    if (!Directory.Exists(modules)) return found
+
+    const packages: string[] = []
+    for (const entry of subdirs(modules)) {
+        if (Path.GetFileName(entry).startsWith("@")) packages.push(...subdirs(entry))
+        else packages.push(entry)
+    }
+    for (const pkg of packages) {
+        const assets = Path.Combine(pkg, "assets")
+        if (!Directory.Exists(assets)) continue
+        for (const dir of subdirs(assets)) {
+            const ns = Path.GetFileName(dir)
+            if (ns.startsWith("@") && !(ns in found)) found[ns] = dir
+        }
+    }
+    return found
+}
+
+/**
  * Resolve an asset path to a full file path
  *
  * - Absolute paths are returned as-is (for loading from arbitrary locations)
@@ -158,6 +202,15 @@ function resolveAssetPath(assetPath: string): string {
                 if (nsInfo) {
                     // Resolve through manifest
                     return Path.Combine(workingDir, nsInfo.path, relativePath)
+                }
+
+                // A package's own folder, read in place. The app's folder for
+                // the namespace wins, as it does in a player build, where
+                // JSRunnerBuildProcessor ships it instead of the package's.
+                const own = Path.Combine(workingDir, manifest.userAssetsPath, namespace)
+                if (!CS.System.IO.Directory.Exists(own)) {
+                    const pkgDir = loadPackageNamespaces(workingDir)[namespace]
+                    if (pkgDir) return Path.Combine(pkgDir, relativePath)
                 }
             }
         }
