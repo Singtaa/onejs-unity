@@ -303,7 +303,7 @@ Flattens `:is()` and `:where()` selectors (used by Tailwind v3):
 .card .title { color: red; }
 ```
 
-**Known issue (every release so far, 0.9.1 included):** a `:is()` or `:where()` with a comma inside it, such as `.button:is(.primary, .secondary)`, never returns, so the build hangs. Until that is fixed, run `ussUnwrapIs()` only on CSS whose `:is()` and `:where()` each hold one selector.
+A `:is()` or `:where()` with a comma inside it expands to one selector per member: `.button:is(.primary, .secondary)` becomes `.button.primary, .button.secondary`. Before 0.10.0 such a rule never returned and the build hung.
 
 ## GPU Compute
 
