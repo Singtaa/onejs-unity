@@ -78,64 +78,55 @@ export function useAnimation(canvas: Canvas, build: (seconds: number) => Image, 
 export function useTexture(canvas: Canvas, build: () => Image, deps?: DependencyList): Texture | null
 export function useTexture(build: () => Image, deps?: DependencyList): Texture | null
 export function useTexture(
-    a: Canvas | (() => Image),
-    b?: (() => Image) | DependencyList,
-    c?: DependencyList,
+    canvasOrBuild: Canvas | (() => Image),
+    buildOrDeps?: (() => Image) | DependencyList,
+    maybeDeps?: DependencyList,
 ): Texture | null {
-    // The form is fixed for a call site, so the hooks below run in the same
-    // order on every render.
-    return typeof a === "function"
-        ? useChainTexture(a, (b as DependencyList | undefined) ?? [])
-        : useCanvasTexture(a, b as () => Image, c ?? [])
-}
+    // Both forms come down to one: a build, its deps, and a canvas or none
+    const canvas = typeof canvasOrBuild === "function" ? null : canvasOrBuild
+    const build = (canvas ? buildOrDeps : canvasOrBuild) as () => Image
+    const deps = (canvas ? maybeDeps : buildOrDeps as DependencyList | undefined) ?? []
 
-function useCanvasTexture(canvas: Canvas, build: () => Image, deps: DependencyList): Texture | null {
     const [texture, setTexture] = useState<Texture | null>(null)
     const latest = useRef(build)
     latest.current = build
 
     useEffect(() => {
-        const target = renderOnce(canvas, () => latest.current())
-        setTexture(target.texture())
-        return () => target.dispose()
+        const rendered = renderTexture(canvas, () => latest.current())
+        setTexture(rendered.texture)
+        // Not setTexture(null) on cleanup: it runs on unmount too, where
+        // setting state warns, and the next effect overwrites it anyway.
+        return rendered.release
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canvas.width, canvas.height, ...deps])
+    }, [canvas?.width, canvas?.height, ...deps])
 
     return texture
 }
 
-function useChainTexture(build: () => Image, deps: DependencyList): Texture | null {
-    const owned = useRef<Image[] | null>(null)
-    const [texture, setTexture] = useState<Texture | null>(null)
-
-    useEffect(() => {
-        let images: Image[] = []
-        let tex: Texture | null = null
-        beginOwnership()
-        try {
-            const result = build()
-            // render() before endOwnership, or the chain's own target is not
-            // counted among what this hook owns.
-            result.render()
-            tex = result.texture()
-        } catch (e) {
-            for (const img of endOwnership()) img.dispose()
-            throw e
-        }
-        images = endOwnership()
-        owned.current = images
-        setTexture(tex)
-
-        return () => {
-            for (const img of images) img.dispose()
-            owned.current = null
-            // Not setTexture(null): this runs on unmount too, and setting state
-            // there warns. The next effect overwrites it anyway.
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, deps)
-
-    return texture
+/**
+ * Renders `build()` once. With a canvas it renders into a target the canvas's
+ * size; without one the chain renders at its own size. `release` frees what
+ * the render made, the target or the chain's own images.
+ */
+function renderTexture(canvas: Canvas | null, build: () => Image): { texture: Texture; release: () => void } {
+    if (canvas) {
+        const target = renderOnce(canvas, build)
+        return { texture: target.texture(), release: () => target.dispose() }
+    }
+    beginOwnership()
+    let texture: Texture
+    try {
+        const result = build()
+        // render() before endOwnership, or the chain's own target is not
+        // counted among what is released
+        result.render()
+        texture = result.texture()
+    } catch (e) {
+        for (const img of endOwnership()) img.dispose()
+        throw e
+    }
+    const owned = endOwnership()
+    return { texture, release: () => { for (const img of owned) img.dispose() } }
 }
 
 /**
