@@ -26,6 +26,8 @@
 
 declare const CS: any
 declare function useExtensions(typeRef: any): void
+// The bootstrap installs atob on native; a browser has its own
+declare function atob(data: string): string
 // fetch is provided by QuickJSBootstrap.js (UnityWebRequest-backed) on native
 // platforms and by the browser on WebGL
 declare function fetch(url: string): Promise<{ ok: boolean; status: number; text(): Promise<string> }>
