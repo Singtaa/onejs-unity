@@ -540,20 +540,20 @@ describe("a chain from a texture you hold", () => {
 describe("still and animated renders", () => {
     it("renders a still into a canvas sized target and frees what the build made", async () => {
         const { canvas } = await load()
-        const { renderStill } = await import("./hooks")
+        const { renderOnce } = await import("./hooks")
         const bridge = (globalThis as any).CS.OneJS.Fx.FxBridge
         const c = canvas(32, 16)
-        const target = renderStill(c, () => c.noise())
+        const target = renderOnce(c, () => c.noise())
         expect(bridge.CreateTarget).toHaveBeenCalledWith(32, 16)
         expect(target.handle).toBeGreaterThan(0)
     })
 
     it("frees the target and every image a still made when its build throws", async () => {
         const { canvas } = await load()
-        const { renderStill } = await import("./hooks")
+        const { renderOnce } = await import("./hooks")
         const bridge = (globalThis as any).CS.OneJS.Fx.FxBridge
         const c = canvas(8)
-        expect(() => renderStill(c, () => { c.noise().render(); throw new Error("bad build") })).toThrow("bad build")
+        expect(() => renderOnce(c, () => { c.noise().render(); throw new Error("bad build") })).toThrow("bad build")
         // the noise target the build rendered, and the still's own target
         expect(bridge.Release).toHaveBeenCalledTimes(2)
     })

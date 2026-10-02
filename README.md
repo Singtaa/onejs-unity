@@ -32,7 +32,7 @@ Each module is its own subpath, so a bundle carries only what it imports. The ro
 | `onejs-unity/input` | Keyboard, mouse, gamepad, touch, InputActions read with `float()` and `vec2()`, a zero allocation reader whose reads check their binding, React hooks that re-render only when input changes | [`src/input/README.md`](src/input/README.md), [guide](https://onejs.com/docs/guides/input) |
 | `onejs-unity/audio` | `audio.load(path)`, then `play` and `loop`, on Unity's AudioSource | [guide](https://onejs.com/docs/guides/audio) |
 | `onejs-unity/physics2d` | `createPhysicsWorld`: 2D physics whose bodies move VisualElements, simulated in C# | [guide](https://onejs.com/docs/guides/physics) |
-| `onejs-unity/fx` | Textures as values: fused image operation chains, sources, `useStill` and `useAnimation` hooks | [`src/fx/README.md`](src/fx/README.md), [guide](https://onejs.com/docs/guides/image-fx) |
+| `onejs-unity/fx` | Textures as values: fused image operation chains, sources, `useTexture` and `useAnimation` hooks | [`src/fx/README.md`](src/fx/README.md), [guide](https://onejs.com/docs/guides/image-fx) |
 | `onejs-unity/sl` | The shader language a game imports (re-exported from `onejs-sl`) | [`src/sl/README.md`](src/sl/README.md), [guide](https://onejs.com/docs/guides/shader-language) |
 | `onejs-unity/sl/compiler` | The shader language at build time, parser included | [`src/sl/README.md`](src/sl/README.md) |
 | `onejs-unity/gpu` | Compute shaders from JavaScript, with a zero allocation dispatcher | [below](#gpu-compute), [guide](https://onejs.com/docs/guides/gpu-compute) |

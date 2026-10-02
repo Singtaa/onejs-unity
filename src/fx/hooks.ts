@@ -4,10 +4,10 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../timers.d.ts" />
 /**
- * React surface for the fx pipeline. A still and an animation, named as a pair:
+ * React surface for the fx pipeline. A texture and an animation, named as a pair:
  *
  *     const c = canvas(200)
- *     const badge = useStill(c, () => c.sdf("hexagon", { r: 0.4 }).outline(6, accent, "luminance"), [accent])
+ *     const badge = useTexture(c, () => c.sdf("hexagon", { r: 0.4 }).outline(6, accent, "luminance"), [accent])
  *     const fire = useAnimation(c, (t) => c.noise({ scroll: [0, -0.3] }).ramp(FIRE))
  *
  *     <View style={{ width: 200, height: 200, backgroundImage: badge }} />
@@ -26,8 +26,9 @@ const createTarget = (w: number, h: number): RenderTarget => imageFactory.target
  * Renders `build()` into a target the canvas's size and frees every image the
  * build caused to exist. The target is the caller's to dispose. If the build
  * throws, everything it made and the target are freed before the throw goes on.
+ * Exported for the tests; the package exports the hooks.
  */
-export function renderStill(canvas: Canvas, build: () => Image): RenderTarget {
+export function renderOnce(canvas: Canvas, build: () => Image): RenderTarget {
     const target = createTarget(canvas.width, canvas.height)
     let owned: Image[] = []
     beginOwnership()
@@ -41,33 +42,6 @@ export function renderStill(canvas: Canvas, build: () => Image): RenderTarget {
         for (const img of owned) img.dispose()
     }
     return target
-}
-
-/**
- * A still: builds a chain once, and again when `deps` change, renders it at
- * the canvas's size, and returns the Unity texture for a `backgroundImage`
- * style or an `<Image src>`.
- *
- *     const c = canvas(256)
- *     const glow = useStill(c, () => c.sdf("circle", { r: 0.3 }).blur(12), [])
- *
- * Everything the build makes is released after rendering, and the texture is
- * released when the deps change or the component unmounts. Returns null until
- * the first render has happened, so render something in its place.
- */
-export function useStill(canvas: Canvas, build: () => Image, deps: DependencyList = []): Texture | null {
-    const [texture, setTexture] = useState<Texture | null>(null)
-    const latest = useRef(build)
-    latest.current = build
-
-    useEffect(() => {
-        const target = renderStill(canvas, () => latest.current())
-        setTexture(target.texture())
-        return () => target.dispose()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canvas.width, canvas.height, ...deps])
-
-    return texture
 }
 
 /**
@@ -85,28 +59,52 @@ export function useAnimation(canvas: Canvas, build: (seconds: number) => Image, 
 }
 
 /**
- * Builds a chain, renders it, and returns the Unity texture to hand to a
- * `backgroundImage` style or an `<Image src>`.
+ * A texture: builds a chain once, and again when `deps` change, renders it at
+ * the canvas's size, and returns the Unity texture for a `backgroundImage`
+ * style or an `<Image src>`.
  *
- * The chain is rebuilt when `deps` change, and the previous one is released
- * first. Everything the build callback causes to be rendered is released
- * together, including an operand built inside it:
+ *     const c = canvas(256)
+ *     const glow = useTexture(c, () => c.sdf("circle", { r: 0.3 }).blur(12), [])
  *
- *     useTexture(() => {
- *         const mask = image.sdf(256, 256, "star", { r: 0.4 })  // owned too
- *         return image.noise(256, 256).blend(mask, "multiply")
- *     }, [])
+ * Everything the build makes is released after rendering, including an
+ * operand built inside it, and the texture is released when the deps change or
+ * the component unmounts. An `Image` created outside the build has already
+ * rendered by the time it gets here, so it stays yours to dispose. Returns null
+ * until the first render has happened, so render something in its place.
  *
- * An `Image` created *outside* the callback has already rendered by the time it
- * gets here, so it stays yours to dispose. The rule is that this owns what it
- * caused to exist, not what it merely used.
- *
- * Returns null until the first render has happened.
- *
- * @deprecated Use `useStill(canvas, build, deps)`, the still half of
- * `useStill` and `useAnimation`.
+ * The older form without a canvas, `useTexture(build, deps)`, still works and
+ * keeps the chain's own size.
  */
-export function useTexture(build: () => Image, deps: DependencyList = []): Texture | null {
+export function useTexture(canvas: Canvas, build: () => Image, deps?: DependencyList): Texture | null
+export function useTexture(build: () => Image, deps?: DependencyList): Texture | null
+export function useTexture(
+    a: Canvas | (() => Image),
+    b?: (() => Image) | DependencyList,
+    c?: DependencyList,
+): Texture | null {
+    // The form is fixed for a call site, so the hooks below run in the same
+    // order on every render.
+    return typeof a === "function"
+        ? useChainTexture(a, (b as DependencyList | undefined) ?? [])
+        : useCanvasTexture(a, b as () => Image, c ?? [])
+}
+
+function useCanvasTexture(canvas: Canvas, build: () => Image, deps: DependencyList): Texture | null {
+    const [texture, setTexture] = useState<Texture | null>(null)
+    const latest = useRef(build)
+    latest.current = build
+
+    useEffect(() => {
+        const target = renderOnce(canvas, () => latest.current())
+        setTexture(target.texture())
+        return () => target.dispose()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvas.width, canvas.height, ...deps])
+
+    return texture
+}
+
+function useChainTexture(build: () => Image, deps: DependencyList): Texture | null {
     const owned = useRef<Image[] | null>(null)
     const [texture, setTexture] = useState<Texture | null>(null)
 
@@ -214,7 +212,7 @@ function sameDeps(a: DependencyList, b: DependencyList): boolean {
  * around it.
  *
  * @deprecated Use `useAnimation(canvas, build, deps)`, the animated half of
- * `useStill` and `useAnimation`.
+ * `useTexture` and `useAnimation`.
  */
 export function useAnimatedTexture(canvas: Canvas, build: (seconds: number) => Image, deps?: DependencyList): Texture | null
 export function useAnimatedTexture(width: number, height: number, build: (seconds: number) => Image, deps?: DependencyList): Texture | null

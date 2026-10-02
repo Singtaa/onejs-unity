@@ -7,7 +7,7 @@
  */
 
 export { image, canvas, Image, RenderTarget } from "./image"
-export { useStill, useAnimation, useImage, renderStill, useTexture, useAnimatedTexture } from "./hooks"
+export { useTexture, useAnimation, useImage, useAnimatedTexture } from "./hooks"
 export type { Operand, RGBA, ColorLike, Stops, Texture, Canvas, NoiseOptions, GradientStop, GradientDirection, TransformOptions } from "./image"
 export { OP, MODE, SOURCE, BLEND, WIRE_VERSION, MAX_FUSED_OPS, MAX_GRADIENT_STOPS, MAX_FILTER_TAPS, FIRST_SPATIAL_OP, FIRST_FILTER_OP, isPixelOp, isSpatialOp, isFilterOp } from "./ops"
 export type { OpCode, Mode, BlendMode } from "./ops"
