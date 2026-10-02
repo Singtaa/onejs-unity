@@ -41,7 +41,9 @@ function makeApp(files: Record<string, string>): { root: string, bundle: string 
 }
 
 afterEach(() => {
-    while (tmpDirs.length) fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true })
+    // Retried, because Windows refuses to remove a folder a process that just
+    // exited (esbuild's service, say) still had open for a moment.
+    while (tmpDirs.length) fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 })
 })
 
 const REACT_APP = `import { useState } from "react"\nexport function useCount() { return useState(0) }\n`
@@ -163,7 +165,9 @@ describe("onejs-unity build", () => {
             fs.writeFileSync(path.join(root, "index.tsx"), "export const word = \"second\"\n")
             expect(await until(() => read().includes("second"), 10000)).toBe(true)
         } finally {
+            const exited = new Promise((resolve) => child.once("exit", resolve))
             child.kill()
+            await exited
         }
     }, 30000)
 })
