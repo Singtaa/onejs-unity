@@ -118,7 +118,7 @@ function restoreGlobals(content, globals) {
 function extractClassNames(ussContent, hash) {
     // Strip /* ... */ comments first so prose like "e.g. a frame" isn't scraped as a
     // phantom `.g` class into the generated styles map / .d.ts.
-    const withoutComments = ussContent.replace(/\/\*[\s\S]*?\*\//g, "")
+    const withoutComments = selectorText(ussContent.replace(/\/\*[\s\S]*?\*\//g, ""))
     // Match class selectors that start with a dot followed by valid CSS identifier
     // This regex captures class names but not pseudo-class names (which follow :)
     const classRegex = /\.([a-zA-Z_][\w-]*)/g
@@ -152,7 +152,19 @@ function extractClassNames(ussContent, hash) {
  * @returns {string} USS content with scoped class names
  */
 function scopeClassNames(ussContent, classMap) {
-    let scoped = ussContent
+    // Rewrite selectors only: a declaration body holds values such as
+    // url("bg.png"), whose ".png" would otherwise be scoped like a class.
+    return ussContent.replace(/([^{}]*)(\{[^}]*\}|$)/g, (_, selectors, body) =>
+        scopeSelectors(selectors, classMap) + body)
+}
+
+/** The selector text of a stylesheet: everything outside `{ ... }` bodies. */
+function selectorText(ussContent) {
+    return ussContent.replace(/\{[^}]*\}/g, "{}")
+}
+
+function scopeSelectors(selectorsText, classMap) {
+    let scoped = selectorsText
 
     // Sort by length (longest first) to avoid partial replacements
     // e.g., ".button" shouldn't match ".button-primary"

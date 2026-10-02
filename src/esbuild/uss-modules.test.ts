@@ -117,3 +117,17 @@ describe("uss modules scoping", () => {
         expect(new Set(names).size).toBe(2)
     })
 })
+
+describe("uss modules leave declaration values alone", () => {
+    it("does not scope a file extension inside url() or resource()", async () => {
+        const root = makeApp({
+            "a.module.uss": '.card { background-image: url("images/bg.png"); -unity-font: resource("Fonts/Inter.ttf"); }',
+            "index.ts": 'import s from "./a.module.uss"\nexport default s',
+        })
+        const out = await bundle(root, "index.ts")
+        expect(out).toContain('url("images/bg.png")')
+        expect(out).toContain('resource("Fonts/Inter.ttf")')
+        expect(out).not.toMatch(/png__|ttf__|"png"|"ttf"/)
+        expect(out).toMatch(/card__[0-9a-f]{6}/)
+    })
+})
