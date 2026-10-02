@@ -78,6 +78,23 @@ describe("onejs-unity/globals", () => {
         `)).toBe("")
     })
 
+    it("types the onejs namespace as the same globals under one name", () => {
+        expect(typecheck(`
+            const playing: boolean = onejs.isPlaying
+            onejs.root.Add(new CS.UnityEngine.UIElements.VisualElement())
+            const dir: string = onejs.paths.persistentData + onejs.paths.working
+            onejs.fs.readText(dir).then((text: string) => onejs.fs.writeText(dir, text))
+            const files: string[] = onejs.fs.list(dir, "*.json")
+            const loaded: boolean = onejs.styles.compile(".a {}", "a") && onejs.fs.exists(dir)
+            const known: boolean = onejs.cs.typeExists("UnityEngine.Vector3") || onejs.cs.typeExists(CS.UnityEngine.GameObject)
+            const type: CS.System.Type = onejs.cs.typeOf(CS.UnityEngine.MeshFilter)
+            onejs.cs.release(onejs.root)
+            console.log(playing, files, loaded, known, type)
+            // @ts-expect-error the namespace is frozen
+            onejs.isPlaying = true
+        `)).toBe("")
+    })
+
     it("keeps the runtime's internals out of an app's names", () => {
         expect(typecheck(`
             // @ts-expect-error internal, reached through onejs-react

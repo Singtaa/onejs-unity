@@ -98,7 +98,10 @@ interface Storage {
     clear(): void;
     key(index: number): string | null;
 }
-/** Native platforms: PlayerPrefs, where clear() deletes every key, key() returns null and length is 0. */
+/**
+ * Native platforms: PlayerPrefs under an `onejs:` prefix, so clear() removes only
+ * what localStorage stored. Writes reach disk a second after the last one.
+ */
 declare const localStorage: Storage;
 /** Native platforms: the same PlayerPrefs storage as localStorage, so it persists across restarts. */
 declare const sessionStorage: Storage;
@@ -176,7 +179,11 @@ interface RequestInit {
     body?: string;
 }
 
-/** Native platforms: UnityWebRequest. A request cannot be aborted yet, so there is no signal option. */
+/**
+ * Native platforms: UnityWebRequest. Rejects with a TypeError when no response
+ * arrives, as on the web; an HTTP error status resolves with `ok` false. A
+ * request cannot be aborted yet, so there is no signal option.
+ */
 declare function fetch(url: string, init?: RequestInit): Promise<Response>;
 
 interface AbortEvent {
@@ -338,3 +345,56 @@ declare class WebSocket {
  * const asset = await loadResourceAsync("Prefabs/Player");
  */
 declare function loadResourceAsync(path: string, type?: any): Promise<any>;
+
+/**
+ * Every public OneJS global under one name. The older names (`__root`,
+ * `__isPlaying`, `readTextFile`, `loadStyleSheet`, `$typeof`, `useExtensions`,
+ * `releaseObject` and the rest) still work and mean the same thing.
+ */
+declare const onejs: {
+    /** True in Play mode, false in edit-mode preview. */
+    readonly isPlaying: boolean;
+    /** The root VisualElement the app renders into. */
+    readonly root: CS.UnityEngine.UIElements.VisualElement;
+    /** Folders the app reads and writes. */
+    readonly paths: {
+        /** The app's working directory (`~/` in the Editor). */
+        readonly working: string;
+        /** Application.persistentDataPath: user-writable storage that persists across sessions */
+        readonly persistentData: string;
+        /** Application.streamingAssetsPath: read-only assets bundled with the app (a URL on Android and WebGL) */
+        readonly streamingAssets: string;
+        /** Application.dataPath: Assets in the Editor, the data folder in a build */
+        readonly data: string;
+        /** Application.temporaryCachePath: a temporary cache directory */
+        readonly temporaryCache: string;
+    };
+    /** Files by absolute path. */
+    readonly fs: {
+        readonly readText: typeof readTextFile;
+        readonly writeText: typeof writeTextFile;
+        readonly exists: typeof fileExists;
+        readonly directoryExists: typeof directoryExists;
+        readonly delete: typeof deleteFile;
+        readonly list: typeof listFiles;
+    };
+    /** Stylesheets on the root element. */
+    readonly styles: {
+        readonly load: typeof loadStyleSheet;
+        readonly compile: typeof compileStyleSheet;
+        readonly remove: typeof removeStyleSheet;
+        readonly clear: typeof clearStyleSheets;
+    };
+    /** The C# side: types, extension methods and object lifetimes. */
+    readonly cs: {
+        readonly typeOf: typeof $typeof;
+        /**
+         * Whether a C# type is loaded, by reference or full name. A `CS.` path is
+         * never null even when nothing is there, so this is the existence check.
+         * One crossing per name, then cached.
+         */
+        readonly typeExists: (type: Function | string) => boolean;
+        readonly extensions: typeof useExtensions;
+        readonly release: typeof releaseObject;
+    };
+};

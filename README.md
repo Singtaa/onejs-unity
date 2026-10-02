@@ -143,7 +143,7 @@ Options:
 }
 ```
 
-`onejs-unity/globals` types what a OneJS app runs with: `__root`, `__isPlaying`, timers (extra arguments included), `console`, `fetch`, `URL`, `localStorage`, `WebSocket`, the file and style sheet functions, and the `onejs:tailwind`, `onejs:themes` and `*.uss` imports. It updates with this package. Declarations of your own go in `types/global.d.ts`.
+`onejs-unity/globals` types what a OneJS app runs with: `__root`, `__isPlaying`, timers (extra arguments included), `console`, `fetch`, `URL`, `localStorage`, `WebSocket`, the file and style sheet functions, and the `onejs:tailwind`, `onejs:themes` and `*.uss` imports, plus the `onejs` namespace that holds all of them under one name (`onejs.root`, `onejs.isPlaying`, `onejs.fs.readText`, `onejs.cs.typeExists`, needing OneJS 3.9.5). It updates with this package. Declarations of your own go in `types/global.d.ts`.
 
 A project from before OneJS 3.9.5 has a copy of these in `types/global.d.ts`: delete the copy, keep your own additions, and add the line above.
 
