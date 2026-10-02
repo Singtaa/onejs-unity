@@ -419,10 +419,12 @@ export function loadBytes(assetPath: string): Uint8Array {
         throw new Error(`Asset not found: ${assetPath} (resolved to ${fullPath})`)
     }
 
-    const bytes = File.ReadAllBytes(fullPath)
-    const result = new Uint8Array(bytes.Length)
-    for (let i = 0; i < bytes.Length; i++) {
-        result[i] = bytes[i]
+    // The C# byte[] crosses once as base64: reading it element by element
+    // would cross twice per byte (Length, then the indexer).
+    const binary = atob(CS.System.Convert.ToBase64String(File.ReadAllBytes(fullPath)))
+    const result = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+        result[i] = binary.charCodeAt(i)
     }
     return result
 }
