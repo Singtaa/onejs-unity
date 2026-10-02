@@ -274,9 +274,9 @@ It is the wrong tool for game logic. Read `input` directly inside your frame
 loop instead, where the same values cost no render at all:
 
 ```typescript
-import { useAnimationFrame } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
-useAnimationFrame(() => {
+useFrame(() => {
     if (input.keyboard.isKeyDown("Space")) jump()
 })
 ```
@@ -377,7 +377,7 @@ For performance-critical game loops, use `InputReader` to avoid per-frame alloca
 
 ```typescript
 import { useInputReader } from "onejs-unity/input"
-import { useAnimationFrame } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function Game() {
     // Reader is built once, auto-ticks each frame, auto-disposes on unmount
@@ -398,7 +398,7 @@ function Game() {
         .gamepadVec2("gamepadLook", "rightStick")
     )
 
-    useAnimationFrame(() => {
+    useFrame(() => {
         // All vec2() calls return the SAME cached object each frame
         const move = reader.vec2("move")
         const look = reader.vec2("look")
@@ -502,26 +502,16 @@ Note: This only disables `onPointerMove` handlers. `onPointerEnter`, `onPointerL
 
 ## Manual Polling (Alternative)
 
-If you prefer manual control, you can use `input` directly with your own animation loop:
+If you prefer manual control, read `input` directly from a frame loop:
 
 ```typescript
 import { input } from "onejs-unity/input"
-
-function useAnimationFrame(callback: () => void) {
-    const ref = useRef(callback)
-    ref.current = callback
-    useEffect(() => {
-        let id: number
-        const tick = () => { ref.current(); id = requestAnimationFrame(tick) }
-        id = requestAnimationFrame(tick)
-        return () => cancelAnimationFrame(id)
-    }, [])
-}
+import { useFrame } from "onejs-react"
 
 function Game() {
     const [pos, setPos] = useState({ x: 0, y: 0 })
 
-    useAnimationFrame(() => {
+    useFrame(() => {
         setPos(input.mouse.position)
         if (input.keyboard.wasKeyPressed("Space")) {
             player.jump()

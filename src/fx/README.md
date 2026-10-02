@@ -119,7 +119,7 @@ the `sdfDistance` switch in each of the two shaders.
 | `index.ts` | `onejs-unity/fx`: what the module exports |
 | `ops.ts` | The wire contract: opcodes, operand modes, the window size |
 | `image.ts` | The `Image` node, `RenderTarget`, the `image` source factory and `canvas` |
-| `hooks.ts` | `useTexture`, `useImage`, `useAnimatedTexture` |
+| `hooks.ts` | `useStill`, `useAnimation`, `useImage` (and the deprecated `useTexture`, `useAnimatedTexture`) |
 | `sdf.ts` | Shape ids and parameter packing for the sdf source |
 | `fx.test.ts` | Encoding tests |
 
@@ -132,9 +132,9 @@ the failure mode the particle wire was built to avoid.
 
 ## What is not here yet
 
-Phases 2a, 2b, 2c and 3 are in. Phase 3 is `hooks.ts`: `useTexture` for a
+Phases 2a, 2b, 2c and 3 are in. Phase 3 is `hooks.ts`: `useStill` for a
 chain that ends in a texture, `useImage` for one kept as an operand (built
-synchronously, never null), and `useAnimatedTexture` for one rebuilt per frame
+synchronously, never null), and `useAnimation` for one rebuilt per frame
 into a stable target, calling the latest render's build function and setting
 the clock `scroll` reads. Still to come:
 

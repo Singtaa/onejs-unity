@@ -294,7 +294,8 @@ terrain.recalculateNormals()
 
 ```typescript
 import { noise } from "onejs-unity/proc"
-import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
+import { useComputeTexture } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function AnimatedBackground() {
     const texture = useComputeTexture({ autoResize: false, width: 512, height: 512 })
@@ -305,7 +306,7 @@ function AnimatedBackground() {
         noise.gpu.preload().then(() => setReady(true))
     }, [])
 
-    useAnimationFrame((dt) => {
+    useFrame((dt) => {
         if (!ready || !texture) return
         timeRef.current += dt
 

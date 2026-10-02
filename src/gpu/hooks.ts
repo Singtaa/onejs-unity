@@ -113,6 +113,9 @@ export interface UseAnimationFrameOptions {
  *         .float("_Time", performance.now() / 1000)
  *         .dispatchAuto(texture)
  * })
+ *
+ * @deprecated Use `useFrame((dt) => ..., deps)` from onejs-react, the one frame
+ * hook, which shares a single loop and follows a host's clock.
  */
 export function useAnimationFrame(
     callback: (deltaTime: number) => void,

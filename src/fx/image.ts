@@ -35,6 +35,7 @@ declare const CS: {
         Fx: {
             FxBridge: {
                 LoadTexture: (path: string) => number
+                WrapTexture: (texture: unknown) => number
                 Execute: (buffer: unknown) => number
                 ExecuteInto: (dst: number, buffer: unknown) => void
                 CreateTarget: (width: number, height: number) => number
@@ -487,6 +488,15 @@ export const image = {
         return Image.from(OP.SOURCE_TEXTURE, [CS.OneJS.Fx.FxBridge.LoadTexture(path)])
     },
 
+    /**
+     * Starts a chain from a Unity texture you already hold: an asset, a
+     * render texture, a camera's output. The texture stays yours; the chain
+     * only reads it.
+     */
+    texture(texture: Texture): Image {
+        return Image.from(OP.SOURCE_TEXTURE, [CS.OneJS.Fx.FxBridge.WrapTexture(texture)])
+    },
+
     /** Wraps a texture handle you already hold, from GPUBridge or elsewhere. */
     fromHandle(handle: number): Image {
         return Image.from(OP.SOURCE_TEXTURE, [handle])
@@ -580,6 +590,8 @@ export interface Canvas {
     noise(o?: NoiseOptions): Image
     gradient(stops: Stops, direction?: GradientDirection | number): Image
     sdf(kind: SdfKind, o?: SdfOptions): Image
+    /** A chain from a texture you hold. It keeps its own size; the canvas does not resize it. */
+    texture(texture: Texture): Image
     target(): RenderTarget
 }
 
@@ -591,6 +603,7 @@ export function canvas(width: number, height: number = width): Canvas {
         noise: (o) => image.noise(width, height, o),
         gradient: (stops, direction) => image.gradient(width, height, stops, direction),
         sdf: (kind, o) => image.sdf(width, height, kind, o),
+        texture: (texture) => image.texture(texture),
         target: () => image.target(width, height),
     }
 }

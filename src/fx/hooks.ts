@@ -4,13 +4,13 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../timers.d.ts" />
 /**
- * React surface for the fx pipeline.
+ * React surface for the fx pipeline. A still and an animation, named as a pair:
  *
- *     const tex = useTexture(() =>
- *         image.sdf(200, 200, "hexagon", { r: 0.4 }).outline(6, accent, "luminance"),
- *         [accent])
+ *     const c = canvas(200)
+ *     const badge = useStill(c, () => c.sdf("hexagon", { r: 0.4 }).outline(6, accent, "luminance"), [accent])
+ *     const fire = useAnimation(c, (t) => c.noise({ scroll: [0, -0.3] }).ramp(FIRE))
  *
- *     <View style={{ width: 200, height: 200, backgroundImage: tex }} />
+ *     <View style={{ width: 200, height: 200, backgroundImage: badge }} />
  *
  * Without a hook you would reach for useMemo, and that gets two things wrong:
  * nothing releases the target when the component unmounts, and an empty
@@ -21,6 +21,68 @@ import { useEffect, useRef, useState, type DependencyList } from "react"
 import { Image, RenderTarget, beginOwnership, endOwnership, image as imageFactory, setAnimationTime, type Canvas, type Texture } from "./image"
 
 const createTarget = (w: number, h: number): RenderTarget => imageFactory.target(w, h)
+
+/**
+ * Renders `build()` into a target the canvas's size and frees every image the
+ * build caused to exist. The target is the caller's to dispose. If the build
+ * throws, everything it made and the target are freed before the throw goes on.
+ */
+export function renderStill(canvas: Canvas, build: () => Image): RenderTarget {
+    const target = createTarget(canvas.width, canvas.height)
+    let owned: Image[] = []
+    beginOwnership()
+    try {
+        build().renderTo(target)
+    } catch (e) {
+        target.dispose()
+        throw e
+    } finally {
+        owned = endOwnership()
+        for (const img of owned) img.dispose()
+    }
+    return target
+}
+
+/**
+ * A still: builds a chain once, and again when `deps` change, renders it at
+ * the canvas's size, and returns the Unity texture for a `backgroundImage`
+ * style or an `<Image src>`.
+ *
+ *     const c = canvas(256)
+ *     const glow = useStill(c, () => c.sdf("circle", { r: 0.3 }).blur(12), [])
+ *
+ * Everything the build makes is released after rendering, and the texture is
+ * released when the deps change or the component unmounts. Returns null until
+ * the first render has happened, so render something in its place.
+ */
+export function useStill(canvas: Canvas, build: () => Image, deps: DependencyList = []): Texture | null {
+    const [texture, setTexture] = useState<Texture | null>(null)
+    const latest = useRef(build)
+    latest.current = build
+
+    useEffect(() => {
+        const target = renderStill(canvas, () => latest.current())
+        setTexture(target.texture())
+        return () => target.dispose()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvas.width, canvas.height, ...deps])
+
+    return texture
+}
+
+/**
+ * An animation: `build(seconds)` runs every frame against a clock and renders
+ * into one texture at the canvas's size, so the element is assigned once.
+ *
+ *     const c = canvas(512)
+ *     const fire = useAnimation(c, (t) => c.noise({ scale: 4, scroll: [0, -0.3] }).ramp(FIRE))
+ *
+ * A build that throws stops the animation and logs once, rather than every
+ * frame.
+ */
+export function useAnimation(canvas: Canvas, build: (seconds: number) => Image, deps: DependencyList = []): Texture | null {
+    return useAnimatedTexture(canvas, build, deps)
+}
 
 /**
  * Builds a chain, renders it, and returns the Unity texture to hand to a
@@ -39,8 +101,10 @@ const createTarget = (w: number, h: number): RenderTarget => imageFactory.target
  * gets here, so it stays yours to dispose. The rule is that this owns what it
  * caused to exist, not what it merely used.
  *
- * Returns null on the first render if the runtime is unavailable, so a caller
- * can render something rather than throwing.
+ * Returns null until the first render has happened.
+ *
+ * @deprecated Use `useStill(canvas, build, deps)`, the still half of
+ * `useStill` and `useAnimation`.
  */
 export function useTexture(build: () => Image, deps: DependencyList = []): Texture | null {
     const owned = useRef<Image[] | null>(null)
@@ -56,9 +120,11 @@ export function useTexture(build: () => Image, deps: DependencyList = []): Textu
             // counted among what this hook owns.
             result.render()
             tex = result.texture()
-        } finally {
-            images = endOwnership()
+        } catch (e) {
+            for (const img of endOwnership()) img.dispose()
+            throw e
         }
+        images = endOwnership()
         owned.current = images
         setTexture(tex)
 
@@ -146,6 +212,9 @@ function sameDeps(a: DependencyList, b: DependencyList): boolean {
  * callback captured its first render's values for as long as the loop ran,
  * and every game with a slider ended up mirroring its state into a ref to get
  * around it.
+ *
+ * @deprecated Use `useAnimation(canvas, build, deps)`, the animated half of
+ * `useStill` and `useAnimation`.
  */
 export function useAnimatedTexture(canvas: Canvas, build: (seconds: number) => Image, deps?: DependencyList): Texture | null
 export function useAnimatedTexture(width: number, height: number, build: (seconds: number) => Image, deps?: DependencyList): Texture | null
@@ -193,6 +262,10 @@ export function useAnimatedTexture(
             setAnimationTime(seconds)
             try {
                 latest.current(seconds).renderTo(target)
+            } catch (e) {
+                // Stop rather than throw the same error sixty times a second
+                cancelAnimationFrame(raf)
+                console.error("[onejs fx] the animation's build threw, so it stopped:", e)
             } finally {
                 setAnimationTime(0)
                 owned = endOwnership()

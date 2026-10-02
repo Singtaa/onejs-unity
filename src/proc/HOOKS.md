@@ -79,7 +79,7 @@ Create a 3D noise source for animated effects.
 
 ```tsx
 import { useNoise3D } from "onejs-unity/proc"
-import { useAnimationFrame } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function AnimatedEffect() {
     const noise = useNoise3D({
@@ -89,7 +89,7 @@ function AnimatedEffect() {
     })
 
     const time = useRef(0)
-    useAnimationFrame((dt) => {
+    useFrame((dt) => {
         time.current += dt
         const value = noise.sample(x, y, time.current)  // z = time for animation
     })
@@ -141,7 +141,7 @@ function AnimatedNoise() {
     // With animated: true, dispatch reads the hook's own clock unless you
     // pass { time }. The `time` field is a getter: destructured at render,
     // it would be the time of that render, not of this frame.
-    useAnimationFrame(() => {
+    useFrame(() => {
         if (ready && texture) {
             dispatch(texture)
         }
@@ -400,7 +400,8 @@ function NoiseTerrain() {
 
 ```tsx
 import { useNoiseTexture } from "onejs-unity/proc"
-import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
+import { useComputeTexture } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function AnimatedNoiseBackground() {
     const texture = useComputeTexture({
@@ -418,7 +419,7 @@ function AnimatedNoiseBackground() {
         octaves: 5
     })
 
-    useAnimationFrame(() => {
+    useFrame(() => {
         if (ready && texture) {
             dispatch(texture)
         }

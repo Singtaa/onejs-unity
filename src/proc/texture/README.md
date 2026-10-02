@@ -236,7 +236,8 @@ interface GPUPatternOptions {
 
 ```typescript
 import { texture } from "onejs-unity/proc"
-import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
+import { useComputeTexture } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function AnimatedMarble() {
     const rt = useComputeTexture({ autoResize: false, width: 512, height: 512 })
@@ -249,7 +250,7 @@ function AnimatedMarble() {
         }
     }, [])
 
-    useAnimationFrame((dt) => {
+    useFrame((dt) => {
         time.current += dt
         if (ready && rt) {
             texture.gpu.dispatchSync(rt, "marble", {
@@ -383,7 +384,8 @@ const stone = texture.voronoi({
 
 ```typescript
 import { texture } from "onejs-unity/proc"
-import { useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
+import { useComputeTexture } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function AnimatedBackground() {
     const rt = useComputeTexture({ autoResize: false, width: 512, height: 512 })
@@ -393,7 +395,7 @@ function AnimatedBackground() {
         texture.gpu.preload()
     }, [])
 
-    useAnimationFrame((dt) => {
+    useFrame((dt) => {
         if (!texture.gpu.available || !rt) return
         timeRef.current += dt
 

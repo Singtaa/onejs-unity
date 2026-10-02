@@ -19,6 +19,9 @@ beforeEach(() => {
             Fx: {
                 FxBridge: {
                     LoadTexture: vi.fn(() => nextHandle++),
+                    WrapTexture: vi.fn(() => nextHandle++),
+                    CreateTarget: vi.fn(() => nextHandle++),
+                    ExecuteInto: vi.fn(),
                     Execute: vi.fn((buf: Float32Array) => {
                         executed.push(buf)
                         return nextHandle++
@@ -518,5 +521,40 @@ describe("fx for reading aloud", () => {
         }
         const own = decode(image.noise(64, 64, { type: "turbulence", gain: 0.8 }).encode()).steps[0].args
         expect(own[10]).toBeCloseTo(0.8)
+    })
+})
+
+describe("a chain from a texture you hold", () => {
+    it("starts from image.texture(tex) and canvas.texture(tex), wrapping it once in C#", async () => {
+        const { image, canvas, OP } = { ...(await load()), ...(await import("./ops")) }
+        const tex = { name: "art" }
+        const a = decode(image.texture(tex).blur(2).encode()).steps[0]!
+        expect(a.op).toBe(OP.SOURCE_TEXTURE)
+        const b = decode(canvas(64).texture(tex).encode()).steps[0]!
+        expect(b.op).toBe(OP.SOURCE_TEXTURE)
+        const wrap = (globalThis as any).CS.OneJS.Fx.FxBridge.WrapTexture
+        expect(wrap).toHaveBeenCalledWith(tex)
+    })
+})
+
+describe("still and animated renders", () => {
+    it("renders a still into a canvas sized target and frees what the build made", async () => {
+        const { canvas } = await load()
+        const { renderStill } = await import("./hooks")
+        const bridge = (globalThis as any).CS.OneJS.Fx.FxBridge
+        const c = canvas(32, 16)
+        const target = renderStill(c, () => c.noise())
+        expect(bridge.CreateTarget).toHaveBeenCalledWith(32, 16)
+        expect(target.handle).toBeGreaterThan(0)
+    })
+
+    it("frees the target and every image a still made when its build throws", async () => {
+        const { canvas } = await load()
+        const { renderStill } = await import("./hooks")
+        const bridge = (globalThis as any).CS.OneJS.Fx.FxBridge
+        const c = canvas(8)
+        expect(() => renderStill(c, () => { c.noise().render(); throw new Error("bad build") })).toThrow("bad build")
+        // the noise target the build rendered, and the still's own target
+        expect(bridge.Release).toHaveBeenCalledTimes(2)
     })
 })

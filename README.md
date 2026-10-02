@@ -31,7 +31,7 @@ Each module is its own subpath, so a bundle carries only what it imports. The ro
 | `onejs-unity/input` | Keyboard, mouse, gamepad, touch, InputActions, a zero allocation reader, React hooks | [`src/input/README.md`](src/input/README.md), [guide](https://onejs.com/docs/guides/input) |
 | `onejs-unity/audio` | `audio.load(path)`, then `play` and `loop`, on Unity's AudioSource | [guide](https://onejs.com/docs/guides/audio) |
 | `onejs-unity/physics2d` | `createPhysicsWorld`: 2D physics whose bodies move VisualElements, simulated in C# | [guide](https://onejs.com/docs/guides/physics) |
-| `onejs-unity/fx` | Textures as values: fused image operation chains, sources, `useTexture` hooks | [`src/fx/README.md`](src/fx/README.md), [guide](https://onejs.com/docs/guides/image-fx) |
+| `onejs-unity/fx` | Textures as values: fused image operation chains, sources, `useStill` and `useAnimation` hooks | [`src/fx/README.md`](src/fx/README.md), [guide](https://onejs.com/docs/guides/image-fx) |
 | `onejs-unity/sl` | The shader language a game imports (re-exported from `onejs-sl`) | [`src/sl/README.md`](src/sl/README.md), [guide](https://onejs.com/docs/guides/shader-language) |
 | `onejs-unity/sl/compiler` | The shader language at build time, parser included | [`src/sl/README.md`](src/sl/README.md) |
 | `onejs-unity/gpu` | Compute shaders from JavaScript, with a zero allocation dispatcher | [below](#gpu-compute), [guide](https://onejs.com/docs/guides/gpu-compute) |
@@ -314,13 +314,14 @@ Access Unity compute shaders from JavaScript with optional zero-allocation dispa
 
 ```typescript
 import { View } from "onejs-react"
-import { compute, useComputeShader, useComputeTexture, useAnimationFrame } from "onejs-unity/gpu"
+import { compute, useComputeShader, useComputeTexture } from "onejs-unity/gpu"
+import { useFrame } from "onejs-react"
 
 function BackgroundEffect({ shaderGlobal }: { shaderGlobal: unknown }) {
     const shader = useComputeShader(shaderGlobal, "MyEffect")
     const texture = useComputeTexture({ autoResize: true })
 
-    useAnimationFrame(() => {
+    useFrame(() => {
         if (!shader || !texture) return
         shader.kernel("CSMain")
             .float("_Time", performance.now() / 1000)
@@ -366,8 +367,8 @@ Pass a schema to pre-resolve all property IDs at creation time:
 
 ```typescript
 import { useMemo } from "react"
-import { View } from "onejs-react"
-import { useComputeShader, useComputeTexture, useAnimationFrame, type KernelDispatcher } from "onejs-unity/gpu"
+import { View, useFrame } from "onejs-react"
+import { useComputeShader, useComputeTexture, type KernelDispatcher } from "onejs-unity/gpu"
 
 function ZeroAllocEffect({ shaderGlobal }: { shaderGlobal: unknown }) {
     const shader = useComputeShader(shaderGlobal)
@@ -383,7 +384,7 @@ function ZeroAllocEffect({ shaderGlobal }: { shaderGlobal: unknown }) {
         [shader]
     )
 
-    useAnimationFrame(() => {
+    useFrame(() => {
         if (!dispatch || !texture) return
 
         // No lookups on the first frame: every ID is already cached
