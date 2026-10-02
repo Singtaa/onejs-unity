@@ -25,7 +25,8 @@ import { createReader } from "./reader"
 
 // Global declarations for QuickJS environment
 declare const performance: { now(): number }
-declare const console: { error(...args: unknown[]): void }
+declare const console: { error(...args: unknown[]): void; warn(...args: unknown[]): void }
+declare const requestAnimationFrame: (callback: () => void) => number
 
 import { keyboard } from "./keyboard"
 import { mouse } from "./mouse"
@@ -36,6 +37,69 @@ import { getInputBridge } from "./backend"
 
 // Phase mapping
 const PHASE_MAP: ActionPhase[] = ["disabled", "waiting", "started", "performed", "canceled"]
+
+// MARK: Action events
+
+/**
+ * C# queues each watched action's started/performed/canceled as it happens,
+ * and one drain a frame hands them to the callbacks. Only actions with a
+ * callback are watched, and the frame loop runs only while one exists, so an
+ * app that never calls `on()` pays nothing.
+ */
+const EVENT_NAMES = ["started", "performed", "canceled"] as const
+const watchedActions = new Map<number, InputActionImpl>()
+let pumping = false
+let teardownHookOwner: unknown = null
+
+function watchAction(handle: number, action: InputActionImpl): void {
+    if (watchedActions.has(handle)) return
+    try {
+        getInputBridge().WatchActionEvents(handle)
+    } catch (e) {
+        console.warn(`[onejs-unity/input] action.on() needs a newer OneJS than this project has, so "${action.name}" callbacks will never fire. Update the OneJS package.`, e)
+        return
+    }
+    watchedActions.set(handle, action)
+    ensureTeardownHook()
+    if (!pumping) {
+        pumping = true
+        requestAnimationFrame(pumpActionEvents)
+    }
+}
+
+function unwatchAction(handle: number): void {
+    if (!watchedActions.delete(handle)) return
+    getInputBridge().UnwatchActionEvents(handle)
+}
+
+function pumpActionEvents(): void {
+    if (watchedActions.size === 0) {
+        pumping = false
+        return
+    }
+    const events: string = getInputBridge().DrainActionEvents()
+    if (events) {
+        for (const event of events.split(";")) {
+            const comma = event.indexOf(",")
+            const action = watchedActions.get(Number(event.slice(0, comma)))
+            action?._triggerCallbacks(EVENT_NAMES[Number(event.slice(comma + 1))])
+        }
+    }
+    requestAnimationFrame(pumpActionEvents)
+}
+
+// C# keeps its subscriptions across a hot reload; the new context's actions
+// get new handles, so the old ones are dropped on teardown
+function ensureTeardownHook(): void {
+    const onTeardown = (globalThis as { __onTeardown?: (cb: () => void) => void }).__onTeardown
+    if (typeof onTeardown !== "function" || teardownHookOwner === onTeardown) return
+    teardownHookOwner = onTeardown
+    onTeardown(() => {
+        teardownHookOwner = null
+        pumping = false
+        for (const handle of [...watchedActions.keys()]) unwatchAction(handle)
+    })
+}
 
 // ============ InputAction Implementation ============
 
@@ -89,25 +153,33 @@ class InputActionImpl implements InputAction {
             this._callbacks.set(event, new Set())
         }
         this._callbacks.get(event)!.add(callback)
+        watchAction(this._handle, this)
 
         // Return unsubscribe function
         return () => {
             this._callbacks.get(event)?.delete(callback)
+            if (!this._hasCallbacks()) unwatchAction(this._handle)
         }
     }
 
     off(): void {
         this._callbacks.clear()
+        unwatchAction(this._handle)
     }
 
-    // Internal: trigger callbacks (called from polling loop if needed)
+    private _hasCallbacks(): boolean {
+        for (const set of this._callbacks.values()) if (set.size > 0) return true
+        return false
+    }
+
+    // Internal: called by the action event pump
     _triggerCallbacks(event: "started" | "performed" | "canceled"): void {
         const callbacks = this._callbacks.get(event)
         if (!callbacks) return
 
         const context: ActionCallbackContext = {
             time: performance.now() / 1000,
-            phase: this.phase,
+            phase: event,
             readValue: <T>(): T => this.value() as T,
         }
 
