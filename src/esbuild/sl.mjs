@@ -162,7 +162,7 @@ function describeUniform(u) {
  * program, plus the program in the two web languages. No parser and no `.sl`
  * source.
  */
-function moduleFor(compiled, relativePath, source) {
+function moduleFor(compiled, relativePath, source, live = false) {
     const payload = {
         uniforms: compiled.uniforms,
         defaults: compiled.defaults,
@@ -181,6 +181,7 @@ function moduleFor(compiled, relativePath, source) {
     // does not ask for it: the default import carries no `.sl` text. Something
     // showing a shader beside its own output can then show the file rather
     // than a copy of it, which is the only way that copy cannot drift.
+    if (live) return liveModule(payload, relativePath, source)
     return `// Shader program: ${relativePath}
 // Auto-generated from the .sl source at build time: do not edit
 
@@ -195,6 +196,31 @@ export const source = ${JSON.stringify(source)}
  * Anything else is rethrown with the file named, because a parse failure an
  * author cannot locate is worse than a crash.
  */
+/**
+ * The same program, swappable while the cart runs: the Play editor's preview.
+ *
+ * The editor compiles a `.sl` file as it is edited and hands the result to the
+ * running cart, so a shader is tuned without restarting the game. The default
+ * export is a live binding, which esbuild keeps through scope hoisting and
+ * minification, and the module registers a setter under the file's name on
+ * `globalThis.__ojLiveShaders`. A swapped program reaches every ShaderProgram
+ * that renders after it, by hash, the way a changed program always has.
+ *
+ * Only on request. A published cart and an ejected one stay a constant, with
+ * no global and no setter.
+ */
+function liveModule(payload, relativePath, source) {
+    const key = relativePath.replace(/^(\.\/|\/)+/, "")
+    return `// Shader program: ${relativePath}, swappable while it runs
+// Auto-generated from the .sl source at build time: do not edit
+
+let program = ${JSON.stringify(payload)}
+export { program as default }
+export const source = ${JSON.stringify(source)}
+;(globalThis.__ojLiveShaders || (globalThis.__ojLiveShaders = {}))[${JSON.stringify(key)}] = (next) => { program = next }
+`
+}
+
 function esbuildError(error, file, source) {
     const line = typeof error?.line === "number" ? error.line : undefined
     if (line === undefined) {
@@ -231,9 +257,11 @@ function esbuildError(error, file, source) {
  *   no outfile.
  * @param {(manifest: { version: number, programs: unknown[] }) => void} [options.onManifest]
  *   Called with the manifest on every build, whether or not one is written.
+ * @param {boolean} [options.live] Make each program swappable while the cart
+ *   runs, by its file's name (see liveModule). For an editor's preview only.
  */
 export function slPlugin(options = {}) {
-    const { generateTypes = true, compiler = null, onManifest = null } = options
+    const { generateTypes = true, compiler = null, onManifest = null, live = false } = options
 
     return {
         name: "sl-program",
@@ -304,7 +332,7 @@ export function slPlugin(options = {}) {
 
                 let contents
                 try {
-                    contents = moduleFor(sl.compile(program), args.path, source)
+                    contents = moduleFor(sl.compile(program), args.path, source, live)
                 } catch (e) {
                     // A program the parser accepted and an emitter could not
                     // print is a gap in the emitter, not a line of the

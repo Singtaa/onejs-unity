@@ -462,3 +462,68 @@ describe("the manifest", () => {
         expect(fs.existsSync(path.join(root, "app.sl.json"))).toBe(false)
     })
 })
+
+/**
+ * A preview build's programs can be swapped while the cart runs.
+ *
+ * The Play editor compiles a `.sl` file as it is edited and hands the result
+ * to the running cart, so a shader is tuned without restarting the game (the
+ * Ghost Hunt dry run, 1 Oct 2026). The import stays a live binding, and the
+ * module registers a setter under the file's name. A build that is not asked
+ * for this carries none of it: a published cart and an ejected one are a
+ * constant, as before.
+ */
+describe("a live build", () => {
+    const globals = globalThis as { __ojLiveShaders?: Record<string, (next: unknown) => void> }
+    afterEach(() => { delete globals.__ojLiveShaders })
+
+    async function run(code: string): Promise<{ current: () => { hash: string } }> {
+        return import("data:text/javascript;base64," + Buffer.from(code).toString("base64"))
+    }
+
+    const APP = {
+        "fx/plasma.sl": PLASMA,
+        "index.ts": `import plasma from "./fx/plasma.sl"\nexport const current = () => plasma`,
+    }
+
+    it("lets the running cart's import be swapped, by the file's name", async () => {
+        const root = makeApp(APP)
+        const { code } = await bundle(root, "index.ts", { live: true })
+        const cart = await run(code)
+        const before = cart.current()
+        expect(before.hash).toBe(compile(parse(PLASMA, { file: "fx/plasma.sl" })).hash)
+
+        const next = { hash: "next", uniforms: [] }
+        globals.__ojLiveShaders!["fx/plasma.sl"]!(next)
+        expect(cart.current()).toBe(next)
+    })
+
+    it("stays swappable through a minified IIFE, which is how the site builds", async () => {
+        const root = makeApp(APP)
+        const prevCwd = process.cwd()
+        process.chdir(root)
+        let code: string
+        try {
+            const result = await esbuild.build({
+                entryPoints: [path.join(root, "index.ts")], bundle: true, write: false, minify: true,
+                format: "iife", globalName: "__exports", logLevel: "silent",
+                plugins: [slPlugin({ generateTypes: false, live: true })],
+            })
+            code = result.outputFiles[0]!.text
+        } finally {
+            process.chdir(prevCwd)
+        }
+        const exports = new Function(code + "\nreturn __exports")() as { current: () => unknown }
+        const next = { hash: "next" }
+        globals.__ojLiveShaders!["fx/plasma.sl"]!(next)
+        expect(exports.current()).toBe(next)
+    })
+
+    it("is not in a build that did not ask for it", async () => {
+        const root = makeApp(APP)
+        const { code } = await bundle(root, "index.ts")
+        expect(code).not.toContain("__ojLiveShaders")
+        await run(code)
+        expect(globals.__ojLiveShaders).toBeUndefined()
+    })
+})
