@@ -13,6 +13,9 @@
  * file this barrel reaches. `onejs-unity/sl/compiler` is the build time
  * surface, parser included.
  */
+import { compile } from "onejs-sl/compile"
+import type { Compiled } from "onejs-sl/compile"
+
 export {
     sl, SLOP, SL_ARITY, SL_NAME, INPUT_ID, isSampling, SL_IR_VERSION, toJSON, fromJSON, SL_SDF_SHAPES,
     TYPE, INPUTS, MAX_NODES, SLError, hashProgram, widthName, UNIFORM_SLOTS, TEXTURE_SLOTS,
@@ -21,12 +24,15 @@ export type {
     ProgramJSON, SlSdfKind, SLOpCode, SLType, InputName, NodeRef, SLNode, Program, UniformDecl, TextureDecl,
     Float, Vec2, Vec3, Vec4, Num, ProgramInputs, Texture,
 } from "onejs-sl/core"
+export { compile } from "onejs-sl/compile"
+export type { Compiled } from "onejs-sl/compile"
 /**
- * `encode` is `compile` under its old name, so a game written against it
- * draws unchanged.
+ * `compile` under its old name, so a game written against it draws unchanged.
+ * @deprecated Use `compile`.
  */
-export { compile, compile as encode } from "onejs-sl/compile"
-export type { Compiled, Compiled as Encoded } from "onejs-sl/compile"
+export const encode = compile
+/** @deprecated Use `Compiled`. */
+export type Encoded = Compiled
 export { emitShader, emitFragmentBody, uniformProperty } from "onejs-sl/emit/unity"
 export type { EmitOptions } from "onejs-sl/emit/unity"
 export { emitGLSL, emitWGSL, WEB_UNIFORM_SLOTS } from "onejs-sl/emit/web"
