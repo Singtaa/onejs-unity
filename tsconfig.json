@@ -21,5 +21,6 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "//exclude": "runtime-globals.d.ts declares an app's globals against unity-types, which this package does not install; runtime-globals.test.ts typechecks it as an app does",
+  "exclude": ["node_modules", "dist", "src/runtime-globals.d.ts"]
 }

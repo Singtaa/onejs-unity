@@ -25,7 +25,8 @@ Each module is its own subpath, so a bundle carries only what it imports. The ro
 
 | Import | What it is | Docs |
 |---|---|---|
-| `onejs-unity/esbuild` | esbuild plugins: C# imports, Tailwind, USS modules, themes, `.sl` files, asset manifest | [below](#esbuild-plugins) |
+| `onejs-unity/esbuild` | The OneJS build in one call (`oneJSConfig`), and its esbuild plugins: C# imports, Tailwind, USS modules, themes, `.sl` files, asset manifest | [below](#the-onejs-build) |
+| `onejs-unity/globals` | Types for the runtime's globals, named in tsconfig's `types` | [below](#runtime-globals) |
 | `onejs-unity/postcss` | PostCSS plugins for a Tailwind v3 pipeline | [below](#postcss-plugins) |
 | `onejs-unity/assets` | Load images, fonts, text and JSON with Editor/Build path resolution | [below](#asset-loading) |
 | `onejs-unity/input` | Keyboard, mouse, gamepad, touch, InputActions, a zero allocation reader, React hooks | [`src/input/README.md`](src/input/README.md), [guide](https://onejs.com/docs/guides/input) |
@@ -104,7 +105,51 @@ During Unity builds, `JSRunnerBuildProcessor` (OneJS 3.9.3 and newer) copies the
 
 ## Build Plugins
 
+### The OneJS build
+
+A OneJS app's whole build is one call:
+
+```javascript
+// esbuild.config.mjs
+import { oneJSConfig } from "onejs-unity/esbuild"
+
+export default oneJSConfig({ entry: "index.tsx" })
+```
+
+```json
+"scripts": {
+    "build": "onejs-unity build",
+    "watch": "onejs-unity watch"
+}
+```
+
+`oneJSConfig` returns esbuild options: the bundle JSRunner reads (`../app.js.txt`, an IIFE whose exports land on `__exports`), React and `oj` pinned to the app's own copies, `.uss` files as text, the source map named `app.js.map.txt`, and every plugin below. `onejs-unity build` runs the config's default export with the app's own esbuild, and `onejs-unity watch` rebuilds on every save.
+
+`process.env.NODE_ENV` picks React's build. It is `"development"` unless the build runs with `NODE_ENV=production`, which is how OneJS 3.9.5 and newer builds a player, so players get React's production build and the editor keeps its warnings.
+
+Options:
+
+- `entry`: the entry file. Default `"index.tsx"`.
+- `outfile`: where the bundle goes. Default `"../app.js.txt"`.
+- `plugins`: the project's own esbuild plugins, run after OneJS's.
+- `tailwind`: options for `tailwindPlugin` (`content`, `safelist`, `preflight`).
+- Any other esbuild option passes straight through. `alias`, `define` and `loader` are merged with OneJS's, so adding an alias keeps React deduplicated.
+
+### Runtime globals
+
+```json
+"compilerOptions": {
+    "types": ["unity-types", "react", "onejs-unity/globals"]
+}
+```
+
+`onejs-unity/globals` types what a OneJS app runs with: `__root`, `__isPlaying`, timers (extra arguments included), `console`, `fetch`, `URL`, `localStorage`, `WebSocket`, the file and style sheet functions, and the `onejs:tailwind`, `onejs:themes` and `*.uss` imports. It updates with this package. Declarations of your own go in `types/global.d.ts`.
+
+A project from before OneJS 3.9.5 has a copy of these in `types/global.d.ts`: delete the copy, keep your own additions, and add the line above.
+
 ### esbuild Plugins
+
+The plugins `oneJSConfig` runs, one by one, for a config of your own:
 
 ```javascript
 import { importTransformPlugin, ussModulesPlugin, tailwindPlugin, themesPlugin, slPlugin, copyAssetsPlugin } from "onejs-unity/esbuild"
