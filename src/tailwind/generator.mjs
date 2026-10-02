@@ -723,9 +723,26 @@ const PROPERTY_RANK = new Map(PROPERTY_ORDER.map((p, i) => [p, i]))
  * the filesystem handed the scanner its files in.
  */
 function compareRules(a, b) {
+    if (a.vrank !== b.vrank) return a.vrank - b.vrank
     if (a.rank !== b.rank) return a.rank - b.rank
     if (a.count !== b.count) return b.count - a.count
     return a.className < b.className ? -1 : a.className > b.className ? 1 : 0
+}
+
+// Tailwind's own variant order, so the later state wins a tie the way it does
+// on the web: a pressed button is also hovered, and active must beat hover.
+const VARIANT_ORDER = ["checked", "hover", "focus", "focus-within", "active", "enabled", "disabled"]
+
+/**
+ * 0 for a plain utility, then one step per state in VARIANT_ORDER; variants
+ * outside it (arbitrary, `*`) sort first among the stateful ones. USS scores a
+ * pseudo-class like a class, so every one-state rule ties at the same
+ * specificity and only this order separates them.
+ */
+function variantRank(variant) {
+    if (!variant) return 0
+    const pseudo = variant.replace(/^(group|peer)-/, "")
+    return 1 + VARIANT_ORDER.indexOf(pseudo) + 1
 }
 
 function rankOf(declarations) {
@@ -910,6 +927,7 @@ export function generateUSS(classNames, options = {}) {
             rule: `${selector} {\n${generateDeclarations(declarations)}\n}`,
             rank: rankOf(declarations),
             count: Object.keys(declarations).length,
+            vrank: variantRank(variant),
             className,
         }
 
@@ -949,27 +967,34 @@ export function generateUSS(classNames, options = {}) {
 
     uss += `/* USS variable declarations */\n* {\n    --tw-scale-x: 1;\n    --tw-scale-y: 1;\n    --tw-translate-x: 0;\n    --tw-translate-y: 0;\n}\n\n`
     
-    uss += `/* Base utilities */\n`
-    uss += rules.sort(compareRules).map((e) => e.rule).join("\n\n")
-
-    // Add breakpoint-scoped rules
-    for (const [bp, bpEntries] of Object.entries(breakpointRules)) {
-        if (bpEntries.length === 0) continue
-
-        uss += `\n\n/* ${bp} breakpoint (${breakpoints[bp] || 1536}px+) */\n`
-        // For USS, we use ancestor selectors instead of media queries
-        // .sm .sm_c_p-4 { ... }
-        // Each bucket is a cascade of its own, so it gets the same ordering.
-        const bpRules = bpEntries.sort(compareRules).map((e) => e.rule)
-        for (const rule of bpRules) {
-            // Wrap with breakpoint ancestor selector
-            const wrappedRule = rule.replace(
-                /^(\.[^\s{]+)/,
-                `.${bp} $1`
-            )
-            uss += wrappedRule + "\n\n"
+    // Plain utilities, then each breakpoint's plain utilities, then the state
+    // variants, then each breakpoint's state variants. A breakpoint's ancestor
+    // class (`.md .md_c_x`) scores the same as a state (`.x:hover`), and on the
+    // web the state wins (media queries add no specificity), so states go after.
+    const plain = (entries) => entries.filter((e) => e.vrank === 0)
+    const stateful = (entries) => entries.filter((e) => e.vrank !== 0)
+    // For USS, breakpoints use ancestor selectors instead of media queries:
+    // .md .md_c_p-4 { ... }
+    const emitBreakpoints = (pick, label) => {
+        for (const [bp, bpEntries] of Object.entries(breakpointRules)) {
+            const entries = pick(bpEntries)
+            if (entries.length === 0) continue
+            uss += `\n\n/* ${bp} breakpoint (${breakpoints[bp] || 1536}px+)${label} */\n`
+            for (const e of entries.sort(compareRules)) {
+                uss += e.rule.replace(/^(\.[^\s{]+)/, `.${bp} $1`) + "\n\n"
+            }
         }
     }
+
+    uss += `/* Base utilities */\n`
+    uss += plain(rules).sort(compareRules).map((e) => e.rule).join("\n\n")
+    emitBreakpoints(plain, "")
+    const states = stateful(rules)
+    if (states.length > 0) {
+        uss += `\n\n/* State variants */\n`
+        uss += states.sort(compareRules).map((e) => e.rule).join("\n\n")
+    }
+    emitBreakpoints(stateful, ", state variants")
 
     return uss.trim()
 }

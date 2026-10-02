@@ -953,3 +953,25 @@ describe("tracking", () => {
         expect(uss).toMatch(/\.tracking-normal \{\s*letter-spacing: 0;\s*\}/)
     })
 })
+
+// USS scores a class and a pseudo-class alike (UssCompiler: 10 each), so
+// `.hover_c_x:hover` and `.md .md_c_x` tie at 21 and order decides, as it does
+// between two state variants. The web's answer: a state beats a breakpoint's
+// base, and active beats focus beats hover.
+describe("cascade order of state variants", () => {
+    const uss = generateUSS(["bg-blue-500", "hover:bg-blue-600", "focus:bg-blue-400", "active:bg-blue-700", "md:bg-gray-900"])
+    const at = (fragment: string) => {
+        const i = uss.indexOf(fragment)
+        expect(i, `${fragment} in output`).toBeGreaterThanOrEqual(0)
+        return i
+    }
+
+    it("puts active after focus after hover", () => {
+        expect(at(":hover {")).toBeLessThan(at(":focus {"))
+        expect(at(":focus {")).toBeLessThan(at(":active {"))
+    })
+
+    it("puts state rules after a breakpoint's base rules", () => {
+        expect(at(".md .md_c_bg-gray-900")).toBeLessThan(at(":hover {"))
+    })
+})
