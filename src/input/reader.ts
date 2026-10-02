@@ -17,6 +17,8 @@ import type {
     ReaderKeyBinding,
 } from "./types"
 import { getInputBridge } from "./backend"
+import { MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, MOUSE_FORWARD, MOUSE_BACK } from "./mouse"
+import { getButtonBit } from "./gamepad"
 
 
 // ============ Zero-Alloc Invoker System ============
@@ -133,192 +135,203 @@ function resolveKeyBinding(binding: ReaderKeyBinding): number[] {
  * Check if any key in an array of key IDs is down.
  */
 function isAnyKeyDown(keyIds: number[], inv: typeof _invokers): boolean {
-    for (const id of keyIds) {
-        if (inv!.getKeyDownById(id)) return true
+    // An index loop: for...of would create an iterator every frame
+    for (let i = 0; i < keyIds.length; i++) {
+        if (inv!.getKeyDownById(keyIds[i])) return true
     }
     return false
 }
 
-// ============ Binding Types ============
+// ============ Bindings ============
 
-type BoolBindingType = "keyDown" | "keyPressed" | "keyReleased" | "mouseButton" | "gamepadButton"
-type FloatBindingType = "keyAxis" | "mouseFloat" | "gamepadFloat"
-type Vec2BindingType = "mouseVec2" | "gamepadVec2" | "keyAxis2D"
+/**
+ * The read a binding answers to. Reading it any other way throws, because a
+ * mismatched read used to return a plausible value: `pressed()` on a held
+ * mouse button was true every frame it was held.
+ */
+type Read = "down" | "pressed" | "released" | "float" | "vec2"
 
-interface BoolBinding {
-    type: BoolBindingType
-    value: boolean
-    // Key bindings: use integer ID for zero-alloc
+type Source =
+    | "key" | "keyAxis" | "keyAxis2D"
+    | "mouseButton" | "mouseFloat" | "mouseVec2"
+    | "gamepadButton" | "gamepadFloat" | "gamepadVec2"
+
+interface Binding {
+    readonly name: string
+    readonly read: Read
+    /** The builder method that made it, for error messages */
+    readonly builder: string
+    readonly source: Source
+    bool: boolean
+    num: number
+    /** Allocated once for a vec2 binding and updated in place */
+    readonly vec?: Vector2
+
+    // What it reads, resolved at build time so tick() passes only numbers
     keyId?: number
-    // Mouse button
-    button?: MouseButtonType
-    // Gamepad: use integer ID for zero-alloc
-    gamepadButtonId?: number
-    gamepadIndex?: number
-}
-
-interface FloatBinding {
-    type: FloatBindingType
-    value: number
-    // Key axis: use integer IDs for zero-alloc
     negativeKeyId?: number
     positiveKeyId?: number
-    // Mouse float
-    mouseProperty?: MouseFloatProperty
-    // Gamepad float
-    gamepadProperty?: GamepadFloatProperty
-    gamepadIndex?: number
-}
-
-interface Vec2Binding {
-    type: Vec2BindingType
-    value: Vector2  // Pre-allocated, updated in place
-    // Mouse vec2
-    mouseProperty?: MouseVec2Property
-    // Gamepad vec2
-    gamepadProperty?: GamepadVec2Property
-    gamepadIndex?: number
-    // Key axis 2D: arrays of key IDs for each direction
     upKeyIds?: number[]
     downKeyIds?: number[]
     leftKeyIds?: number[]
     rightKeyIds?: number[]
+    mouseBit?: number
+    mouseProperty?: MouseFloatProperty | MouseVec2Property
+    gamepadIndex?: number
+    gamepadButtonId?: number
+    gamepadBit?: number
+    gamepadProperty?: GamepadFloatProperty | GamepadVec2Property
 }
+
+const MOUSE_BITS: Record<MouseButtonType, number> = {
+    left: MOUSE_LEFT,
+    right: MOUSE_RIGHT,
+    middle: MOUSE_MIDDLE,
+    forward: MOUSE_FORWARD,
+    back: MOUSE_BACK,
+}
+
+const EDGE_BUILDERS: Partial<Record<Source, string>> = {
+    key: "key",
+    mouseButton: "mouseButton",
+    gamepadButton: "gamepadButton",
+}
+
+const PREFIX = "[onejs-unity/input]"
 
 // ============ InputReader Implementation ============
 
 class InputReaderImpl implements InputReader {
-    private readonly _boolBindings: Map<string, BoolBinding> = new Map()
-    private readonly _floatBindings: Map<string, FloatBinding> = new Map()
-    private readonly _vec2Bindings: Map<string, Vec2Binding> = new Map()
+    // An array for tick(), which walks it every frame without an iterator,
+    // and a map for the reads, which look one name up
+    private _bindings: Binding[]
+    private readonly _byName: Map<string, Binding>
+    private _disposed = false
 
-    constructor(
-        boolBindings: Map<string, BoolBinding>,
-        floatBindings: Map<string, FloatBinding>,
-        vec2Bindings: Map<string, Vec2Binding>
-    ) {
+    // Which shared masks tick() needs, so it reads each at most once a frame
+    private readonly _mouseHeld: boolean
+    private readonly _mousePressed: boolean
+    private readonly _mouseReleased: boolean
+    private readonly _gamepadEdges: boolean
+
+    constructor(bindings: Binding[]) {
         // Initialize zero-alloc invokers on first reader creation
         initZeroAllocInvokers()
 
-        this._boolBindings = boolBindings
-        this._floatBindings = floatBindings
-        this._vec2Bindings = vec2Bindings
+        this._bindings = bindings
+        this._byName = new Map(bindings.map(b => [b.name, b]))
+        const mouse = (read: Read) => bindings.some(b => b.source === "mouseButton" && b.read === read)
+        this._mouseHeld = mouse("down")
+        this._mousePressed = mouse("pressed")
+        this._mouseReleased = mouse("released")
+        this._gamepadEdges = bindings.some(b => b.source === "gamepadButton" && b.read !== "down")
     }
 
     tick(): void {
         // Use zero-alloc invokers with integer IDs (no string marshaling!)
         const inv = _invokers!
 
-        // Update bool bindings
-        for (const binding of this._boolBindings.values()) {
-            switch (binding.type) {
-                case "keyDown":
-                    binding.value = inv.getKeyDownById(binding.keyId!)
-                    break
-                case "keyPressed":
-                    binding.value = inv.getKeyPressedById(binding.keyId!)
-                    break
-                case "keyReleased":
-                    binding.value = inv.getKeyReleasedById(binding.keyId!)
-                    break
-                case "mouseButton": {
-                    const buttons = inv.getMouseButtons()
-                    switch (binding.button) {
-                        case "left": binding.value = (buttons & 1) !== 0; break
-                        case "right": binding.value = (buttons & 2) !== 0; break
-                        case "middle": binding.value = (buttons & 4) !== 0; break
-                        case "forward": binding.value = (buttons & 8) !== 0; break
-                        case "back": binding.value = (buttons & 16) !== 0; break
-                    }
-                    break
-                }
-                case "gamepadButton":
-                    binding.value = inv.getGamepadButtonDownById(
-                        binding.gamepadIndex ?? 0,
-                        binding.gamepadButtonId!
-                    )
-                    break
-            }
-        }
+        // Mouse button edges and gamepad button edges have no zero alloc
+        // invoker yet, so they cross through the bridge: once a frame for
+        // the mouse, once per edge binding for a gamepad
+        const bridge = this._mousePressed || this._mouseReleased || this._gamepadEdges ? getInputBridge() : null
+        const mouseHeld = this._mouseHeld ? inv.getMouseButtons() : 0
+        const mousePressed = this._mousePressed ? bridge.GetMouseButtonsPressed() as number : 0
+        const mouseReleased = this._mouseReleased ? bridge.GetMouseButtonsReleased() as number : 0
 
-        // Update float bindings
-        for (const binding of this._floatBindings.values()) {
-            switch (binding.type) {
+        const bindings = this._bindings
+        for (let i = 0; i < bindings.length; i++) {
+            const b = bindings[i]
+            switch (b.source) {
+                case "key":
+                    b.bool = b.read === "down" ? inv.getKeyDownById(b.keyId!)
+                        : b.read === "pressed" ? inv.getKeyPressedById(b.keyId!)
+                        : inv.getKeyReleasedById(b.keyId!)
+                    break
                 case "keyAxis": {
                     let value = 0
-                    if (inv.getKeyDownById(binding.positiveKeyId!)) value += 1
-                    if (inv.getKeyDownById(binding.negativeKeyId!)) value -= 1
-                    binding.value = value
-                    break
-                }
-                case "mouseFloat": {
-                    switch (binding.mouseProperty) {
-                        case "scrollX": binding.value = inv.getScrollX(); break
-                        case "scrollY": binding.value = inv.getScrollY(); break
-                        case "positionX": binding.value = inv.getMousePositionX(); break
-                        case "positionY": binding.value = inv.getMousePositionY(); break
-                        case "deltaX": binding.value = inv.getMouseDeltaX(); break
-                        case "deltaY": binding.value = inv.getMouseDeltaY(); break
-                    }
-                    break
-                }
-                case "gamepadFloat": {
-                    const idx = binding.gamepadIndex ?? 0
-                    switch (binding.gamepadProperty) {
-                        case "leftTrigger": binding.value = inv.getLeftTrigger(idx); break
-                        case "rightTrigger": binding.value = inv.getRightTrigger(idx); break
-                        case "leftStickX": binding.value = inv.getLeftStickX(idx); break
-                        case "leftStickY": binding.value = inv.getLeftStickY(idx); break
-                        case "rightStickX": binding.value = inv.getRightStickX(idx); break
-                        case "rightStickY": binding.value = inv.getRightStickY(idx); break
-                    }
-                    break
-                }
-            }
-        }
-
-        // Update vec2 bindings (update in place: no allocation!)
-        for (const binding of this._vec2Bindings.values()) {
-            switch (binding.type) {
-                case "mouseVec2": {
-                    switch (binding.mouseProperty) {
-                        case "position":
-                            binding.value.x = inv.getMousePositionX()
-                            binding.value.y = inv.getMousePositionY()
-                            break
-                        case "delta":
-                            binding.value.x = inv.getMouseDeltaX()
-                            binding.value.y = inv.getMouseDeltaY()
-                            break
-                        case "scroll":
-                            binding.value.x = inv.getScrollX()
-                            binding.value.y = inv.getScrollY()
-                            break
-                    }
-                    break
-                }
-                case "gamepadVec2": {
-                    const idx = binding.gamepadIndex ?? 0
-                    switch (binding.gamepadProperty) {
-                        case "leftStick":
-                            binding.value.x = inv.getLeftStickX(idx)
-                            binding.value.y = inv.getLeftStickY(idx)
-                            break
-                        case "rightStick":
-                            binding.value.x = inv.getRightStickX(idx)
-                            binding.value.y = inv.getRightStickY(idx)
-                            break
-                    }
+                    if (inv.getKeyDownById(b.positiveKeyId!)) value += 1
+                    if (inv.getKeyDownById(b.negativeKeyId!)) value -= 1
+                    b.num = value
                     break
                 }
                 case "keyAxis2D": {
                     let x = 0, y = 0
-                    if (isAnyKeyDown(binding.rightKeyIds!, inv)) x += 1
-                    if (isAnyKeyDown(binding.leftKeyIds!, inv)) x -= 1
-                    if (isAnyKeyDown(binding.upKeyIds!, inv)) y += 1
-                    if (isAnyKeyDown(binding.downKeyIds!, inv)) y -= 1
-                    binding.value.x = x
-                    binding.value.y = y
+                    if (isAnyKeyDown(b.rightKeyIds!, inv)) x += 1
+                    if (isAnyKeyDown(b.leftKeyIds!, inv)) x -= 1
+                    if (isAnyKeyDown(b.upKeyIds!, inv)) y += 1
+                    if (isAnyKeyDown(b.downKeyIds!, inv)) y -= 1
+                    b.vec!.x = x
+                    b.vec!.y = y
+                    break
+                }
+                case "mouseButton": {
+                    const mask = b.read === "down" ? mouseHeld : b.read === "pressed" ? mousePressed : mouseReleased
+                    b.bool = (mask & b.mouseBit!) !== 0
+                    break
+                }
+                case "mouseFloat":
+                    switch (b.mouseProperty) {
+                        case "scrollX": b.num = inv.getScrollX(); break
+                        case "scrollY": b.num = inv.getScrollY(); break
+                        case "positionX": b.num = inv.getMousePositionX(); break
+                        case "positionY": b.num = inv.getMousePositionY(); break
+                        case "deltaX": b.num = inv.getMouseDeltaX(); break
+                        case "deltaY": b.num = inv.getMouseDeltaY(); break
+                    }
+                    break
+                case "mouseVec2":
+                    switch (b.mouseProperty) {
+                        case "position":
+                            b.vec!.x = inv.getMousePositionX()
+                            b.vec!.y = inv.getMousePositionY()
+                            break
+                        case "delta":
+                            b.vec!.x = inv.getMouseDeltaX()
+                            b.vec!.y = inv.getMouseDeltaY()
+                            break
+                        case "scroll":
+                            b.vec!.x = inv.getScrollX()
+                            b.vec!.y = inv.getScrollY()
+                            break
+                    }
+                    break
+                case "gamepadButton": {
+                    const idx = b.gamepadIndex!
+                    if (b.read === "down") {
+                        b.bool = inv.getGamepadButtonDownById(idx, b.gamepadButtonId!)
+                    } else {
+                        const mask: number = b.read === "pressed"
+                            ? bridge.GetGamepadButtonsPressed(idx)
+                            : bridge.GetGamepadButtonsReleased(idx)
+                        b.bool = (mask & b.gamepadBit!) !== 0
+                    }
+                    break
+                }
+                case "gamepadFloat": {
+                    const idx = b.gamepadIndex!
+                    switch (b.gamepadProperty) {
+                        case "leftTrigger": b.num = inv.getLeftTrigger(idx); break
+                        case "rightTrigger": b.num = inv.getRightTrigger(idx); break
+                        case "leftStickX": b.num = inv.getLeftStickX(idx); break
+                        case "leftStickY": b.num = inv.getLeftStickY(idx); break
+                        case "rightStickX": b.num = inv.getRightStickX(idx); break
+                        case "rightStickY": b.num = inv.getRightStickY(idx); break
+                    }
+                    break
+                }
+                case "gamepadVec2": {
+                    const idx = b.gamepadIndex!
+                    switch (b.gamepadProperty) {
+                        case "leftStick":
+                            b.vec!.x = inv.getLeftStickX(idx)
+                            b.vec!.y = inv.getLeftStickY(idx)
+                            break
+                        case "rightStick":
+                            b.vec!.x = inv.getRightStickX(idx)
+                            b.vec!.y = inv.getRightStickY(idx)
+                            break
+                    }
                     break
                 }
             }
@@ -326,158 +339,172 @@ class InputReaderImpl implements InputReader {
     }
 
     down(name: string): boolean {
-        return this._boolBindings.get(name)?.value ?? false
+        return this._binding(name, "down").bool
     }
 
     pressed(name: string): boolean {
-        return this._boolBindings.get(name)?.value ?? false
+        return this._binding(name, "pressed").bool
     }
 
     released(name: string): boolean {
-        return this._boolBindings.get(name)?.value ?? false
+        return this._binding(name, "released").bool
     }
 
     float(name: string): number {
-        return this._floatBindings.get(name)?.value ?? 0
+        return this._binding(name, "float").num
     }
 
     vec2(name: string): Vector2 {
-        const binding = this._vec2Bindings.get(name)
-        if (!binding) {
-            // Return a dummy object: shouldn't happen if used correctly
-            return { x: 0, y: 0 }
-        }
-        return binding.value  // Returns the SAME object each time!
+        return this._binding(name, "vec2").vec!  // the SAME object every frame
     }
 
     dispose(): void {
-        this._boolBindings.clear()
-        this._floatBindings.clear()
-        this._vec2Bindings.clear()
+        this._disposed = true
+        this._bindings = []
+        this._byName.clear()
+    }
+
+    private _binding(name: string, read: Read): Binding {
+        const b = this._byName.get(name)
+        if (b !== undefined && b.read === read) return b
+        throw new Error(this._misread(name, read, b))
+    }
+
+    private _misread(name: string, read: Read, b: Binding | undefined): string {
+        const call = `reader.${read}("${name}")`
+        if (this._disposed) return `${PREFIX} ${call}: this reader was disposed.`
+        if (b === undefined) {
+            const bound = [...this._byName.keys()]
+            return bound.length > 0
+                ? `${PREFIX} ${call}: no binding named "${name}". Bound: ${bound.join(", ")}.`
+                : `${PREFIX} ${call}: this reader has no bindings.`
+        }
+        let message = `${PREFIX} ${call} does not fit "${name}", which is bound with ${b.builder}(): `
+            + `read it with reader.${b.read}("${name}")`
+        const base = EDGE_BUILDERS[b.source]
+        if (base !== undefined && b.read === "down" && (read === "pressed" || read === "released")) {
+            const edge = read === "pressed" ? "Pressed" : "Released"
+            message += `, or bind it with ${base}${edge}() for the frame it is ${read}`
+        }
+        return message + "."
     }
 }
 
 // ============ InputReaderBuilder Implementation ============
 
 class InputReaderBuilderImpl implements InputReaderBuilder {
-    private readonly _boolBindings: Map<string, BoolBinding> = new Map()
-    private readonly _floatBindings: Map<string, FloatBinding> = new Map()
-    private readonly _vec2Bindings: Map<string, Vec2Binding> = new Map()
+    private readonly _bindings: Binding[] = []
 
-    key(name: string, key: string): InputReaderBuilder {
-        // Resolve key name to ID at build time (allocates once, not per-frame)
-        this._boolBindings.set(name, {
-            type: "keyDown",
-            value: false,
-            keyId: resolveKeyId(key),
-        })
+    private _add(binding: Omit<Binding, "bool" | "num">): InputReaderBuilder {
+        const existing = this._bindings.find(b => b.name === binding.name)
+        if (existing !== undefined) {
+            throw new Error(`${PREFIX} ${binding.builder}("${binding.name}", ...): "${binding.name}" is already bound `
+                + `with ${existing.builder}(). Each name is bound once: give this binding its own name.`)
+        }
+        this._bindings.push({ ...binding, bool: false, num: 0 })
         return this
+    }
+
+    // Resolving names to IDs here allocates once, at build time, not per frame
+    key(name: string, key: string): InputReaderBuilder {
+        return this._add({ name, read: "down", builder: "key", source: "key", keyId: resolveKeyId(key) })
     }
 
     keyPressed(name: string, key: string): InputReaderBuilder {
-        this._boolBindings.set(name, {
-            type: "keyPressed",
-            value: false,
-            keyId: resolveKeyId(key),
-        })
-        return this
+        return this._add({ name, read: "pressed", builder: "keyPressed", source: "key", keyId: resolveKeyId(key) })
     }
 
     keyReleased(name: string, key: string): InputReaderBuilder {
-        this._boolBindings.set(name, {
-            type: "keyReleased",
-            value: false,
-            keyId: resolveKeyId(key),
-        })
-        return this
+        return this._add({ name, read: "released", builder: "keyReleased", source: "key", keyId: resolveKeyId(key) })
     }
 
     keyAxis(name: string, config: { negative: string; positive: string }): InputReaderBuilder {
-        this._floatBindings.set(name, {
-            type: "keyAxis",
-            value: 0,
+        return this._add({
+            name, read: "float", builder: "keyAxis", source: "keyAxis",
             negativeKeyId: resolveKeyId(config.negative),
             positiveKeyId: resolveKeyId(config.positive),
         })
-        return this
     }
 
     keyAxis2D(name: string, config: KeyAxis2DConfig): InputReaderBuilder {
-        this._vec2Bindings.set(name, {
-            type: "keyAxis2D",
-            value: { x: 0, y: 0 },  // Pre-allocated!
+        return this._add({
+            name, read: "vec2", builder: "keyAxis2D", source: "keyAxis2D", vec: { x: 0, y: 0 },
             upKeyIds: resolveKeyBinding(config.up),
             downKeyIds: resolveKeyBinding(config.down),
             leftKeyIds: resolveKeyBinding(config.left),
             rightKeyIds: resolveKeyBinding(config.right),
         })
-        return this
     }
 
     mouseButton(name: string, button: MouseButtonType): InputReaderBuilder {
-        this._boolBindings.set(name, {
-            type: "mouseButton",
-            value: false,
-            button,
-        })
-        return this
+        return this._mouseButton(name, button, "down", "mouseButton")
+    }
+
+    mouseButtonPressed(name: string, button: MouseButtonType): InputReaderBuilder {
+        return this._mouseButton(name, button, "pressed", "mouseButtonPressed")
+    }
+
+    mouseButtonReleased(name: string, button: MouseButtonType): InputReaderBuilder {
+        return this._mouseButton(name, button, "released", "mouseButtonReleased")
+    }
+
+    private _mouseButton(name: string, button: MouseButtonType, read: Read, builder: string): InputReaderBuilder {
+        const mouseBit = MOUSE_BITS[button]
+        if (mouseBit === undefined) {
+            throw new Error(`${PREFIX} ${builder}("${name}", "${button}"): unknown mouse button "${button}". `
+                + `Use ${Object.keys(MOUSE_BITS).join(", ")}.`)
+        }
+        return this._add({ name, read, builder, source: "mouseButton", mouseBit })
     }
 
     mouseVec2(name: string, property: MouseVec2Property): InputReaderBuilder {
-        this._vec2Bindings.set(name, {
-            type: "mouseVec2",
-            value: { x: 0, y: 0 },  // Pre-allocated!
-            mouseProperty: property,
-        })
-        return this
+        return this._add({ name, read: "vec2", builder: "mouseVec2", source: "mouseVec2", vec: { x: 0, y: 0 }, mouseProperty: property })
     }
 
     mouseFloat(name: string, property: MouseFloatProperty): InputReaderBuilder {
-        this._floatBindings.set(name, {
-            type: "mouseFloat",
-            value: 0,
-            mouseProperty: property,
-        })
-        return this
+        return this._add({ name, read: "float", builder: "mouseFloat", source: "mouseFloat", mouseProperty: property })
     }
 
     gamepadButton(name: string, button: string, index: number = 0): InputReaderBuilder {
-        // Resolve button name to ID at build time (allocates once, not per-frame)
-        this._boolBindings.set(name, {
-            type: "gamepadButton",
-            value: false,
-            gamepadButtonId: resolveGamepadButtonId(button),
-            gamepadIndex: index,
+        return this._add({
+            name, read: "down", builder: "gamepadButton", source: "gamepadButton",
+            gamepadIndex: index, gamepadButtonId: resolveGamepadButtonId(button),
         })
-        return this
+    }
+
+    gamepadButtonPressed(name: string, button: string, index: number = 0): InputReaderBuilder {
+        return this._gamepadEdge(name, button, index, "pressed", "gamepadButtonPressed")
+    }
+
+    gamepadButtonReleased(name: string, button: string, index: number = 0): InputReaderBuilder {
+        return this._gamepadEdge(name, button, index, "released", "gamepadButtonReleased")
+    }
+
+    private _gamepadEdge(name: string, button: string, index: number, read: Read, builder: string): InputReaderBuilder {
+        const gamepadBit = getButtonBit(button)
+        if (gamepadBit === 0) {
+            throw new Error(`${PREFIX} ${builder}("${name}", "${button}"): unknown gamepad button "${button}". `
+                + `Use a name such as South, East, West, North, LeftShoulder, RightShoulder, Start, Select or DpadUp.`)
+        }
+        return this._add({ name, read, builder, source: "gamepadButton", gamepadIndex: index, gamepadBit })
     }
 
     gamepadVec2(name: string, property: GamepadVec2Property, index: number = 0): InputReaderBuilder {
-        this._vec2Bindings.set(name, {
-            type: "gamepadVec2",
-            value: { x: 0, y: 0 },  // Pre-allocated!
-            gamepadProperty: property,
-            gamepadIndex: index,
+        return this._add({
+            name, read: "vec2", builder: "gamepadVec2", source: "gamepadVec2", vec: { x: 0, y: 0 },
+            gamepadProperty: property, gamepadIndex: index,
         })
-        return this
     }
 
     gamepadFloat(name: string, property: GamepadFloatProperty, index: number = 0): InputReaderBuilder {
-        this._floatBindings.set(name, {
-            type: "gamepadFloat",
-            value: 0,
-            gamepadProperty: property,
-            gamepadIndex: index,
+        return this._add({
+            name, read: "float", builder: "gamepadFloat", source: "gamepadFloat",
+            gamepadProperty: property, gamepadIndex: index,
         })
-        return this
     }
 
     build(): InputReader {
-        return new InputReaderImpl(
-            this._boolBindings,
-            this._floatBindings,
-            this._vec2Bindings
-        )
+        return new InputReaderImpl([...this._bindings])
     }
 }
 

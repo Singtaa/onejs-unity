@@ -5,6 +5,11 @@
 import type { Keyboard, Axis2DConfig, AxisConfig, KeyBinding, Vector2 } from "./types"
 import { getInputBridge } from "./backend"
 
+/** GetModifiers() bit flags (matching InputBridge.cs) */
+export const MODIFIER_SHIFT = 1
+export const MODIFIER_CTRL = 2
+export const MODIFIER_ALT = 4
+export const MODIFIER_META = 8
 
 /**
  * Keyboard implementation that wraps the C# InputBridge
@@ -23,19 +28,19 @@ class KeyboardImpl implements Keyboard {
     }
 
     get shift(): boolean {
-        return (getInputBridge().GetModifiers() & 1) !== 0
+        return (getInputBridge().GetModifiers() & MODIFIER_SHIFT) !== 0
     }
 
     get ctrl(): boolean {
-        return (getInputBridge().GetModifiers() & 2) !== 0
+        return (getInputBridge().GetModifiers() & MODIFIER_CTRL) !== 0
     }
 
     get alt(): boolean {
-        return (getInputBridge().GetModifiers() & 4) !== 0
+        return (getInputBridge().GetModifiers() & MODIFIER_ALT) !== 0
     }
 
     get meta(): boolean {
-        return (getInputBridge().GetModifiers() & 8) !== 0
+        return (getInputBridge().GetModifiers() & MODIFIER_META) !== 0
     }
 
     get anyKeyDown(): boolean {

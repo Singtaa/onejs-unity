@@ -7,20 +7,20 @@ import { getInputBridge } from "./backend"
 
 
 // Button bit flags (matching InputBridge.cs)
-const BUTTON_SOUTH = 1
-const BUTTON_EAST = 2
-const BUTTON_WEST = 4
-const BUTTON_NORTH = 8
-const BUTTON_LEFT_SHOULDER = 16
-const BUTTON_RIGHT_SHOULDER = 32
-const BUTTON_LEFT_STICK = 64
-const BUTTON_RIGHT_STICK = 128
-const BUTTON_START = 256
-const BUTTON_SELECT = 512
-const BUTTON_DPAD_UP = 1024
-const BUTTON_DPAD_DOWN = 2048
-const BUTTON_DPAD_LEFT = 4096
-const BUTTON_DPAD_RIGHT = 8192
+export const BUTTON_SOUTH = 1
+export const BUTTON_EAST = 2
+export const BUTTON_WEST = 4
+export const BUTTON_NORTH = 8
+export const BUTTON_LEFT_SHOULDER = 16
+export const BUTTON_RIGHT_SHOULDER = 32
+export const BUTTON_LEFT_STICK = 64
+export const BUTTON_RIGHT_STICK = 128
+export const BUTTON_START = 256
+export const BUTTON_SELECT = 512
+export const BUTTON_DPAD_UP = 1024
+export const BUTTON_DPAD_DOWN = 2048
+export const BUTTON_DPAD_LEFT = 4096
+export const BUTTON_DPAD_RIGHT = 8192
 
 // Button name to bit flag mapping
 const BUTTON_MAP: Record<string, number> = {
@@ -78,7 +78,8 @@ const BUTTON_MAP: Record<string, number> = {
     right: BUTTON_DPAD_RIGHT,
 }
 
-function getButtonBit(button: string): number {
+/** The bit for a button name (case-insensitive), or 0 for a name it does not know */
+export function getButtonBit(button: string): number {
     return BUTTON_MAP[button.toLowerCase()] ?? 0
 }
 

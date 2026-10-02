@@ -108,8 +108,8 @@ class InputActionImpl implements InputAction {
     private readonly _handle: number
     private readonly _callbacks: Map<string, Set<ActionCallback>> = new Map()
 
-    // Cached vector for value reading
-    private readonly _vec2Cache: Vector2 = { x: 0, y: 0 }
+    // vec2() fills this in place, so a frame loop reading it allocates nothing
+    private readonly _vec2: Vector2 = { x: 0, y: 0 }
 
     constructor(name: string, handle: number) {
         this.name = name
@@ -129,23 +129,39 @@ class InputActionImpl implements InputAction {
         return PHASE_MAP[phaseInt] ?? "disabled"
     }
 
-    value<T extends number | Vector2>(): T {
-        // Try to determine type from context (simplified: assume Vector2 for now if not number)
-        // In practice, user knows the type based on the action definition
-        const x = getInputBridge().GetActionValueVector2X(this._handle)
-        const y = getInputBridge().GetActionValueVector2Y(this._handle)
+    float(): number {
+        return getInputBridge().GetActionValueFloat(this._handle)
+    }
 
-        // If y is 0 and this looks like a 1D value, return as number
-        if (y === 0) {
-            const floatVal = getInputBridge().GetActionValueFloat(this._handle)
-            if (Math.abs(floatVal - x) < 0.0001) {
-                return floatVal as T
+    vec2(): Vector2 {
+        const bridge = getInputBridge()
+        this._vec2.x = bridge.GetActionValueVector2X(this._handle)
+        this._vec2.y = bridge.GetActionValueVector2Y(this._handle)
+        return this._vec2
+    }
+
+    /**
+     * @deprecated Use float() or vec2(). Kept for code written against the
+     * guess: Unity's ReadValue<T> throws when T does not match the control
+     * that is actuated, so each read here is tried in turn rather than
+     * trusted.
+     */
+    value<T extends number | Vector2>(): T {
+        let v: Vector2
+        try {
+            v = this.vec2()
+        } catch {
+            return this.float() as T
+        }
+        if (v.y === 0) {
+            try {
+                const f = this.float()
+                if (Math.abs(f - v.x) < 0.0001) return f as T
+            } catch {
+                // a 2D action with one axis held: the Vector2 is the answer
             }
         }
-
-        this._vec2Cache.x = x
-        this._vec2Cache.y = y
-        return this._vec2Cache as T
+        return v as T
     }
 
     on(event: "started" | "performed" | "canceled", callback: ActionCallback): () => void {
@@ -180,6 +196,8 @@ class InputActionImpl implements InputAction {
         const context: ActionCallbackContext = {
             time: performance.now() / 1000,
             phase: event,
+            float: () => this.float(),
+            vec2: () => this.vec2(),
             readValue: <T>(): T => this.value() as T,
         }
 

@@ -5,6 +5,12 @@
 import type { Mouse, Vector2 } from "./types"
 import { getInputBridge } from "./backend"
 
+/** GetMouseButtons() bit flags (matching InputBridge.cs) */
+export const MOUSE_LEFT = 1
+export const MOUSE_RIGHT = 2
+export const MOUSE_MIDDLE = 4
+export const MOUSE_FORWARD = 8
+export const MOUSE_BACK = 16
 
 // Cached vector objects to reduce allocations
 const _position: Vector2 = { x: 0, y: 0 }
@@ -34,47 +40,47 @@ class MouseImpl implements Mouse {
     }
 
     get leftButton(): boolean {
-        return (getInputBridge().GetMouseButtons() & 1) !== 0
+        return (getInputBridge().GetMouseButtons() & MOUSE_LEFT) !== 0
     }
 
     get rightButton(): boolean {
-        return (getInputBridge().GetMouseButtons() & 2) !== 0
+        return (getInputBridge().GetMouseButtons() & MOUSE_RIGHT) !== 0
     }
 
     get middleButton(): boolean {
-        return (getInputBridge().GetMouseButtons() & 4) !== 0
+        return (getInputBridge().GetMouseButtons() & MOUSE_MIDDLE) !== 0
     }
 
     get forwardButton(): boolean {
-        return (getInputBridge().GetMouseButtons() & 8) !== 0
+        return (getInputBridge().GetMouseButtons() & MOUSE_FORWARD) !== 0
     }
 
     get backButton(): boolean {
-        return (getInputBridge().GetMouseButtons() & 16) !== 0
+        return (getInputBridge().GetMouseButtons() & MOUSE_BACK) !== 0
     }
 
     get wasLeftPressed(): boolean {
-        return (getInputBridge().GetMouseButtonsPressed() & 1) !== 0
+        return (getInputBridge().GetMouseButtonsPressed() & MOUSE_LEFT) !== 0
     }
 
     get wasRightPressed(): boolean {
-        return (getInputBridge().GetMouseButtonsPressed() & 2) !== 0
+        return (getInputBridge().GetMouseButtonsPressed() & MOUSE_RIGHT) !== 0
     }
 
     get wasMiddlePressed(): boolean {
-        return (getInputBridge().GetMouseButtonsPressed() & 4) !== 0
+        return (getInputBridge().GetMouseButtonsPressed() & MOUSE_MIDDLE) !== 0
     }
 
     get wasLeftReleased(): boolean {
-        return (getInputBridge().GetMouseButtonsReleased() & 1) !== 0
+        return (getInputBridge().GetMouseButtonsReleased() & MOUSE_LEFT) !== 0
     }
 
     get wasRightReleased(): boolean {
-        return (getInputBridge().GetMouseButtonsReleased() & 2) !== 0
+        return (getInputBridge().GetMouseButtonsReleased() & MOUSE_RIGHT) !== 0
     }
 
     get wasMiddleReleased(): boolean {
-        return (getInputBridge().GetMouseButtonsReleased() & 4) !== 0
+        return (getInputBridge().GetMouseButtonsReleased() & MOUSE_MIDDLE) !== 0
     }
 }
 

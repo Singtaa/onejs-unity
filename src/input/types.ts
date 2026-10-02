@@ -237,7 +237,14 @@ export interface ActionCallbackContext {
     readonly time: number
     /** Current phase */
     readonly phase: ActionPhase
-    /** Read value as type T */
+    /** The action's value as a number, for a button or 1D axis. See InputAction.float */
+    float(): number
+    /** The action's value as a Vector2, for a 2D axis. See InputAction.vec2 */
+    vec2(): Vector2
+    /**
+     * @deprecated Use float() or vec2(), whichever matches the action's
+     * control. readValue<T>() cannot see T at runtime, so it guesses.
+     */
     readValue<T>(): T
 }
 
@@ -254,7 +261,24 @@ export interface InputAction {
     /** Current action phase */
     readonly phase: ActionPhase
 
-    /** Read action value as specified type */
+    /**
+     * The value of a button or 1D axis action: 0 to 1 for a button, -1 to 1
+     * for an axis. Unity throws if the action's control produces a Vector2:
+     * read that with vec2().
+     */
+    float(): number
+
+    /**
+     * The value of a 2D action (a stick, a WASD composite). Returns the same
+     * object every call, updated in place: copy it to keep a value.
+     */
+    vec2(): Vector2
+
+    /**
+     * @deprecated Use float() or vec2(), whichever matches the action's
+     * control. value<T>() cannot see T at runtime, so it guesses by reading
+     * both, and at rest a 2D action reads as the number 0.
+     */
     value<T extends number | Vector2>(): T
 
     /** Subscribe to action events */
@@ -363,15 +387,21 @@ export interface KeyAxis2DConfig {
 /**
  * Fluent builder for creating an InputReader.
  * Chain binding methods and call build() to create the reader.
+ *
+ * Each binding is read by one method, and the builder names say which:
+ * `key`, `mouseButton` and `gamepadButton` are held, read with `down()`; the
+ * `...Pressed` and `...Released` forms are one frame edges, read with
+ * `pressed()` and `released()`; the rest read with `float()` or `vec2()`.
+ * Every name is bound once.
  */
 export interface InputReaderBuilder {
-    /** Bind a keyboard key (isKeyDown state) */
+    /** Bind a keyboard key, held. Read with down() */
     key(name: string, key: string): InputReaderBuilder
 
-    /** Bind a keyboard key (wasKeyPressed this frame) */
+    /** Bind a keyboard key, true the frame it is pressed. Read with pressed() */
     keyPressed(name: string, key: string): InputReaderBuilder
 
-    /** Bind a keyboard key (wasKeyReleased this frame) */
+    /** Bind a keyboard key, true the frame it is released. Read with released() */
     keyReleased(name: string, key: string): InputReaderBuilder
 
     /** Bind a keyboard axis from two keys (-1, 0, or 1) */
@@ -380,8 +410,14 @@ export interface InputReaderBuilder {
     /** Bind a 2D keyboard axis from 4 directional keys (returns vec2) */
     keyAxis2D(name: string, config: KeyAxis2DConfig): InputReaderBuilder
 
-    /** Bind a mouse button */
+    /** Bind a mouse button, held. Read with down() */
     mouseButton(name: string, button: MouseButtonType): InputReaderBuilder
+
+    /** Bind a mouse button, true the frame it is pressed. Read with pressed() */
+    mouseButtonPressed(name: string, button: MouseButtonType): InputReaderBuilder
+
+    /** Bind a mouse button, true the frame it is released. Read with released() */
+    mouseButtonReleased(name: string, button: MouseButtonType): InputReaderBuilder
 
     /** Bind a mouse Vector2 property (position, delta, scroll) */
     mouseVec2(name: string, property: MouseVec2Property): InputReaderBuilder
@@ -389,8 +425,14 @@ export interface InputReaderBuilder {
     /** Bind a mouse float property */
     mouseFloat(name: string, property: MouseFloatProperty): InputReaderBuilder
 
-    /** Bind a gamepad button */
+    /** Bind a gamepad button, held. Read with down() */
     gamepadButton(name: string, button: string, index?: number): InputReaderBuilder
+
+    /** Bind a gamepad button, true the frame it is pressed. Read with pressed() */
+    gamepadButtonPressed(name: string, button: string, index?: number): InputReaderBuilder
+
+    /** Bind a gamepad button, true the frame it is released. Read with released() */
+    gamepadButtonReleased(name: string, button: string, index?: number): InputReaderBuilder
 
     /** Bind a gamepad Vector2 property (leftStick, rightStick) */
     gamepadVec2(name: string, property: GamepadVec2Property, index?: number): InputReaderBuilder
@@ -406,27 +448,31 @@ export interface InputReaderBuilder {
  * Zero-allocation input reader.
  * All Vector2 objects are pre-allocated and reused.
  * Call tick() once per frame to update all bindings.
+ *
+ * A read must match its binding: `pressed("fire")` on a binding made with
+ * `mouseButton()` throws and names the binding to use, as does a name that
+ * was never bound. A wrong read never quietly returns a plausible value.
  */
 export interface InputReader {
     /** Update all bindings. Call once per frame. */
     tick(): void
 
-    /** Get boolean binding value (current down state) */
+    /** Held state of a key(), mouseButton() or gamepadButton() binding */
     down(name: string): boolean
 
-    /** Get boolean binding value (pressed this frame) */
+    /** True the frame a keyPressed(), mouseButtonPressed() or gamepadButtonPressed() binding is pressed */
     pressed(name: string): boolean
 
-    /** Get boolean binding value (released this frame) */
+    /** True the frame a keyReleased(), mouseButtonReleased() or gamepadButtonReleased() binding is released */
     released(name: string): boolean
 
-    /** Get float binding value */
+    /** Value of a keyAxis(), mouseFloat() or gamepadFloat() binding */
     float(name: string): number
 
-    /** Get Vector2 binding value (returns same cached object each frame) */
+    /** Value of a keyAxis2D(), mouseVec2() or gamepadVec2() binding (the same object every frame) */
     vec2(name: string): Vector2
 
-    /** Dispose the reader and release resources */
+    /** Drop the bindings. Reads after this throw. */
     dispose(): void
 }
 

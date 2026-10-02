@@ -50,6 +50,8 @@ export {
 
     // InputAction hooks
     useAction,
+    useActionFloat,
+    useActionVec2,
     useActionValue,
     useActionCallback,
 
@@ -65,6 +67,7 @@ export type {
     TouchState,
     InputState,
     ActionState,
+    ActionSource,
 } from "./hooks"
 
 // Types

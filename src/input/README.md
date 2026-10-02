@@ -192,16 +192,24 @@ const move = actions.action("Player/Move")
 
 // Polling
 if (jump.triggered) { player.jump() }
-const dir = move.value<Vector2>()
+const dir = move.vec2()      // a 2D action: { x, y }, the same object every call
+const charge = jump.float()  // a button or 1D axis: a number
 
 // Callbacks
 jump.on("performed", (ctx) => player.jump())
 jump.on("started", (ctx) => player.startCharge())
-jump.on("canceled", (ctx) => player.releaseCharge())
+jump.on("canceled", (ctx) => player.releaseCharge(ctx.float()))
 
 // Cleanup
 actions.dispose()
 ```
+
+Read a value with the method that matches the action's control: `float()`
+for a button or 1D axis, `vec2()` for a stick or a WASD composite. Unity
+throws when the read type does not match the control that is actuated, so
+there is no reliable way to guess. The deprecated `value<T>()` guesses
+anyway (its `T` does not exist at runtime): at rest a 2D action reads as the
+number 0.
 
 #### Defining in JavaScript
 
@@ -242,16 +250,16 @@ The input module provides React hooks for cleaner integration:
 import {
     useKeyboard, useMouse, useGamepad, useTouch, useInput,
     useKeyPress, useKeyHeld, useMouseClick, useGamepadButton,
-    useAction, useActionValue, useActionCallback
+    useAction, useActionFloat, useActionVec2, useActionCallback
 } from "onejs-unity/input"
 ```
 
 ### Device Hooks
 
 ```typescript
-function Game() {
-    const keyboard = useKeyboard()  // Auto-updates each frame
-    const mouse = useMouse()
+function InputPanel() {
+    const keyboard = useKeyboard()  // Re-renders when a modifier changes
+    const mouse = useMouse()        // Re-renders when the mouse moves or a button changes
     const gamepad = useGamepad()
     const touch = useTouch()
 
@@ -265,13 +273,18 @@ function Game() {
 }
 ```
 
-**"Auto-updates each frame" is not free.** Each of these calls `setState` from a
-frame callback, so a component holding one re-renders at frame rate, and so does
-everything below it. That is what you want for the display above: a readout has
-to change when the input does.
+Each reads its device once a frame and re-renders only when the reading
+changes, so a still mouse and an idle keyboard cost no render. Each change is a
+new object, safe to keep or compare.
 
-It is the wrong tool for game logic. Read `input` directly inside your frame
-loop instead, where the same values cost no render at all:
+They are for showing input, not reacting to it. A render does not happen every
+frame, so `keyboard.wasKeyPressed("Space")` checked during render misses most
+presses: react to a press with an event hook (`useKeyPress`, `useMouseClick`,
+`useGamepadButton`). The functions on `useKeyboard()` (`isKeyDown`, `wasd`, ...)
+read live input when called, which suits an event handler or a frame loop.
+
+For game logic, read `input` directly inside your frame loop, where the values
+cost no render at all:
 
 ```typescript
 import { useFrame } from "onejs-react"
@@ -333,30 +346,39 @@ function Game() {
 ```typescript
 const actions = input.loadActions(playerActionsAsset)
 
+function ControlsReadout() {
+    const jump = useAction("Player/Jump", actions)         // triggered, isPressed, phase
+    const move = useActionVec2("Player/Move", actions)     // a 2D action
+    const throttle = useActionFloat("Player/Throttle", actions)  // a button or 1D axis
+
+    return (
+        <View>
+            <Label>{jump.isPressed ? "Jumping" : "Grounded"}</Label>
+            <Label>Move: {move.x.toFixed(2)}, {move.y.toFixed(2)}</Label>
+            <Label>Throttle: {Math.round(throttle * 100)}%</Label>
+        </View>
+    )
+}
+
 function Game() {
-    const jump = useAction("Player/Jump", actions)
-    const moveDir = useActionValue<Vector2>("Player/Move", actions)
-
-    if (jump.triggered) {
-        player.jump()
-    }
-    player.move(moveDir.x, moveDir.y)
-
-    // Or use callbacks
+    // React to the action firing
     useActionCallback("Player/Attack", "performed", () => {
         player.attack()
     }, actions)
 }
 ```
 
+Like the device hooks, `useAction`, `useActionFloat` and `useActionVec2`
+re-render only when their reading changes, and follow a changed action path.
+
 ### Hook Reference
 
 | Hook | Description |
 |------|-------------|
-| `useKeyboard()` | Keyboard state (modifiers, isKeyDown, wasKeyPressed) |
-| `useMouse()` | Mouse state (position, delta, scroll, buttons) |
-| `useGamepad(index?)` | Gamepad state (sticks, triggers, buttons, dpad) |
-| `useTouch()` | Touch state (touches array, count) |
+| `useKeyboard()` | Keyboard modifiers and live read functions; re-renders on a modifier change |
+| `useMouse()` | Mouse state (position, delta, scroll, buttons); re-renders on change |
+| `useGamepad(index?)` | Gamepad state (sticks, triggers, buttons, dpad); re-renders on change |
+| `useTouch()` | Touch state (touches array, count); re-renders on change |
 | `useInput()` | Combined state for all devices |
 | `useKeyPress(key, cb)` | Callback on key press |
 | `useKeyHeld(key, cb)` | Callback every frame while key held |
@@ -364,10 +386,23 @@ function Game() {
 | `useKeyRelease(key, cb)` | Callback on key release |
 | `useMouseClick(btn, cb)` | Callback on mouse button click (`"left"`, `"right"`, `"middle"`) |
 | `useGamepadButton(btn, cb, index?)` | Callback on gamepad button press |
-| `useAction(path, actions)` | InputAction state |
-| `useActionValue<T>(path, actions)` | InputAction value |
+| `useAction(path, actions)` | InputAction state (triggered, isPressed, phase) |
+| `useActionFloat(path, actions)` | Value of a button or 1D axis action |
+| `useActionVec2(path, actions)` | Value of a 2D action |
 | `useActionCallback(path, event, cb, actions)` | InputAction event callback |
 | `useInputReader(build)` | Zero-alloc InputReader with auto-tick |
+
+### Deprecated Names
+
+Each still works, so nothing written against it breaks.
+
+| Deprecated | Use instead |
+|------------|-------------|
+| `action.value<T>()` | `action.float()` or `action.vec2()` |
+| `ctx.readValue<T>()` in an action callback | `ctx.float()` or `ctx.vec2()` |
+| `useActionValue<T>(path, actions)` | `useActionFloat` or `useActionVec2` |
+| `useAction(...).value<T>()` | `useActionFloat` / `useActionVec2`, or `action.float()` / `action.vec2()` in a frame loop |
+| `useKeyDown(key, cb)` | `useKeyHeld` (every frame while held) or `useKeyPress` (once per press) |
 
 ## Zero-Allocation Input Reader
 
@@ -380,7 +415,7 @@ import { useInputReader } from "onejs-unity/input"
 import { useFrame } from "onejs-react"
 
 function Game() {
-    // Reader is built once, auto-ticks each frame, auto-disposes on unmount
+    // Reader is built once and ticks each frame while mounted
     const reader = useInputReader(b => b
         // keyAxis2D: 4 directions → vec2, supports multiple keys per direction
         .keyAxis2D("move", {
@@ -390,7 +425,7 @@ function Game() {
             right: ["D", "RightArrow"],
         })
         // Mouse bindings
-        .mouseButton("fire", "left")
+        .mouseButtonPressed("fire", "left")  // true on the press frame only
         .mouseVec2("look", "delta")
         .mouseFloat("zoom", "scrollY")
         // Gamepad bindings
@@ -406,12 +441,16 @@ function Game() {
         player.move(move.x, move.y)
         player.rotate(look.x, look.y)
 
-        if (reader.down("fire")) {
-            player.shoot()
+        if (reader.pressed("fire")) {
+            player.shoot()  // once per click
         }
     })
 }
 ```
+
+The reader holds no C# resources, so the hook disposes nothing on unmount: it
+stops ticking. That also keeps it working under React StrictMode, whose
+simulated remount reuses the same reader.
 
 ### Manual Reader Creation
 
@@ -429,10 +468,11 @@ const reader = createReader()
         left: ["A", "LeftArrow"],
         right: ["D", "RightArrow"],
     })
-    .mouseButton("fire", "left")
+    .mouseButton("aim", "right")
+    .mouseButtonPressed("fire", "left")
     .mouseVec2("look", "delta")
     .mouseFloat("zoom", "scrollY")
-    .gamepadButton("gamepadJump", "South")
+    .gamepadButtonPressed("gamepadJump", "South")
     .gamepadVec2("gamepadMove", "leftStick")
     .gamepadFloat("leftTrigger", "leftTrigger")
     .build()
@@ -444,6 +484,7 @@ function update() {
     // Read cached values (zero allocations!)
     if (reader.down("jump")) { ... }
     if (reader.pressed("interact")) { ... }
+    if (reader.down("aim") && reader.pressed("fire")) { ... }
     const h = reader.float("horizontal")
     const move = reader.vec2("move")  // Same object each frame!
 }
@@ -454,31 +495,48 @@ reader.dispose()
 
 ### InputReader Builder Methods
 
-| Method | Description |
-|--------|-------------|
-| `key(name, key)` | Key held state (isKeyDown) |
-| `keyPressed(name, key)` | Key pressed this frame |
-| `keyReleased(name, key)` | Key released this frame |
-| `keyAxis(name, {negative, positive})` | Two keys → float (-1, 0, or 1) |
-| `keyAxis2D(name, {up, down, left, right})` | Four keys → vec2, multi-key support |
-| `mouseButton(name, button)` | Mouse button ("left", "right", "middle", "forward", "back") |
-| `mouseVec2(name, property)` | Mouse vec2 ("position", "delta", "scroll") |
-| `mouseFloat(name, property)` | Mouse float ("scrollX", "scrollY", "positionX", etc.) |
-| `gamepadButton(name, button, index?)` | Gamepad button |
-| `gamepadVec2(name, property, index?)` | Gamepad vec2 ("leftStick", "rightStick") |
-| `gamepadFloat(name, property, index?)` | Gamepad float ("leftTrigger", "rightTrigger", etc.) |
+| Method | Reads | Read with |
+|--------|-------|-----------|
+| `key(name, key)` | Key held | `down` |
+| `keyPressed(name, key)` | Key pressed this frame | `pressed` |
+| `keyReleased(name, key)` | Key released this frame | `released` |
+| `keyAxis(name, {negative, positive})` | Two keys → -1, 0 or 1 | `float` |
+| `keyAxis2D(name, {up, down, left, right})` | Four keys → vec2, several keys per direction | `vec2` |
+| `mouseButton(name, button)` | Mouse button held ("left", "right", "middle", "forward", "back") | `down` |
+| `mouseButtonPressed(name, button)` | Mouse button pressed this frame | `pressed` |
+| `mouseButtonReleased(name, button)` | Mouse button released this frame | `released` |
+| `mouseVec2(name, property)` | "position", "delta" or "scroll" | `vec2` |
+| `mouseFloat(name, property)` | "scrollX", "scrollY", "positionX", ... | `float` |
+| `gamepadButton(name, button, index?)` | Gamepad button held | `down` |
+| `gamepadButtonPressed(name, button, index?)` | Gamepad button pressed this frame | `pressed` |
+| `gamepadButtonReleased(name, button, index?)` | Gamepad button released this frame | `released` |
+| `gamepadVec2(name, property, index?)` | "leftStick" or "rightStick" | `vec2` |
+| `gamepadFloat(name, property, index?)` | "leftTrigger", "rightTrigger", "leftStickX", ... | `float` |
+
+Each name is bound once; binding it twice throws at build time. To read the same
+button held and on its press, bind it twice under two names.
 
 ### InputReader Methods
 
 | Method | Description |
 |--------|-------------|
 | `tick()` | Update all bindings (call once per frame) |
-| `down(name)` | Get key/button held state |
-| `pressed(name)` | Get key pressed this frame |
-| `released(name)` | Get key released this frame |
-| `float(name)` | Get float value |
-| `vec2(name)` | Get Vector2 value (cached object) |
-| `dispose()` | Release resources |
+| `down(name)` | Held state of a `key`, `mouseButton` or `gamepadButton` binding |
+| `pressed(name)` | True the frame a `...Pressed` binding is pressed |
+| `released(name)` | True the frame a `...Released` binding is released |
+| `float(name)` | Value of a `keyAxis`, `mouseFloat` or `gamepadFloat` binding |
+| `vec2(name)` | Value of a `keyAxis2D`, `mouseVec2` or `gamepadVec2` binding (cached object) |
+| `dispose()` | Drop the bindings; reads after it throw |
+
+**A read must match its binding.** `reader.pressed("fire")` on a binding made
+with `mouseButton()` throws, naming `mouseButtonPressed()` and `reader.down("fire")`
+as the two fixes, and a misspelled name throws with the list of bound names. A
+mismatched read used to return the held value, so a weapon fired every frame the
+button was held while the code read as correct.
+
+Mouse and gamepad button edges are read through the bridge rather than a zero
+alloc invoker: one crossing a frame for the mouse, one per edge binding for a
+gamepad.
 
 ### Disabling Pointer Events
 
@@ -549,3 +607,5 @@ function Game() {
 3. **Frame State Tracking**: C# bridge tracks per-frame button states for accurate `wasPressed`/`wasReleased` detection.
 
 4. **Handle-Based InputActions**: Uses integer handles for C#↔JS object references, following the GPUBridge pattern.
+
+5. **State Hooks Change Only When Input Does**: `useKeyboard`, `useMouse`, `useGamepad`, `useTouch` and the action hooks share one `useReading` helper: each frame it reads the device and keeps the previous object when nothing changed, so an idle player costs no render and no allocation.
