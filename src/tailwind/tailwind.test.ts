@@ -479,6 +479,14 @@ describe("escapeClassName", () => {
         expect(escapeClassName("2xl:p-4")).toBe("_2xl_c_p-4")
     })
 
+    it("hangs a 2xl: rule off the escaped ancestor, since .2xl is not a USS class", () => {
+        // onejs-react's ScreenProvider puts the same escaped "_2xl" on the root.
+        const uss = generateUSS(new Set(["2xl:p-4", "md:p-2"]))
+        expect(uss).toContain("._2xl ._2xl_c_p-4 {")
+        expect(uss).toContain(".md .md_c_p-2 {")
+        expect(uss).not.toMatch(/\.2xl\b/)
+    })
+
     it("escapes slash (fractions)", () => {
         expect(escapeClassName("w-1/2")).toBe("w-1_s_2")
     })

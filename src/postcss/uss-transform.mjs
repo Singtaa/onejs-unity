@@ -36,9 +36,11 @@ const BREAKPOINTS = [
 ]
 
 /**
- * Escape special characters in a class name
+ * Escape special characters in a class name. Exported for the container's
+ * Tools/class-escape test, which runs every copy of this escape; the package
+ * entry (index.mjs) does not re-export it.
  */
-function escapeClassName(name) {
+export function escapeClassName(name) {
     // Handle numeric prefix (class names can't start with numbers in USS)
     if (/^[0-9]/.test(name)) {
         name = "_" + name
@@ -168,10 +170,11 @@ export function ussTransform(opts = {}) {
                     const transformedSelector = transformSelector(rule.selector)
 
                     // Add breakpoint prefix as ancestor selector
-                    // .foo becomes .sm .foo (for sm breakpoint)
+                    // .foo becomes .sm .foo (for sm breakpoint), and ._2xl .foo
+                    // for 2xl, escaped like any class
                     const selectors = transformedSelector.split(",").map(s => s.trim())
                     rule.selector = selectors
-                        .map(s => `.${breakpointPrefix} ${s}`)
+                        .map(s => `.${escapeClassName(breakpointPrefix)} ${s}`)
                         .join(", ")
                 })
 

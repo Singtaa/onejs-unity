@@ -975,13 +975,16 @@ export function generateUSS(classNames, options = {}) {
     const stateful = (entries) => entries.filter((e) => e.vrank !== 0)
     // For USS, breakpoints use ancestor selectors instead of media queries:
     // .md .md_c_p-4 { ... }
+    // The ancestor is escaped like any class: ".2xl" is not a USS class
+    // selector, so 2xl: rules hang off "._2xl", which onejs-react's
+    // ScreenProvider puts on the root.
     const emitBreakpoints = (pick, label) => {
         for (const [bp, bpEntries] of Object.entries(breakpointRules)) {
             const entries = pick(bpEntries)
             if (entries.length === 0) continue
             uss += `\n\n/* ${bp} breakpoint (${breakpoints[bp] || 1536}px+)${label} */\n`
             for (const e of entries.sort(compareRules)) {
-                uss += e.rule.replace(/^(\.[^\s{]+)/, `.${bp} $1`) + "\n\n"
+                uss += e.rule.replace(/^(\.[^\s{]+)/, `.${escapeClassName(bp)} $1`) + "\n\n"
             }
         }
     }
