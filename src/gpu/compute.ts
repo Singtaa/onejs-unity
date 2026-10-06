@@ -36,11 +36,15 @@ declare const CS: {
                 CreateBuffer(count: number, stride: number): number
                 DisposeBuffer(handle: number): void
                 SetBufferData(handle: number, dataJson: string): void
+                // Present since #107; undefined against an older runtime (see hasBufferBits)
+                HasBufferBits: boolean
+                SetBufferBits(handle: number, bits: string): void
                 BindBuffer(shaderHandle: number, kernelIndex: number, name: string, bufferHandle: number): void
                 Dispatch(shaderHandle: number, kernelIndex: number, groupsX: number, groupsY: number, groupsZ: number): void
                 RequestReadback(bufferHandle: number): number // Returns request ID
                 IsReadbackComplete(requestId: number): boolean
                 GetReadbackData(requestId: number): string // JSON array
+                GetReadbackBits(requestId: number): string
                 // Shader registration
                 RegisterShader(shader: unknown): number
                 // RenderTexture API
@@ -73,6 +77,38 @@ declare const CS: {
     }
 }
 
+/*
+ * Buffer words cross the bridge as their int32 bit patterns, comma-joined
+ * ("1065353216,-1082130432"): integers format and parse far more cheaply than
+ * float text, and the bits arrive exactly, so an Int32Array reaches a
+ * StructuredBuffer<int> as ints. A runtime from before SetBufferBits gets the
+ * JSON pair instead.
+ */
+let bufferBits: boolean | undefined
+
+function hasBufferBits(): boolean {
+    if (bufferBits === undefined) {
+        // A missing static reads as a truthy proxy, so compare with true
+        bufferBits = CS.OneJS.GPU.GPUBridge.HasBufferBits === true
+    }
+    return bufferBits
+}
+
+/** Words of a 32-bit array as bit-pattern text; null for any other array, which goes as JSON. */
+function toBits(data: TypedArray): string | null {
+    if (!(data instanceof Float32Array || data instanceof Int32Array || data instanceof Uint32Array)) return null
+    return Array.prototype.join.call(new Int32Array(data.buffer, data.byteOffset, data.length), ",")
+}
+
+function fromBits(bits: string, arrayType: "float32" | "int32" | "uint32"): TypedArray {
+    const words = new Int32Array(bits === "" ? [] : JSON.parse(`[${bits}]`) as number[])
+    switch (arrayType) {
+        case "float32": return new Float32Array(words.buffer)
+        case "int32": return words
+        case "uint32": return new Uint32Array(words.buffer)
+    }
+}
+
 // Pending readback requests
 const pendingReadbacks = new Map<number, {
     requestId: number
@@ -88,6 +124,11 @@ function startReadbackPolling() {
     readbackPollTimer = setInterval(() => {
         for (const [bufferHandle, pending] of pendingReadbacks) {
             if (CS.OneJS.GPU.GPUBridge.IsReadbackComplete(pending.requestId)) {
+                if (hasBufferBits()) {
+                    pending.resolve(fromBits(CS.OneJS.GPU.GPUBridge.GetReadbackBits(pending.requestId), pending.arrayType))
+                    pendingReadbacks.delete(bufferHandle)
+                    continue
+                }
                 const jsonData = CS.OneJS.GPU.GPUBridge.GetReadbackData(pending.requestId)
                 const data = JSON.parse(jsonData) as number[]
                 let result: TypedArray
@@ -222,7 +263,12 @@ class ComputeBufferImpl<T extends TypedArray = Float32Array> implements ComputeB
     }
 
     write(data: T, _options?: { offset?: number }): void {
-        // Convert TypedArray to JSON array for C# interop
+        const bits = hasBufferBits() ? toBits(data) : null
+        if (bits !== null) {
+            CS.OneJS.GPU.GPUBridge.SetBufferBits(this.__handle, bits)
+            return
+        }
+        // Other array types, or an older runtime: JSON, each element read as a float
         const arr = Array.from(data as unknown as ArrayLike<number>)
         const json = JSON.stringify(arr)
         CS.OneJS.GPU.GPUBridge.SetBufferData(this.__handle, json)
