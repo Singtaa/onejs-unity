@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { noise, perlin2D, simplex2D, value2D, worley2D } from "./noise"
 import { gpuNoise } from "./noise/gpu"
+import { parseColor } from "../color"
 import {
     mesh,
     cube,
@@ -698,11 +699,7 @@ export function useMaterial(options: UseMaterialOptions = {}): unknown | null {
             if (color) {
                 let r: number, g: number, b: number, a: number
                 if (typeof color === "string") {
-                    const hex = color.replace("#", "")
-                    r = parseInt(hex.slice(0, 2), 16) / 255
-                    g = parseInt(hex.slice(2, 4), 16) / 255
-                    b = parseInt(hex.slice(4, 6), 16) / 255
-                    a = hex.length > 6 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
+                    [r, g, b, a] = parseColor(color)
                 } else {
                     r = color.r
                     g = color.g

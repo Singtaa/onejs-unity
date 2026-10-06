@@ -8,6 +8,7 @@
  */
 
 import { perlin2D, simplex2D, worley2D } from "../noise"
+import { parseColor as parseHex } from "../../color"
 import type { TextureOptions, FBMConfig } from "../types"
 
 // =============================================================================
@@ -622,18 +623,13 @@ export class ProceduralTexture {
 // =============================================================================
 
 /**
- * Parse a color from hex string or RGBA tuple.
+ * Parse a color from hex string or RGBA tuple. Strings go through the one hex
+ * parser fx and sl use, so "#fff" means white here too and a value it cannot
+ * read is an error rather than a wrong colour.
  */
 function parseColor(color: string | RGBA): RGBA {
     if (Array.isArray(color)) return color
-
-    const hex = color.replace("#", "")
-    const r = parseInt(hex.slice(0, 2), 16) / 255
-    const g = parseInt(hex.slice(2, 4), 16) / 255
-    const b = parseInt(hex.slice(4, 6), 16) / 255
-    const a = hex.length > 6 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
-
-    return [r, g, b, a]
+    return parseHex(color)
 }
 
 /**
