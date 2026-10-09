@@ -1,143 +1,21 @@
 /**
- * PostCSS plugin to remove CSS features unsupported by USS
+ * PostCSS plugin to remove CSS that USS cannot parse.
  *
  * Removes:
  * - CSS custom properties (--var)
  * - var() references
- * - Unsupported properties (filter, box-shadow, etc.)
- * - @keyframes rules
- * - @font-face rules
- * - @supports rules
+ * - @keyframes, @font-face, @supports, @layer and @container rules
+ *
+ * It does not judge properties by name. Which ones USS has depends on the Unity
+ * version (filter arrived in 6.3, backdrop-filter in 6.6), and only the editor
+ * knows that: OneJS's runtime USS compiler checks every property against the
+ * running editor's own table and warns about each one UI Toolkit will ignore.
+ * The list this plugin used to carry stripped filter, text-shadow and
+ * transform-origin, all of which USS has.
  */
 
-// Properties that USS doesn't support
-const UNSUPPORTED_PROPERTIES = new Set([
-    // Filters and effects
-    "filter",
-    "backdrop-filter",
-    "box-shadow",
-    "text-shadow",
-    "drop-shadow",
-
-    // Transforms (partial support: keep basic ones)
-    "transform-origin",
-    "transform-style",
-    "perspective",
-    "perspective-origin",
-    "backface-visibility",
-
-    // Animations
-    "animation",
-    "animation-name",
-    "animation-duration",
-    "animation-timing-function",
-    "animation-delay",
-    "animation-iteration-count",
-    "animation-direction",
-    "animation-fill-mode",
-    "animation-play-state",
-
-    // Grid (USS doesn't support CSS Grid)
-    "grid",
-    "grid-template",
-    "grid-template-columns",
-    "grid-template-rows",
-    "grid-template-areas",
-    "grid-auto-columns",
-    "grid-auto-rows",
-    "grid-auto-flow",
-    "grid-column",
-    "grid-column-start",
-    "grid-column-end",
-    "grid-row",
-    "grid-row-start",
-    "grid-row-end",
-    "grid-area",
-    "gap",
-    "column-gap",
-    "row-gap",
-
-    // Other unsupported
-    "will-change",
-    "contain",
-    "content-visibility",
-    "object-fit",
-    "object-position",
-    "mix-blend-mode",
-    "background-blend-mode",
-    "isolation",
-    "clip-path",
-    "mask",
-    "mask-image",
-
-    // Typography (some unsupported)
-    "text-decoration-line",
-    "text-decoration-style",
-    "text-decoration-color",
-    "text-decoration-thickness",
-    "text-underline-offset",
-    "line-clamp",
-    "-webkit-line-clamp",
-    "hyphens",
-    "word-break",
-    "writing-mode",
-    "text-orientation",
-
-    // Scrolling
-    "scroll-behavior",
-    "scroll-snap-type",
-    "scroll-snap-align",
-    "overscroll-behavior",
-
-    // Cursors and pointers
-    "cursor",
-    "caret-color",
-    "pointer-events",
-    "touch-action",
-    "user-select",
-    "-webkit-user-select",
-
-    // Lists
-    "list-style",
-    "list-style-type",
-    "list-style-position",
-    "list-style-image",
-
-    // Tables
-    "border-collapse",
-    "border-spacing",
-    "table-layout",
-    "caption-side",
-
-    // Columns
-    "columns",
-    "column-count",
-    "column-width",
-    "column-gap",
-    "column-rule",
-    "column-fill",
-    "column-span",
-
-    // Outlines (USS uses border instead)
-    "outline",
-    "outline-width",
-    "outline-style",
-    "outline-color",
-    "outline-offset",
-
-    // Resize
-    "resize",
-])
-
-// Properties that might be partially supported but need review
-const WARN_PROPERTIES = new Set([
-    "transform", // Supported but limited
-    "transition", // Supported but limited
-])
-
 export function ussCleanup(opts = {}) {
-    const { removeEmpty = true, warn = false } = opts
-    const removedProperties = new Map()
+    const { removeEmpty = true } = opts
 
     return {
         postcssPlugin: "postcss-uss-cleanup",
@@ -170,21 +48,6 @@ export function ussCleanup(opts = {}) {
                 decl.remove()
                 return
             }
-
-            // Remove unsupported properties
-            if (UNSUPPORTED_PROPERTIES.has(decl.prop)) {
-                if (warn) {
-                    const count = removedProperties.get(decl.prop) || 0
-                    removedProperties.set(decl.prop, count + 1)
-                }
-                decl.remove()
-                return
-            }
-
-            // Warn about partially supported properties
-            if (warn && WARN_PROPERTIES.has(decl.prop)) {
-                console.warn(`[postcss-uss-cleanup] Property "${decl.prop}" has limited USS support`)
-            }
         },
 
         // Remove empty rules after cleanup
@@ -195,14 +58,6 @@ export function ussCleanup(opts = {}) {
                         rule.remove()
                     }
                 })
-            }
-
-            // Report removed properties
-            if (warn && removedProperties.size > 0) {
-                console.warn("\n[postcss-uss-cleanup] Removed unsupported properties:")
-                for (const [prop, count] of removedProperties) {
-                    console.warn(`  ${prop}: ${count} occurrence(s)`)
-                }
             }
         }
     }

@@ -331,10 +331,11 @@ Core USS transformation:
 
 Removes CSS the plugin treats as unsupported by USS:
 - CSS custom properties (`--var`) and any declaration using `var()`. USS itself supports both; this plugin strips them anyway
-- Unsupported properties (filter, box-shadow, animation, grid, etc.)
 - Unsupported at-rules (@keyframes, @font-face, @supports, @layer, @container)
 
-Options: `removeEmpty` (drop rules left empty, default `true`), `warn` (log what was removed, default `false`).
+It keeps every property. Which properties USS has depends on the Unity version (`filter` from 6.3, `backdrop-filter` from 6.6), so OneJS's runtime USS compiler checks each against the running editor's own table and warns about any UI Toolkit will ignore.
+
+Options: `removeEmpty` (drop rules left empty, default `true`).
 
 #### `ussUnwrapIs()`
 
