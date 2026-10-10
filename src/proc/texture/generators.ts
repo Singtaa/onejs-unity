@@ -461,21 +461,26 @@ export function generateGradient(options: GradientTextureOptions): Uint8ClampedA
     return data
 }
 
+let createTextureWarned = false
+
 /**
- * Create a CPU texture from pixel data.
+ * Returns the pixels it was given and makes no texture. It was added as a
+ * placeholder and never finished; `fromData` is what turns pixel data into a
+ * texture. Kept so nothing that calls it changes, and says so once.
  *
- * @param data: RGBA pixel data
- * @param width: Texture width
- * @param height: Texture height
- * @returns Texture handle (platform-dependent)
+ * @deprecated Use `fromData({ data, width, height })`, which returns a
+ * ProceduralTexture. Removal in a future release.
  */
 export function createTexture(
     data: Uint8ClampedArray,
     width: number,
     height: number
 ): unknown {
-    // This would call into the C# bridge to create a Texture2D
-    // For now, return the data for the caller to handle
+    if (!createTextureWarned) {
+        createTextureWarned = true
+        console.warn("[onejs-unity] texture.create returns the pixels it was given and makes no texture. "
+            + "Use texture.fromData({ data, width, height }). texture.create will be removed in a future release.")
+    }
     return { data, width, height }
 }
 

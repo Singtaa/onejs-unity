@@ -247,7 +247,9 @@ export const texture = {
     colorMaps,
 
     /**
-     * Create a texture from pixel data.
+     * Returns the pixels it was given and makes no texture.
+     *
+     * @deprecated Use `texture.fromData({ data, width, height })`. Removal in a future release.
      */
     create: createTexture,
 
