@@ -24,6 +24,8 @@ export interface FakeAction {
 
 export interface FakeInput {
     held: Set<string>, pressed: Set<string>, released: Set<string>
+    /** The keys pressed this frame in the order they went down */
+    pressedInOrder: string[]
     modifiers: number, anyKeyDown: boolean
     mouse: { x: number, y: number, dx: number, dy: number, sx: number, sy: number, held: number, pressed: number, released: number }
     gamepads: FakeGamepad[]
@@ -37,7 +39,7 @@ export const fake: FakeInput = blank()
 
 function blank(): FakeInput {
     return {
-        held: new Set(), pressed: new Set(), released: new Set(),
+        held: new Set(), pressed: new Set(), released: new Set(), pressedInOrder: [],
         modifiers: 0, anyKeyDown: false,
         mouse: { x: 0, y: 0, dx: 0, dy: 0, sx: 0, sy: 0, held: 0, pressed: 0, released: 0 },
         gamepads: [],
@@ -89,6 +91,7 @@ const methods: Record<string, (...args: any[]) => unknown> = {
     GetModifiers: () => fake.modifiers,
     GetAnyKeyDown: () => fake.anyKeyDown,
     GetAnyKeyPressed: () => fake.pressed.size > 0,
+    GetKeysPressed: () => fake.pressedInOrder.join(","),
     getKeyId: keyId,
     getKeyDownById: (id: number) => fake.held.has(keyNames[id]),
     getKeyPressedById: (id: number) => fake.pressed.has(keyNames[id]),

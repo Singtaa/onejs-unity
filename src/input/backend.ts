@@ -37,6 +37,8 @@ export interface InputBackendMethods {
     GetKeyReleased(key: string): boolean
     GetAnyKeyDown(): boolean
     GetAnyKeyPressed(): boolean
+    /** The keys that went down this frame in the order they did, as key names joined by commas, or "". */
+    GetKeysPressed(): string
     GetModifiers(): number
 
     // mouse
