@@ -51,6 +51,13 @@ class KeyboardImpl implements Keyboard {
         return getInputBridge().GetAnyKeyPressed()
     }
 
+    get keysPressed(): readonly string[] {
+        // One string across the bridge rather than an array: a string crosses
+        // from C# as a value, an array as a handle to walk
+        const joined: string = getInputBridge().GetKeysPressed()
+        return joined === "" ? [] : joined.split(",")
+    }
+
     /**
      * Check if any key in a binding is down
      */

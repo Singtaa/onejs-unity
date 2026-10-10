@@ -59,6 +59,15 @@ export interface Keyboard {
     readonly anyKeyPressed: boolean
 
     /**
+     * The keys pressed this frame, in the order they went down, as the key
+     * names wasKeyPressed takes ("C", "Enter", "Backspace"). Empty when none
+     * were. A key pressed twice in one frame is listed twice. Read this rather
+     * than asking wasKeyPressed key by key when order matters: typing faster
+     * than the frame rate puts several letters in one frame.
+     */
+    readonly keysPressed: readonly string[]
+
+    /**
      * Get 2D axis from 4 keys (e.g., WASD)
      * @returns Vector2 with x,y in range -1 to 1
      */

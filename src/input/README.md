@@ -76,6 +76,7 @@ input.keyboard.meta: boolean    // Meta/Command/Windows held
 
 input.keyboard.anyKeyDown: boolean    // Any key held
 input.keyboard.anyKeyPressed: boolean // Any key pressed this frame
+input.keyboard.keysPressed: string[]  // Keys pressed this frame, in the order they went down
 
 // Movement helpers, each -1 to 1 per axis
 input.keyboard.wasd(): Vector2
