@@ -210,6 +210,31 @@ describe("importTransformPlugin through esbuild", () => {
         }
     })
 
+    // A watch rebuild reuses each unchanged file's result, so an edited file
+    // must be transformed again, from its new text
+    it("rebuilds an edited file from its new imports, and the others as before", async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "onejs-import-transform-"))
+        try {
+            const a = path.join(dir, "a.ts"), b = path.join(dir, "b.ts")
+            fs.writeFileSync(a, `import { Texture2D } from "UnityEngine"\nimport { b } from "./b"\nconsole.log(new Texture2D(1, 1), b)\n`)
+            fs.writeFileSync(b, `import { List } from "System.Collections.Generic"\nexport const b = new List()\n`)
+            const ctx = await esbuild.context({ entryPoints: [a], bundle: true, write: false, format: "iife", plugins: [importTransformPlugin()] })
+            try {
+                const first = (await ctx.rebuild()).outputFiles?.[0]?.text ?? ""
+                expect(first).toContain("Texture2D")
+                fs.writeFileSync(a, `import { Material } from "UnityEngine"\nimport { b } from "./b"\nconsole.log(new Material(), b)\n`)
+                const second = (await ctx.rebuild()).outputFiles?.[0]?.text ?? ""
+                expect(second).toContain("Material")
+                expect(second).not.toContain("Texture2D")
+                expect(second).toContain("CS.System.Collections.Generic")
+            } finally {
+                await ctx.dispose()
+            }
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
+
     it("bundles a type-only import as nothing at all", async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "onejs-import-transform-"))
         try {
