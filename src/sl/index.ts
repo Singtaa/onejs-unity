@@ -22,7 +22,7 @@ export {
 } from "onejs-sl/core"
 export type {
     ProgramJSON, SlSdfKind, SLOpCode, SLType, InputName, NodeRef, SLNode, Program, UniformDecl, TextureDecl,
-    Float, Vec2, Vec3, Vec4, Num, ProgramInputs, Texture,
+    Float, Vec2, Vec3, Vec4, Num, ProgramInputs, Texture, TextureSamplingOptions,
 } from "onejs-sl/core"
 export { compile } from "onejs-sl/compile"
 export type { Compiled } from "onejs-sl/compile"

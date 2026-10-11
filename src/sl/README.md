@@ -25,10 +25,9 @@ not appear here until somebody decides it should.
 against it still builds. Neither re-exports anything only the VM had
 (`surface.test.ts`). The caps are `UNIFORM_SLOTS` and `TEXTURE_SLOTS`.
 
-`onejs-sl` is a peer dependency (`^0.4.0 || ^0.5.0 || ^0.6.0 || ^0.7.0`, whose
-core names the hash scheme the manifest carries; 0.5.0 adds control flow, 0.6.0
-an int uniform's kind and 0.7.0 the previous frame, all keeping that scheme),
-installed with this package by npm,
+`onejs-sl` is a peer dependency (`^0.9.0`, the language with a texture's own
+sampler, `textureSize` and `tex2Dfetch`, 64 uniforms and 8 textures, and
+`classifyLine`, which `sl/compiler` re-exports), installed with this package by npm,
 and a `file:../onejs-sl` dev dependency here, so the container always builds
 against the checkout beside it. Run `npm install` here after pulling a change
 to that link.

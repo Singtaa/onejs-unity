@@ -20,8 +20,8 @@ describe("the shader language surface", () => {
         })
 
         it(`${name} gives the caps under their own names, and encode as compile`, () => {
-            expect((entry as Record<string, unknown>).UNIFORM_SLOTS).toBe(16)
-            expect((entry as Record<string, unknown>).TEXTURE_SLOTS).toBe(4)
+            expect((entry as Record<string, unknown>).UNIFORM_SLOTS).toBe(64)
+            expect((entry as Record<string, unknown>).TEXTURE_SLOTS).toBe(8)
             expect(entry.encode).toBe(entry.compile)
         })
     }
