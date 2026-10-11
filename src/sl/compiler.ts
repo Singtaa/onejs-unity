@@ -4,7 +4,8 @@
  * Everything here runs while a game is being built and nothing runs while one
  * is being played: the `.sl` parser, `compile`, which turns a program into what
  * a host draws it from, and the manifest an editor turns into compiled shaders.
- * The esbuild plugin and the Play worker import this; a game imports
+ * The esbuild plugin, the Play worker and the Play editor (its highlighting
+ * and Paste GLSL) import this; a game imports
  * `onejs-unity/sl`, which leaves the parser out.
  *
  * A re-export of `onejs-sl`, by name. Every import that worked before the
@@ -13,12 +14,12 @@
  */
 
 export {
-    analyze, classify, diagnose, parse, parseUnit, preludeFunctions, tokenize, PRELUDE_SOURCE, SLParseError,
-    INPUTS, SL_IR_VERSION, TYPE, widthName, toJSON, fromJSON, SL_SDF_SHAPES, UNIFORM_SLOTS, TEXTURE_SLOTS,
+    analyze, classify, classifyLine, diagnose, fromGLSL, parse, parseUnit, preludeFunctions, tokenize, PRELUDE_SOURCE,
+    SLParseError, INPUTS, SL_IR_VERSION, TYPE, widthName, toJSON, fromJSON, SL_SDF_SHAPES, UNIFORM_SLOTS, TEXTURE_SLOTS,
 } from "onejs-sl"
 export type {
     Checked, Expr, FuncDecl, ParseOptions, Stmt, Unit, ProgramJSON, Program, SLType, SlSdfKind,
-    SLClassifiedToken, SLFix, SLTokenClass,
+    SLClassifiedToken, SLFix, SLLineState, SLTokenClass, FromGLSL,
 } from "onejs-sl"
 export { compile, compile as encode } from "onejs-sl/compile"
 export type { Compiled, Compiled as Encoded } from "onejs-sl/compile"

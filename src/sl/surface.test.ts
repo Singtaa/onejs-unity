@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import * as game from "./index"
 import * as compiler from "./compiler"
+import * as sl from "onejs-sl"
 
 /**
  * What `onejs-unity/sl` and `onejs-unity/sl/compiler` export about the
@@ -24,4 +25,11 @@ describe("the shader language surface", () => {
             expect(entry.encode).toBe(entry.compile)
         })
     }
+
+    // The Play editor's Paste GLSL and its highlighting run from this entry.
+    it("onejs-unity/sl/compiler gives an editor onejs-sl's fromGLSL, classify and classifyLine", () => {
+        expect(compiler.fromGLSL).toBe(sl.fromGLSL)
+        expect(compiler.classify).toBe(sl.classify)
+        expect(compiler.classifyLine).toBe(sl.classifyLine)
+    })
 })
