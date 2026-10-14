@@ -48,6 +48,27 @@ let manifestCache: AssetManifest | null = null
 // Package asset namespaces (@ns -> folder), scanned once and cached
 let packageNamespacesCache: Record<string, string> | null = null
 
+// Where a host said this app's files are, or null for OneJS's own convention
+// (assets/ in the working directory, StreamingAssets/onejs/assets in a player)
+let hostBase: string | null = null
+// Under hostBase, where the carts the app uses keep theirs ("" for straight under it)
+let hostUsedCarts = ""
+
+/**
+ * Says where this app's files are, for a host that keeps them somewhere other
+ * than OneJS's convention: a cart at a Unity project's root reads its files
+ * where they sit in the editor and from StreamingAssets/onejs/carts/<folder>
+ * in a player (Specs/ROOT_CARTS.md in the OneJS container). Its build calls
+ * this before the cart runs, as it calls oj's setAssetBase. A name starting
+ * with "@" is a used cart's file, under `usedCarts` when one is given.
+ *
+ * Null puts OneJS's convention back. Apps never call this.
+ */
+export function setAssetBase(base: string | null, options: { usedCarts?: string } = {}): void {
+    hostBase = base === null ? null : base.replace(/[\\/]+$/, "")
+    hostUsedCarts = base === null ? "" : (options.usedCarts ?? "").replace(/^\/+|\/+$/g, "")
+}
+
 interface NamespaceInfo {
     type: "user" | "package"
     package?: string
@@ -187,6 +208,11 @@ function resolveAssetPath(assetPath: string): string {
     // Absolute paths bypass asset resolution entirely
     if (Path.IsPathRooted(assetPath)) {
         return assetPath
+    }
+
+    if (hostBase !== null) {
+        const name = assetPath.replace(/^\.\//, "")
+        return hostUsedCarts !== "" && name.startsWith("@") ? `${hostBase}/${hostUsedCarts}/${name}` : `${hostBase}/${name}`
     }
 
     if (isEditor()) {
