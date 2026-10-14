@@ -126,3 +126,44 @@ describe("loadBytes", () => {
         expect(crossings).toBeLessThanOrEqual(3)
     })
 })
+
+// Specs/ROOT_CARTS.md 5.4a: a cart's build tells the loaders where its files
+// are. With no base set, nothing about OneJS's own convention moves.
+describe("resolveAssetPath with and without a host-set base", () => {
+    it("resolves an app's own file into assets/ when no host has set a base", async () => {
+        write("assets/images/logo.png")
+        const { getAssetPath } = await load()
+        expect(getAssetPath("images/logo.png")).toBe(path.join(workingDir, "assets", "images/logo.png"))
+    })
+
+    it("resolves into StreamingAssets/onejs/assets in a player when no host has set a base", async () => {
+        ;(globalThis as any).CS.UnityEngine.Application.isEditor = false
+        ;(globalThis as any).CS.UnityEngine.Application.streamingAssetsPath = "jar:file:///data/app.apk!/assets"
+        const { getAssetPath } = await load()
+        expect(getAssetPath("glow.png")).toBe("jar:file:///data/app.apk!/assets/onejs/assets/glow.png")
+    })
+
+    it("reads a cart's own files where they sit, and a used cart's from its used carts folder", async () => {
+        const { getAssetPath, setAssetBase } = await load()
+        setAssetBase("/Project/Lightning/", { usedCarts: ".oj/carts" })
+        expect(getAssetPath("glow.png")).toBe("/Project/Lightning/glow.png")
+        expect(getAssetPath("./art/bg.png")).toBe("/Project/Lightning/art/bg.png")
+        expect(getAssetPath("@singtaa/bolt@1.2.0/spark.png")).toBe("/Project/Lightning/.oj/carts/@singtaa/bolt@1.2.0/spark.png")
+    })
+
+    it("puts a used cart's files straight under the base when no folder is named, as a player has them", async () => {
+        const { getAssetPath, setAssetBase } = await load()
+        setAssetBase("jar:file:///data/app.apk!/assets/onejs/carts/Lightning")
+        expect(getAssetPath("@singtaa/bolt@1.2.0/spark.png")).toBe("jar:file:///data/app.apk!/assets/onejs/carts/Lightning/@singtaa/bolt@1.2.0/spark.png")
+    })
+
+    it("leaves URLs and rooted paths alone with a base set, and goes back to the convention on null", async () => {
+        write("assets/glow.png")
+        const { getAssetPath, setAssetBase } = await load()
+        setAssetBase("/Project/Lightning")
+        expect(getAssetPath("https://example.com/a.png")).toBe("https://example.com/a.png")
+        expect(getAssetPath(path.join(workingDir, "x.png"))).toBe(path.join(workingDir, "x.png"))
+        setAssetBase(null)
+        expect(getAssetPath("glow.png")).toBe(path.join(workingDir, "assets", "glow.png"))
+    })
+})
