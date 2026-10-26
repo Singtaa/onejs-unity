@@ -101,3 +101,26 @@ describe("buffer transport", () => {
         expect(api.GetReadbackBits).not.toHaveBeenCalled()
     })
 })
+
+describe("compute.struct", () => {
+    // The probe struct from the stride measurements: 28 bytes in HLSL, which packs a
+    // structured buffer at 4-byte alignment on Metal, D3D11, D3D12, Vulkan and WebGPU.
+    const PARTICLE = { position: "float3", velocity: "float3", life: "float" } as const
+
+    it("gives the HLSL struct's size as the stride, fields packed in order, and passes it to the bridge", async () => {
+        const api = fakeBridge({ bits: true })
+        const compute = await load()
+        const type = compute.struct(PARTICLE)
+        expect(type.stride).toBe(28)
+        expect(type.fieldOffsets).toEqual({ position: 0, velocity: 12, life: 24 })
+        compute.buffer({ count: 4, type })
+        expect(api.CreateBuffer).toHaveBeenCalledWith(4, 28)
+    })
+
+    it("keeps a pad the schema names, for an HLSL struct padded by hand", async () => {
+        fakeBridge({ bits: true })
+        const compute = await load()
+        expect(compute.struct({ ...PARTICLE, pad: "float" }).stride).toBe(32)
+        expect(compute.struct({ position: "float3", life: "float" }).stride).toBe(16)
+    })
+})
