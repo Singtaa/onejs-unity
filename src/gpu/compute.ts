@@ -694,8 +694,7 @@ class StructTypeImpl implements StructType {
             this.fieldOffsets[name] = offset
             offset += FIELD_SIZES[type] || 4
         }
-        // Align to 16 bytes (GPU requirement)
-        this.stride = Math.ceil(offset / 16) * 16
+        this.stride = offset
     }
 }
 
