@@ -123,10 +123,10 @@ for (const [name, tsc] of Object.entries(COMPILERS)) {
             expectErrors(tsc, `
                 declare const q: Tensor<["B", 8, 64, 32]>
                 declare const k: Tensor<["B", 8, 128, 16]>
-                einsum(/*! size mismatch on "d" */"bhqd,bhkd->bhqk", q, k)
+                einsum(/*! size mismatch on 'd' */"bhqd,bhkd->bhqk", q, k)
                 declare const n: Tensor<["N", 8]>
                 declare const m: Tensor<["B", 8]>
-                einsum(/*! size mismatch on "b" */"bi,bi->b", n, m)
+                einsum(/*! size mismatch on 'b' */"bi,bi->b", n, m)
             `)
         })
 
@@ -136,7 +136,7 @@ for (const [name, tsc] of Object.entries(COMPILERS)) {
                 declare const k: Tensor<["B", 8, 128, 32]>
                 einsum(/*! rank mismatch */"bhqd,bhk->bhqk", q, k)
                 einsum(/*! rank mismatch */"bhqd,bhkdx->bhqk", q, k)
-                einsum(/*! unknown output index "x" */"bhqd,bhkd->bhqx", q, k)
+                einsum(/*! unknown output index 'x' */"bhqd,bhkd->bhqx", q, k)
                 einsum(/*! bad spec */"bhqd bhkd", q, k)
             `)
         })
@@ -176,8 +176,8 @@ for (const [name, tsc] of Object.entries(COMPILERS)) {
             expectErrors(tsc, `
                 declare const x: Tensor<[2, 3, 4]>
                 at(x, /*! too many indices */"0, 0, 0, 0")
-                at(x, /*! bad slice "a:b" */":, a:b")
-                at(x, /*! bad slice "1.5" */"1.5")
+                at(x, /*! bad slice 'a:b' */":, a:b")
+                at(x, /*! bad slice '1.5' */"1.5")
                 at(x, /*! more than one ellipsis */"..., 0, ...")
             `)
         })
