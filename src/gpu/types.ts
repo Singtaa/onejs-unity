@@ -412,7 +412,8 @@ export interface ComputeModule {
     renderTexture(options: RenderTextureOptions): RenderTexture
 
     /**
-     * Define a struct type for structured buffers
+     * Define a struct type for structured buffers. The stride is the HLSL
+     * struct's size: the fields packed in order, with no padding added.
      * @param schema Field definitions
      */
     struct(schema: StructSchema): StructType
