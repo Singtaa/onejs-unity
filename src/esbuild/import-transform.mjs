@@ -163,6 +163,24 @@ function parseClause(text) {
  * instance running the build (esbuild-wasm in a browser included).
  */
 export async function transformCsImports(esbuild, source, filePath, shouldTransform) {
+    const replacements = await csImportReplacements(esbuild, source, filePath, shouldTransform)
+    if (replacements === null) return null
+
+    let out = source
+    for (let i = replacements.length - 1; i >= 0; i--) {
+        const { start, end, replacement } = replacements[i]
+        out = out.slice(0, start) + replacement + out.slice(end)
+    }
+    return out
+}
+
+/**
+ * The same rewrite as `transformCsImports`, as `{ start, end, replacement }`
+ * ranges over the original source in ascending order, or null when nothing
+ * needs rewriting. The TS pass applies them to its own edits, so the two
+ * share one source map.
+ */
+export async function csImportReplacements(esbuild, source, filePath, shouldTransform) {
     if (!mightHaveCsImport(source)) return null
 
     const candidates = []
@@ -220,14 +238,7 @@ export async function transformCsImports(esbuild, source, filePath, shouldTransf
         replacements.push({ start, end, replacement })
     }
 
-    if (replacements.length === 0) return null
-
-    let out = source
-    for (let i = replacements.length - 1; i >= 0; i--) {
-        const { start, end, replacement } = replacements[i]
-        out = out.slice(0, start) + replacement + out.slice(end)
-    }
-    return out
+    return replacements.length === 0 ? null : replacements
 }
 
 export function importTransformPlugin(options = {}) {
