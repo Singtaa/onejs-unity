@@ -37,6 +37,7 @@ Each module is its own subpath, so a bundle carries only what it imports. The ro
 | `onejs-unity/sl/compiler` | The shader language at build time, parser included | [`src/sl/README.md`](src/sl/README.md) |
 | `onejs-unity/gpu` | Compute shaders from JavaScript, with a zero allocation dispatcher | [below](#gpu-compute), [guide](https://onejs.com/docs/guides/gpu-compute) |
 | `onejs-unity/interop` | Zero allocation bindings to C# static methods (`za`) | [below](#zero-allocation-interop), [guide](https://onejs.com/docs/guides/zero-alloc) |
+| `onejs-unity/tensor` | Tensor shapes as types: einsum and slicing checked in the editor, with no runtime and no build step | [below](#tensor-shapes) |
 | `onejs-unity/proc` | Noise, procedural meshes and procedural textures; also `proc/noise`, `proc/geometry`, `proc/texture` | [`src/proc/README.md`](src/proc/README.md), [guide](https://onejs.com/docs/guides/procedural) |
 | `onejs-unity/fs-provider` | The filesystem the build plugins read through, replaceable by a host with no disk (a Cloudflare Worker) | `src/fs-provider.mjs` |
 
@@ -553,6 +554,33 @@ CharacterController.MoveStatic(cc, velocity.x, velocity.y, velocity.z)
 | `za.fromId` | None | Typed delegate invoke (zero-alloc) |
 
 Arguments cross as primitives, strings, `{ x, y, z }` / `{ x, y, z, w }` / `{ r, g, b, a }` values and C# objects, up to 8 per call.
+
+## Tensor Shapes
+
+`onejs-unity/tensor` is types only. It types a tensor by its shape and checks einsum specs and numpy-style slices
+against it, so a shape error lands on the spec string in the editor. Nothing here runs: a tensor library binds the
+types by declaring its own functions against them.
+
+```typescript
+import type { Tensor, Shape, EinsumCheck, EinsumResult, SliceCheck, SliceResult } from "onejs-unity/tensor"
+
+declare function einsum<S extends string, A extends Shape, B extends Shape>(
+    spec: S & EinsumCheck<S, A, B>, a: Tensor<A>, b: Tensor<B>): EinsumResult<S, A, B>
+declare function at<S extends Shape, P extends string>(x: Tensor<S>, spec: P & SliceCheck<S, P>): SliceResult<S, P>
+
+declare const q: Tensor<["B", 8, 64, 32]>
+declare const k: Tensor<["B", 8, 128, 32]>
+const att = einsum("bhqd,bhkd->bhqk", q, k)   // Tensor<["B", 8, 64, 128]>
+einsum("bhqd,bhk->bhqk", q, k)                // error on the spec: rank mismatch
+at(att, ":, 0, 1:3")                          // Tensor<["B", number, 128]>
+```
+
+A dimension is a literal size, a symbolic name (`"B"`) or `number`. Two different names never unify, and a name
+never matches a literal; `number` matches anything. In a slice, `:` keeps a dimension, an index drops it, and bounds
+or a step widen it to `number`, because sizes are not computed in types. Dimensions past the last part are kept,
+and one `...` stands for those in the middle. Einsum takes two operands.
+
+Checking costs about 0.7 ms per einsum call and 0.3 ms per slice on TypeScript 7 (500 calls in 0.37 s and 0.14 s).
 
 ## Peer Dependencies
 

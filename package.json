@@ -10,6 +10,7 @@
     "./gpu": "./src/gpu/index.ts",
     "./input": "./src/input/index.ts",
     "./interop": "./src/interop/index.ts",
+    "./tensor": "./src/tensor/index.ts",
     "./proc": "./src/proc/index.ts",
     "./proc/noise": "./src/proc/noise/index.ts",
     "./proc/geometry": "./src/proc/geometry/index.ts",
