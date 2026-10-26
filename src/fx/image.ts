@@ -252,7 +252,7 @@ export class Image {
         return this.#then(op, MODE.SCALAR, args)
     }
 
-    // MARK: basic
+    // basic
 
     add(v: Operand): Image { return this.#binary(OP.ADD, v) }
     subtract(v: Operand): Image { return this.#binary(OP.SUBTRACT, v) }
@@ -262,7 +262,7 @@ export class Image {
     pow(v: Operand): Image { return this.#binary(OP.POW, v) }
     sqrt(): Image { return this.#unary(OP.SQRT) }
 
-    // MARK: range
+    // range
 
     clamp(min: number, max: number): Image { return this.#unary(OP.CLAMP, [min, max]) }
     frac(): Image { return this.#unary(OP.FRACTION) }
@@ -274,7 +274,7 @@ export class Image {
     }
     saturate(): Image { return this.#unary(OP.SATURATE) }
 
-    // MARK: advanced
+    // advanced
 
     abs(): Image { return this.#unary(OP.ABSOLUTE) }
     exp(): Image { return this.#unary(OP.EXPONENTIAL) }
@@ -284,7 +284,7 @@ export class Image {
     posterize(v: Operand): Image { return this.#binary(OP.POSTERIZE, v) }
     reciprocal(): Image { return this.#unary(OP.RECIPROCAL) }
 
-    // MARK: interpolation
+    // interpolation
 
     /** Mixes toward `v` by `t`. */
     lerp(v: Operand, t: number): Image {
@@ -297,7 +297,7 @@ export class Image {
     }
     inverseLerp(v: Operand): Image { return this.#binary(OP.INVERSE_LERP, v) }
 
-    // MARK: colour
+    // colour
     //
     // These adjust rgb and leave alpha alone.
 
@@ -344,7 +344,7 @@ export class Image {
         return this.#then(OP.RAMP, MODE.SCALAR, args)
     }
 
-    // MARK: composite
+    // composite
 
     /**
      * Blends an operand over this image with one of the 27 Photoshop modes.
@@ -359,7 +359,7 @@ export class Image {
         return this.#then(OP.BLEND, operandMode, [...args, BLEND[mode], opacity])
     }
 
-    // MARK: spatial
+    // spatial
     //
     // Each of these takes a pass of its own: they move uv before the sample, so
     // there is nothing for them to fuse into.
@@ -390,7 +390,7 @@ export class Image {
         return this.#then(OP.CROP, MODE.SCALAR, [x, y, width, height])
     }
 
-    // MARK: filters
+    // filters
     //
     // These sample the neighbourhood, so they need the texel size and take
     // passes of their own. The separable ones are two passes each.

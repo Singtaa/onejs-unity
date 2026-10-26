@@ -132,7 +132,7 @@ export function createInputBackend(
     })
 }
 
-// MARK: key names
+// key names
 
 /**
  * Aliases accepted for key names, lowercased.

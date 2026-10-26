@@ -38,7 +38,7 @@ import { getInputBridge } from "./backend"
 // Phase mapping
 const PHASE_MAP: ActionPhase[] = ["disabled", "waiting", "started", "performed", "canceled"]
 
-// MARK: Action events
+// Action events
 
 /**
  * C# queues each watched action's started/performed/canceled as it happens,

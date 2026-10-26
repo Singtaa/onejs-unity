@@ -117,7 +117,7 @@ describe("transformCsImports", () => {
         expect(await run(`import styles from "./App.module.uss"\n`)).toBeNull()
     })
 
-    // MARK: the corruption cases this rewrite exists for
+    // the corruption cases this rewrite exists for
 
     it("does not rewrite import text inside a string literal", async () => {
         const src = `const code = 'import { Texture2D } from "UnityEngine"'\n`
@@ -154,7 +154,7 @@ describe("transformCsImports", () => {
         expect(out).not.toContain(`const { Material }`)
     })
 
-    // MARK: fidelity
+    // fidelity
 
     it("preserves the line count of a multi-line import", async () => {
         const src = `import {\n    Texture2D,\n    Material,\n} from "UnityEngine"\nconst after = 1\n`
