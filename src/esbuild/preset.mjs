@@ -75,19 +75,24 @@ export function oneJSConfig(options = {}) {
         // Packages like onejs-react ship TypeScript source.
         resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".json"],
         sourcemap: true,
+        // unityOutputs writes the files, each only when it changed.
+        write: false,
         // A plain .uss import is its text, for compileStyleSheet(), which embeds
         // the styles in the bundle so they work in a build.
         loader: { ".uss": "text", ...loader },
         alias: { ...appAliases(root), ...alias },
         define: { "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"), ...define },
         plugins: [
+            // First, so every other plugin's onEnd finds this build's files on disk.
+            unityOutputs(),
             importTransformPlugin(),
             tailwindPlugin({ content: ["./**/*.{tsx,ts,jsx,js}"], ...tailwind }),
             themesPlugin(),
             ussModulesPlugin({ generateTypes: true }),
-            slPlugin({ generateTypes: true }),
+            // Named here because the plugin writes no manifest by default for
+            // a build that leaves writing to someone else, as this one does.
+            slPlugin({ generateTypes: true, manifest: path.resolve(root, path.dirname(outfile), "app.sl.json") }),
             ...plugins,
-            unitySourceMapName(),
         ],
         ...esbuildOptions,
     }
@@ -130,20 +135,41 @@ function packageDir(require, name) {
 }
 
 /**
- * Renames the source map from app.js.txt.map to app.js.map.txt, a name Unity
- * imports as a TextAsset so a build can carry it.
+ * Writes the build's files, each only when its bytes changed, with the source
+ * map named app.js.map.txt, a name Unity imports as a TextAsset so a build can
+ * carry it.
+ *
+ * esbuild alone rewrites every file on every build, and Unity imports a
+ * rewritten file again even when nothing in it changed (#9).
  */
-function unitySourceMapName() {
+function unityOutputs() {
     return {
-        name: "unity-source-map-name",
+        name: "unity-outputs",
         setup(build) {
             const { outfile, absWorkingDir = process.cwd() } = build.initialOptions
-            if (!outfile || !outfile.endsWith(".txt")) return
-            const from = path.resolve(absWorkingDir, `${outfile}.map`)
-            const to = path.resolve(absWorkingDir, outfile.replace(/\.txt$/, ".map.txt"))
-            build.onEnd(() => {
-                if (fs.existsSync(from)) fs.renameSync(from, to)
+            const map = outfile?.endsWith(".txt") ? path.resolve(absWorkingDir, `${outfile}.map`) : null
+            const mapAs = map === null ? null : path.resolve(absWorkingDir, outfile.replace(/\.txt$/, ".map.txt"))
+            build.onEnd((result) => {
+                // A config that sets write: true has had esbuild write its
+                // files, which leaves only the map to rename.
+                if (result.outputFiles === undefined) {
+                    if (map !== null && fs.existsSync(map)) fs.renameSync(map, mapAs)
+                    return
+                }
+                for (const file of result.outputFiles) {
+                    writeIfChanged(file.path === map ? mapAs : file.path, file.contents)
+                }
             })
         },
     }
+}
+
+/** Writes `bytes` to `file` unless the file already holds exactly them. */
+function writeIfChanged(file, bytes) {
+    try {
+        if (Buffer.compare(fs.readFileSync(file), bytes) === 0) return
+    } catch {
+        fs.mkdirSync(path.dirname(file), { recursive: true })
+    }
+    fs.writeFileSync(file, bytes)
 }

@@ -123,7 +123,7 @@ export default oneJSConfig({ entry: "index.tsx" })
 }
 ```
 
-`oneJSConfig` returns esbuild options: the bundle JSRunner reads (`../app.js.txt`, an IIFE whose exports land on `__exports`), React and `oj` pinned to the app's own copies, `.uss` files as text, the source map named `app.js.map.txt`, and every plugin below. `onejs-unity build` runs the config's default export with the app's own esbuild, and `onejs-unity watch` rebuilds on every save.
+`oneJSConfig` returns esbuild options: the bundle JSRunner reads (`../app.js.txt`, an IIFE whose exports land on `__exports`), React and `oj` pinned to the app's own copies, `.uss` files as text, the source map named `app.js.map.txt`, and every plugin below. `onejs-unity build` runs the config's default export with the app's own esbuild, and `onejs-unity watch` rebuilds on every save. A file is written only when its bytes changed, so a rebuild that changes nothing gives Unity nothing to import again.
 
 `process.env.NODE_ENV` picks React's build. It is `"development"` unless the build runs with `NODE_ENV=production`, which is how OneJS 3.9.5 and newer builds a player, so players get React's production build and the editor keeps its warnings.
 

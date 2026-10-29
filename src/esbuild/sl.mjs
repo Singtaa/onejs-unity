@@ -66,6 +66,19 @@ function exists(file) {
 }
 
 /**
+ * Writes `text` to `file` unless the file already holds exactly it, so a
+ * rebuild that changed no program leaves the manifest for Unity untouched.
+ */
+async function writeIfChanged(file, text) {
+    try {
+        if (await getFs().promises.readFile(file, "utf8") === text) return
+    } catch {
+        // Not there yet.
+    }
+    await getFs().promises.writeFile(file, text)
+}
+
+/**
  * `{ parse, compile, manifest }`, as JavaScript this Node process can load.
  *
  * `build.esbuild` is the exact esbuild running the build, so there is no second
@@ -364,7 +377,7 @@ export function slPlugin(options = {}) {
                         : { version: 1, hashVersion: bundledScheme, programs: [] }
                     if (onManifest !== null) onManifest(empty)
                     if (where === null || (bundledScheme === null && !exists(where))) return
-                    await getFs().promises.writeFile(where, JSON.stringify(empty, null, 1))
+                    await writeIfChanged(where, JSON.stringify(empty, null, 1))
                     return
                 }
                 const sl = compiler ?? await loadCompiler(build.esbuild)
@@ -372,7 +385,7 @@ export function slPlugin(options = {}) {
                 if (bundledScheme !== null) written.hashVersion = bundledScheme
                 if (onManifest !== null) onManifest(written)
                 if (where === null) return
-                await getFs().promises.writeFile(where, JSON.stringify(written, null, 1))
+                await writeIfChanged(where, JSON.stringify(written, null, 1))
             })
         },
     }

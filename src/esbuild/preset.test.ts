@@ -127,6 +127,48 @@ describe("onejs-unity build", () => {
         expect(fs.existsSync(`${bundle}.map`)).toBe(false)
     })
 
+    it("leaves every output untouched when a rebuild changes nothing, and rewrites only the one that changed (#9)", () => {
+        const SL = "float4 main() {\n    return float4(uv.x, 0, 0, 1);\n}\n"
+        const { root, bundle } = makeApp({
+            "index.tsx": `import fx from "./fx.sl"\nexport const program = fx\nexport const word = "first"\n`,
+            "fx.sl": SL,
+            "esbuild.config.mjs": CONFIG,
+        })
+        const outputs = [bundle, bundle.replace(/app\.js\.txt$/, "app.js.map.txt"), bundle.replace(/app\.js\.txt$/, "app.sl.json")]
+        const first = cli(root, ["build"])
+        expect(first.status, first.stdout + first.stderr).toBe(0)
+        // Each output's time set back an hour, so any write at all shows.
+        const past = new Date(Date.now() - 3600 * 1000)
+        for (const file of outputs) fs.utimesSync(file, past, past)
+        const stamp = () => outputs.map((file) => fs.statSync(file).mtimeMs)
+        const before = stamp()
+
+        const again = cli(root, ["build"])
+        expect(again.status, again.stdout + again.stderr).toBe(0)
+        expect(stamp(), "a rebuild of the same source rewrote an output").toEqual(before)
+
+        fs.writeFileSync(path.join(root, "index.tsx"), `import fx from "./fx.sl"\nexport const program = fx\nexport const word = "second"\n`)
+        const changed = cli(root, ["build"])
+        expect(changed.status, changed.stdout + changed.stderr).toBe(0)
+        expect(fs.readFileSync(bundle, "utf8")).toContain("second")
+        const after = stamp()
+        expect(after[0], "the bundle changed and was not written").toBeGreaterThan(before[0])
+        expect(after[1], "the map changed and was not written").toBeGreaterThan(before[1])
+        expect(after[2], "the shader manifest did not change and was written").toBe(before[2])
+    })
+
+    it("has the build's files on disk, under their Unity names, when the project's own plugins end", () => {
+        const peek = `import fs from "node:fs"\nimport { oneJSConfig } from "onejs-unity/esbuild"\n`
+            + `export default oneJSConfig({ entry: "index.tsx", plugins: [{ name: "peek", setup(build) { build.onEnd(() => {\n`
+            + `    fs.writeFileSync("peek.txt", fs.readFileSync("../app.js.txt", "utf8") + fs.readFileSync("../app.js.map.txt", "utf8"))\n`
+            + `}) } }] })\n`
+        const { root, bundle } = makeApp({ "index.tsx": REACT_APP, "esbuild.config.mjs": peek })
+        const res = cli(root, ["build"])
+        expect(res.status, res.stdout + res.stderr).toBe(0)
+        const map = bundle.replace(/app\.js\.txt$/, "app.js.map.txt")
+        expect(fs.readFileSync(path.join(root, "peek.txt"), "utf8")).toBe(fs.readFileSync(bundle, "utf8") + fs.readFileSync(map, "utf8"))
+    })
+
     it("builds a config named on the command line from that config's folder", () => {
         const { root, bundle } = makeApp({ "index.tsx": REACT_APP, "esbuild.config.mjs": CONFIG })
         const res = spawnSync(process.execPath, [CLI, "build", path.join(root, "esbuild.config.mjs")], {
