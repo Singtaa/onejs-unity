@@ -5,14 +5,21 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
  * ComputeBuffer would, so a write and a readback can be compared bit for bit.
  * `bits: false` is a runtime from before SetBufferBits: the static is missing,
  * which the CS proxy reads as a truthy proxy object rather than undefined.
+ * `words` is a runtime where typed arrays cross as bytes (SetBufferWords),
+ * missing the same way when false.
  */
-function fakeBridge({ bits }: { bits: boolean }) {
+function fakeBridge({ bits, words: hasWords = false }: { bits: boolean, words?: boolean }) {
     const words = new Map<number, Int32Array>()
     const readbacks = new Map<number, number>()
     let next = 1
     const asFloats = (w: Int32Array) => Array.from(new Float32Array(w.buffer))
     const api = {
         HasBufferBits: bits ? true : {},
+        HasBufferWords: hasWords ? true : {},
+        // What arrives in C#: the typed array's own bytes, a view's only
+        SetBufferWords: vi.fn((h: number, data: Float32Array | Int32Array | Uint32Array) => {
+            words.set(h, new Int32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)))
+        }),
         CreateBuffer: vi.fn((count: number) => { const h = next++; words.set(h, new Int32Array(count)); return h }),
         SetBufferBits: vi.fn((h: number, text: string) => {
             words.set(h, new Int32Array(text === "" ? [] : text.split(",").map(Number)))
@@ -43,6 +50,39 @@ async function readBack<T>(promise: Promise<T>): Promise<T> {
     await vi.advanceTimersByTimeAsync(20)
     return promise
 }
+
+describe("buffer transport as typed arrays", () => {
+    it("writes a Float32Array as itself, exact to the bit", async () => {
+        const api = fakeBridge({ bits: true, words: true })
+        const compute = await load()
+        const data = new Float32Array([1, -1, 0.1, -0, Number.MIN_VALUE, 3.4e38, NaN])
+        const buffer = compute.buffer({ data })
+        expect(api.SetBufferWords).toHaveBeenCalledOnce()
+        expect(api.SetBufferWords.mock.calls[0][1]).toBe(data)
+        expect(api.SetBufferBits).not.toHaveBeenCalled()
+        expect(api.SetBufferData).not.toHaveBeenCalled()
+        expect(api.stored(buffer.__handle)).toEqual(new Int32Array(data.buffer))
+    })
+
+    it("writes only a subarray's own words", async () => {
+        const api = fakeBridge({ bits: true, words: true })
+        const compute = await load()
+        const buffer = compute.buffer({ count: 2 })
+        buffer.write(new Int32Array([9, -1, 2, 9]).subarray(1, 3) as never)
+        expect(Array.from(api.stored(buffer.__handle))).toEqual([-1, 2])
+    })
+
+    it("sends other array types as floats rather than JSON", async () => {
+        const api = fakeBridge({ bits: true, words: true })
+        const compute = await load()
+        const buffer = compute.buffer({ count: 2 })
+        buffer.write(new Float64Array([1.5, 2.5]) as never)
+        const sent = api.SetBufferWords.mock.calls[0][1]
+        expect(sent).toBeInstanceOf(Float32Array)
+        expect(Array.from(sent)).toEqual([1.5, 2.5])
+        expect(api.SetBufferData).not.toHaveBeenCalled()
+    })
+})
 
 describe("buffer transport", () => {
     it("writes a Float32Array as its bit patterns and reads it back exactly", async () => {
@@ -89,6 +129,14 @@ describe("buffer transport", () => {
         buffer.write(new Float64Array([1.5, 2.5]) as never)
         expect(api.SetBufferData).toHaveBeenCalledWith(buffer.__handle, "[1.5,2.5]")
         expect(api.SetBufferBits).not.toHaveBeenCalled()
+    })
+
+    it("keeps to bit-pattern text against a runtime without SetBufferWords", async () => {
+        const api = fakeBridge({ bits: true, words: false })
+        const compute = await load()
+        compute.buffer({ data: new Float32Array([1, 2]) })
+        expect(api.SetBufferWords).not.toHaveBeenCalled()
+        expect(api.SetBufferBits).toHaveBeenCalledOnce()
     })
 
     it("uses the JSON pair against a runtime without SetBufferBits", async () => {

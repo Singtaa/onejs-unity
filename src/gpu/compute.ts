@@ -39,6 +39,9 @@ declare const CS: {
                 // Present since #107; undefined against an older runtime (see hasBufferBits)
                 HasBufferBits: boolean
                 SetBufferBits(handle: number, bits: string): void
+                // Present once typed arrays cross as bytes; undefined before (see hasBufferWords)
+                HasBufferWords: boolean
+                SetBufferWords(handle: number, words: Float32Array | Int32Array | Uint32Array): void
                 BindBuffer(shaderHandle: number, kernelIndex: number, name: string, bufferHandle: number): void
                 Dispatch(shaderHandle: number, kernelIndex: number, groupsX: number, groupsY: number, groupsZ: number): void
                 RequestReadback(bufferHandle: number): number // Returns request ID
@@ -75,6 +78,28 @@ declare const CS: {
             }
         }
     }
+}
+
+/*
+ * A runtime where typed arrays cross the bridge as their bytes takes a buffer's
+ * words as the typed array itself (SetBufferWords): no text either way, and
+ * only a view's own words. A runtime from before that gets the bit-pattern
+ * text below.
+ */
+let bufferWords: boolean | undefined
+
+function hasBufferWords(): boolean {
+    if (bufferWords === undefined) {
+        // A missing static reads as a truthy proxy, so compare with true
+        bufferWords = CS.OneJS.GPU.GPUBridge.HasBufferWords === true
+    }
+    return bufferWords
+}
+
+/** The array as 32-bit words SetBufferWords takes: as it is, or as floats for any other array. */
+function toWords(data: TypedArray): Float32Array | Int32Array | Uint32Array {
+    if (data instanceof Float32Array || data instanceof Int32Array || data instanceof Uint32Array) return data
+    return Float32Array.from(data as unknown as ArrayLike<number>)
 }
 
 /*
@@ -263,6 +288,10 @@ class ComputeBufferImpl<T extends TypedArray = Float32Array> implements ComputeB
     }
 
     write(data: T, _options?: { offset?: number }): void {
+        if (hasBufferWords()) {
+            CS.OneJS.GPU.GPUBridge.SetBufferWords(this.__handle, toWords(data))
+            return
+        }
         const bits = hasBufferBits() ? toBits(data) : null
         if (bits !== null) {
             CS.OneJS.GPU.GPUBridge.SetBufferBits(this.__handle, bits)
