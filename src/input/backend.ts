@@ -87,12 +87,54 @@ export interface InputBackendMethods {
     IsMouseOverUI?(): boolean
     /** Whether the touch began over UI that answers presses. */
     GetTouchOverUI?(index: number): boolean
+
+    // pointer lock: optional, since a browser host asks the page for it. Left
+    // out, they lock Unity's own cursor, which is what an ejected cart and a
+    // OneJS project mean by it.
+    /** Locks the pointer to the game, where the host can. */
+    LockMouse?(): void
+    /** Lets the pointer go. */
+    UnlockMouse?(): void
+    /** Whether the pointer is locked now. */
+    IsMouseLocked?(): boolean
+}
+
+/**
+ * Unity's Cursor, or null where CS does not reach one (a test, a host with
+ * CS shadowed). Its modes are named from Unity's own enum, whose members
+ * cross as the numbers a read of lockState returns.
+ */
+function unityCursor(): { cursor: any, mode: any } | null {
+    try {
+        const engine = (globalThis as any).CS?.UnityEngine
+        if (!engine?.Cursor || !engine.CursorLockMode) return null
+        return { cursor: engine.Cursor, mode: engine.CursorLockMode }
+    } catch {
+        return null
+    }
 }
 
 /** Methods a backend may leave out, and what input reads in their place. */
 const OPTIONAL_METHODS: Record<string, () => unknown> = {
     IsMouseOverUI: () => false,
     GetTouchOverUI: () => false,
+    LockMouse: () => {
+        const unity = unityCursor()
+        if (unity) unity.cursor.lockState = unity.mode.Locked
+    },
+    UnlockMouse: () => {
+        const unity = unityCursor()
+        if (unity) unity.cursor.lockState = unity.mode.None
+    },
+    IsMouseLocked: () => {
+        const unity = unityCursor()
+        return unity !== null && unity.cursor.lockState === unity.mode.Locked
+    },
+}
+
+/** Whether a backend may leave this method out (callOptional answers it then). */
+export function isOptionalMethod(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(OPTIONAL_METHODS, name)
 }
 
 /**

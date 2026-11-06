@@ -129,6 +129,24 @@ export interface Mouse {
      */
     readonly overUI: boolean
 
+    /**
+     * Whether the pointer is locked to the game: hidden and held in place,
+     * with `delta` still reporting each movement, as a mouse-look camera
+     * wants. Follows the browser or Unity, so Escape, which always unlocks,
+     * reads here on a following frame.
+     */
+    readonly locked: boolean
+
+    /**
+     * Locks the pointer. A browser grants a lock only in a press, so in a
+     * frame with no click, tap or key it is asked on the next press instead.
+     * Nothing happens where there is no pointer to lock, such as a phone.
+     */
+    lock(): void
+
+    /** Lets the pointer go, and forgets a lock still waiting for a press. */
+    unlock(): void
+
     /** Left mouse button was pressed this frame */
     readonly wasLeftPressed: boolean
 

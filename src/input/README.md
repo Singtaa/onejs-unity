@@ -54,10 +54,13 @@ expects when nothing is plugged in.
 
 `setInputBackend(null)` returns to the CS bridge.
 
-Two methods are optional, because only a host that can ask the UI knows the
-answer: `IsMouseOverUI` and `GetTouchOverUI` (see `overUI` below). Left out,
-or on the CS bridge, they read as false; nothing throws and nothing asks
-`InputBridge` for a method it does not have.
+Five methods are optional, and `isOptionalMethod(name)` names them. Two are
+answered only by a host that can ask the UI: `IsMouseOverUI` and
+`GetTouchOverUI` (see `overUI` below), which read as false when left out or on
+the CS bridge. Three lock the pointer: `LockMouse`, `UnlockMouse` and
+`IsMouseLocked` (see `lock` below), which a browser host answers from the
+page and which otherwise set and read Unity's `Cursor.lockState`. Nothing
+throws, and nothing asks `InputBridge` for a method it does not have.
 
 This is what OJPlay uses. Its container evaluates game bundles with the
 runtime's globals shadowed, so `CS` is undefined there, and game code still
@@ -114,7 +117,18 @@ input.mouse.wasRightReleased: boolean
 input.mouse.wasMiddleReleased: boolean
 
 input.mouse.overUI: boolean   // The held press began on UI that answers presses; with none held, the pointer is over such UI
+
+input.mouse.lock(): void      // Hide the pointer and hold it in place; delta keeps moving
+input.mouse.unlock(): void
+input.mouse.locked: boolean   // Whether it is locked now
 ```
+
+`lock()` is mouse-look: `delta` keeps reporting each movement while the
+pointer stays put. Natively it sets Unity's `Cursor.lockState`. A browser
+grants a lock only in a press, so OJPlay's container asks at once in a frame
+with a click, tap or key, and otherwise on the next press. Escape always
+unlocks there, and `locked` follows on a later frame. A phone has nothing to
+lock: `lock()` does nothing and `locked` stays false.
 
 `overUI` is how a game that fires on `leftButton` keeps a click on its HUD from
 being a shot: `if (input.mouse.leftButton && !input.mouse.overUI) fire()`. UI

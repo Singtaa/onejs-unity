@@ -19,7 +19,7 @@ export { input } from "./input"
 
 // Backend seam: lets a host without CS (the OJPlay container, a headless
 // test) supply input to this same API instead of forking a second one.
-export { setInputBackend, getInputBackend, createInputBackend, resolveKeyName, keyNameFromDomCode } from "./backend"
+export { setInputBackend, getInputBackend, createInputBackend, isOptionalMethod, resolveKeyName, keyNameFromDomCode } from "./backend"
 export type { InputBackend, InputBackendMethods } from "./backend"
 
 // Individual device modules (for direct imports if needed)

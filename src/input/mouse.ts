@@ -63,6 +63,18 @@ class MouseImpl implements Mouse {
         return Boolean(callOptional("IsMouseOverUI"))
     }
 
+    get locked(): boolean {
+        return Boolean(callOptional("IsMouseLocked"))
+    }
+
+    lock(): void {
+        callOptional("LockMouse")
+    }
+
+    unlock(): void {
+        callOptional("UnlockMouse")
+    }
+
     get wasLeftPressed(): boolean {
         return (getInputBridge().GetMouseButtonsPressed() & MOUSE_LEFT) !== 0
     }
