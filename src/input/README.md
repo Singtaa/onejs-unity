@@ -54,6 +54,11 @@ expects when nothing is plugged in.
 
 `setInputBackend(null)` returns to the CS bridge.
 
+Two methods are optional, because only a host that can ask the UI knows the
+answer: `IsMouseOverUI` and `GetTouchOverUI` (see `overUI` below). Left out,
+or on the CS bridge, they read as false; nothing throws and nothing asks
+`InputBridge` for a method it does not have.
+
 This is what OJPlay uses. Its container evaluates game bundles with the
 runtime's globals shadowed, so `CS` is undefined there, and game code still
 calls this same API. `resolveKeyName` and `keyNameFromDomCode` are exported for
@@ -107,7 +112,17 @@ input.mouse.wasMiddlePressed: boolean
 input.mouse.wasLeftReleased: boolean  // Released this frame
 input.mouse.wasRightReleased: boolean
 input.mouse.wasMiddleReleased: boolean
+
+input.mouse.overUI: boolean   // The held press began on UI that answers presses; with none held, the pointer is over such UI
 ```
+
+`overUI` is how a game that fires on `leftButton` keeps a click on its HUD from
+being a shot: `if (input.mouse.leftButton && !input.mouse.overUI) fire()`. UI
+that answers presses is an element with a click, pointer or change handler
+(a button, a slider with an onChange), under the point or above it in the
+tree. It is known
+where the host can ask the UI (OJPlay's container and an ejected cart) and
+false elsewhere.
 
 ### Gamepad
 
@@ -177,6 +192,7 @@ touch.fingerId: number
 touch.position: Vector2
 touch.delta: Vector2
 touch.phase: "began" | "moved" | "stationary" | "ended" | "canceled"
+touch.overUI: boolean   // Began on UI that answers presses, for its whole life
 ```
 
 ### InputActions

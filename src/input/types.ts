@@ -119,6 +119,16 @@ export interface Mouse {
     /** Back mouse button is held */
     readonly backButton: boolean
 
+    /**
+     * While a button is held, whether that press began on UI that answers
+     * presses (an element with a click, pointer or change handler); with
+     * none held, whether the pointer is over such UI now. A game that fires on
+     * `leftButton` checks it so a click on its HUD is not a shot. Known where
+     * the host can ask the UI (OJPlay's container and an ejected cart);
+     * false elsewhere.
+     */
+    readonly overUI: boolean
+
     /** Left mouse button was pressed this frame */
     readonly wasLeftPressed: boolean
 
@@ -233,6 +243,13 @@ export interface Touch {
 
     /** Current touch phase */
     readonly phase: TouchPhase
+
+    /**
+     * Whether the touch began on UI that answers presses, for its whole life.
+     * oj's sticks and pads leave such a touch alone. Known where the host can
+     * ask the UI (OJPlay's container and an ejected cart); false elsewhere.
+     */
+    readonly overUI: boolean
 }
 
 // ============ InputActions ============

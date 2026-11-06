@@ -77,6 +77,31 @@ export interface InputBackendMethods {
     GetTouchPositionY(index: number): number
     GetTouchDeltaX(index: number): number
     GetTouchDeltaY(index: number): number
+
+    // over UI: optional, since only a host that can ask the UI knows. Left
+    // out, input reads them as false, as it does on Unity's own InputBridge.
+    /**
+     * While a mouse button is held, whether that press began over UI that
+     * answers presses; with none held, whether the pointer is over such UI.
+     */
+    IsMouseOverUI?(): boolean
+    /** Whether the touch began over UI that answers presses. */
+    GetTouchOverUI?(index: number): boolean
+}
+
+/** Methods a backend may leave out, and what input reads in their place. */
+const OPTIONAL_METHODS: Record<string, () => unknown> = {
+    IsMouseOverUI: () => false,
+    GetTouchOverUI: () => false,
+}
+
+/**
+ * Calls an optional backend method, or answers its default. Unity's own
+ * InputBridge has none of them, and asking it would log "Method not found".
+ */
+export function callOptional<T>(name: keyof typeof OPTIONAL_METHODS, ...args: unknown[]): T {
+    const method = installed === null ? undefined : (installed as Record<string, unknown>)[name]
+    return (typeof method === "function" ? method.apply(installed, args) : OPTIONAL_METHODS[name]()) as T
 }
 
 /** Anything callable the input modules might reach for. */
@@ -125,6 +150,7 @@ export function createInputBackend(
         get(target, prop) {
             if (prop in target) return (target as Record<string | symbol, unknown>)[prop]
             if (typeof prop !== "string") return undefined
+            if (prop in OPTIONAL_METHODS) return OPTIONAL_METHODS[prop]
             return () => {
                 throw new Error(`[onejs-unity/input] ${prop} is not available in the ${label}`)
             }

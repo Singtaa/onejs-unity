@@ -3,7 +3,7 @@
  */
 
 import type { Mouse, Vector2 } from "./types"
-import { getInputBridge } from "./backend"
+import { callOptional, getInputBridge } from "./backend"
 
 /** GetMouseButtons() bit flags (matching InputBridge.cs) */
 export const MOUSE_LEFT = 1
@@ -57,6 +57,10 @@ class MouseImpl implements Mouse {
 
     get backButton(): boolean {
         return (getInputBridge().GetMouseButtons() & MOUSE_BACK) !== 0
+    }
+
+    get overUI(): boolean {
+        return Boolean(callOptional("IsMouseOverUI"))
     }
 
     get wasLeftPressed(): boolean {

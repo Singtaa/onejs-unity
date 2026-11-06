@@ -3,7 +3,7 @@
  */
 
 import type { Touch, TouchPhase, Vector2 } from "./types"
-import { getInputBridge } from "./backend"
+import { callOptional, getInputBridge } from "./backend"
 
 
 // Phase mapping
@@ -20,6 +20,7 @@ class TouchImpl implements Touch {
     private readonly _position: Vector2 = { x: 0, y: 0 }
     private readonly _delta: Vector2 = { x: 0, y: 0 }
     private _phase: TouchPhase = "began"
+    private _overUI = false
 
     constructor(index: number) {
         this._index = index
@@ -34,6 +35,7 @@ class TouchImpl implements Touch {
         this._delta.y = getInputBridge().GetTouchDeltaY(this._index)
         const phaseInt = getInputBridge().GetTouchPhase(this._index)
         this._phase = PHASE_MAP[phaseInt] ?? "began"
+        this._overUI = Boolean(callOptional("GetTouchOverUI", this._index))
     }
 
     get fingerId(): number {
@@ -50,6 +52,10 @@ class TouchImpl implements Touch {
 
     get phase(): TouchPhase {
         return this._phase
+    }
+
+    get overUI(): boolean {
+        return this._overUI
     }
 }
 
