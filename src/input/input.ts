@@ -18,6 +18,7 @@ import type {
     ActionPhase,
     ActionCallback,
     ActionCallbackContext,
+    PointerType,
     Vector2,
 } from "./types"
 
@@ -32,7 +33,7 @@ import { keyboard } from "./keyboard"
 import { mouse } from "./mouse"
 import { getGamepad, getGamepads, getGamepadCount, pauseHaptics, resumeHaptics } from "./gamepad"
 import { getTouches, getTouchCount } from "./touch"
-import { getInputBridge } from "./backend"
+import { callOptional, getInputBridge } from "./backend"
 
 
 // Phase mapping
@@ -514,6 +515,11 @@ class InputModuleImpl implements InputModule {
 
     get touchCount(): number {
         return getTouchCount()
+    }
+
+    get pointerType(): PointerType {
+        const type = callOptional<string>("GetPointerType")
+        return type === "touch" || type === "pen" ? type : "mouse"
     }
 
     loadActions(asset: unknown): InputActions {

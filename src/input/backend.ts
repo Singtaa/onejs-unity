@@ -97,6 +97,11 @@ export interface InputBackendMethods {
     UnlockMouse?(): void
     /** Whether the pointer is locked now. */
     IsMouseLocked?(): boolean
+
+    // pointer type: optional. Left out, Unity's InputBridge answers on a OneJS
+    // that has GetPointerType, and a guess from the platform on one before it.
+    /** "mouse", "touch" or "pen": the last press's pointer, or before any press the device's best guess. */
+    GetPointerType?(): string
 }
 
 /**
@@ -111,6 +116,22 @@ function unityCursor(): { cursor: any, mode: any } | null {
         return { cursor: engine.Cursor, mode: engine.CursorLockMode }
     } catch {
         return null
+    }
+}
+
+/**
+ * Unity's own answer: InputBridge.GetPointerType on a OneJS that has it
+ * (`PointerTypes` reads true there, and a missing static reads as a proxy),
+ * else a guess from the platform, else "mouse" where CS reaches nothing.
+ */
+function unityPointerType(): string {
+    try {
+        const cs = (globalThis as any).CS
+        const bridge = cs?.OneJS?.Input?.InputBridge
+        if (bridge?.PointerTypes === true) return String(bridge.GetPointerType())
+        return cs?.UnityEngine?.Application?.isMobilePlatform === true ? "touch" : "mouse"
+    } catch {
+        return "mouse"
     }
 }
 
@@ -130,6 +151,7 @@ const OPTIONAL_METHODS: Record<string, () => unknown> = {
         const unity = unityCursor()
         return unity !== null && unity.cursor.lockState === unity.mode.Locked
     },
+    GetPointerType: unityPointerType,
 }
 
 /** Whether a backend may leave this method out (callOptional answers it then). */

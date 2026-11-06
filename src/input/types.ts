@@ -522,6 +522,9 @@ export interface InputReader {
 
 // ============ Main Input Module ============
 
+/** The kind of pointer a press came from. */
+export type PointerType = "mouse" | "touch" | "pen"
+
 export interface InputModule {
     /** Keyboard device access */
     readonly keyboard: Keyboard
@@ -543,6 +546,15 @@ export interface InputModule {
 
     /** Number of active touches */
     readonly touchCount: number
+
+    /**
+     * The kind of pointer the last press came from: a stick on screen for
+     * "touch", a keyboard hint for "mouse". Before any press, the device's
+     * best guess: "touch" on a phone or tablet, "mouse" otherwise (a pen is
+     * known only once it presses). A tap never reads as a click, though a
+     * platform makes a mouse press of it too. Moving the mouse is no press.
+     */
+    readonly pointerType: PointerType
 
     /**
      * Load InputActions from a Unity InputActionAsset

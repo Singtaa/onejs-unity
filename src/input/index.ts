@@ -74,6 +74,7 @@ export type {
 export type {
     // Device types
     Keyboard,
+    PointerType,
     Mouse,
     Gamepad,
     DPad,

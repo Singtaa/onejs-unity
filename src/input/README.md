@@ -54,12 +54,16 @@ expects when nothing is plugged in.
 
 `setInputBackend(null)` returns to the CS bridge.
 
-Five methods are optional, and `isOptionalMethod(name)` names them. Two are
+Six methods are optional, and `isOptionalMethod(name)` names them. Two are
 answered only by a host that can ask the UI: `IsMouseOverUI` and
 `GetTouchOverUI` (see `overUI` below), which read as false when left out or on
 the CS bridge. Three lock the pointer: `LockMouse`, `UnlockMouse` and
 `IsMouseLocked` (see `lock` below), which a browser host answers from the
-page and which otherwise set and read Unity's `Cursor.lockState`. Nothing
+page and which otherwise set and read Unity's `Cursor.lockState`. One says
+which pointer pressed: `GetPointerType` (see `pointerType` below), which a
+browser host answers from the page's pointer events and which otherwise asks
+`InputBridge.GetPointerType` on a OneJS whose `InputBridge.PointerTypes` reads
+true, and guesses from `Application.isMobilePlatform` on one before it. Nothing
 throws, and nothing asks `InputBridge` for a method it does not have.
 
 This is what OJPlay uses. Its container evaluates game bundles with the
@@ -121,7 +125,18 @@ input.mouse.overUI: boolean   // The held press began on UI that answers presses
 input.mouse.lock(): void      // Hide the pointer and hold it in place; delta keeps moving
 input.mouse.unlock(): void
 input.mouse.locked: boolean   // Whether it is locked now
+
+input.pointerType: "mouse" | "touch" | "pen"   // The last press's pointer; before any press, the device's best guess
 ```
+
+`pointerType` is how a game shows a stick to a finger and a keyboard hint to a
+mouse. Before any press it guesses: the page's `(pointer: coarse)` in the
+browser, a handheld device natively, so a touchscreen laptop starts as a
+mouse. A press then says, and a moved mouse does not. A tap never reads as a
+click, though platforms make a mouse press of it: the browser host listens to
+pointer events only, and Unity's bridge counts a mouse press within 0.2 s of
+a touch or pen press as that press. Natively it watches from the first read,
+counting a press still held then.
 
 `lock()` is mouse-look: `delta` keeps reporting each movement while the
 pointer stays put. Natively it sets Unity's `Cursor.lockState`. A browser
