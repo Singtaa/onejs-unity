@@ -32,6 +32,8 @@
  * exists because PhysX is tuned for bodies a few units across, not hundreds.
  */
 
+import { csHas } from "../cs-host"
+
 declare const CS: any
 
 export type BodyType = "dynamic" | "kinematic" | "static"
@@ -147,15 +149,19 @@ const SHAPES: Record<BodyShape, number> = { box: 0, circle: 1, capsule: 2 }
 /** Six floats per contact, matching PhysicsWorld2D.EventStride. */
 const EVENT_STRIDE = 6
 
+/** The CS whose Physics2DBridge was found, so a host is asked once. */
+let foundIn: unknown
+
 function bridge(): any {
-    const found = CS?.OneJS?.Physics2DBridge
-    if (found === undefined || found === null) {
-        throw new Error(
+    const cs = (globalThis as any).CS
+    if (cs === undefined || foundIn !== cs) {
+        if (!csHas("OneJS.Physics2DBridge", () => cs.OneJS?.Physics2DBridge?.LiveWorldCount)) throw new Error(
             "[oj] physics is unavailable: OneJS.Physics2DBridge was not found. " +
             "In a stripped build this usually means UnityEngine.Physics2DModule was not preserved in link.xml.",
         )
+        foundIn = cs
     }
-    return found
+    return CS.OneJS.Physics2DBridge
 }
 
 /** The ergonomic config, flattened into the document the bridge parses. */

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { audio } from "./index"
+import { fakeCS } from "../test-fake-cs"
 
 /** A stand-in for AudioBridge that records what crossed. */
 function fakeBridge() {
@@ -29,7 +30,7 @@ function fakeBridge() {
         GetVoiceCount: vi.fn(() => 24),
         GetActiveVoiceCount: vi.fn(() => playing.size),
     }
-    ;(globalThis as any).CS = { OneJS: { Audio: { AudioBridge: api } } }
+    ;(globalThis as any).CS = fakeCS({ "OneJS.Audio.AudioBridge": api })
     return api
 }
 
@@ -49,9 +50,12 @@ describe("audio.load", () => {
         expect(api.LoadClip).not.toHaveBeenCalled()
     })
 
+    // A host without the bridge, as a stripped build is: AudioBridge reads as a path proxy, never undefined.
     it("says something useful when the bridge is missing", async () => {
-        ;(globalThis as any).CS = {}
-        await expect(audio.load("x.wav")).rejects.toThrow(/AudioBridge|link\.xml/)
+        ;(globalThis as any).CS = fakeCS({})
+        await expect(audio.load("x.wav")).rejects.toThrow(/AudioBridge was not found\. In a stripped build .*link\.xml/)
+        delete (globalThis as any).CS
+        await expect(audio.load("x.wav")).rejects.toThrow(/AudioBridge was not found/)
     })
 })
 

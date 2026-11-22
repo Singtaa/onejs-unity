@@ -23,6 +23,8 @@
  * playing, so the cost is per sound started, not per frame.
  */
 
+import { csHas } from "../cs-host"
+
 declare const CS: any
 
 /** A sound that has finished loading. */
@@ -57,15 +59,20 @@ export interface Voice {
     setPitch(pitch: number): void
 }
 
+/** The CS whose AudioBridge was found, so a host is asked once. */
+let foundIn: unknown
+
 function bridge(): any {
-    const found = CS?.OneJS?.Audio?.AudioBridge
-    if (found === undefined || found === null) {
-        throw new Error(
+    const cs = (globalThis as any).CS
+    // IsPlaying is a pure read every AudioBridge has had; a host without the type answers it with a throw.
+    if (cs === undefined || foundIn !== cs) {
+        if (!csHas("OneJS.Audio.AudioBridge", () => cs.OneJS?.Audio?.AudioBridge?.IsPlaying(0))) throw new Error(
             "[oj] audio is unavailable: OneJS.Audio.AudioBridge was not found. " +
             "In a stripped build this usually means UnityEngine.AudioModule was not preserved in link.xml.",
         )
+        foundIn = cs
     }
-    return found
+    return CS.OneJS.Audio.AudioBridge
 }
 
 function makeVoice(id: number): Voice {

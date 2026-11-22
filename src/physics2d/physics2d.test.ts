@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { toWire, createPhysicsWorld } from "./index"
+import { fakeCS } from "../test-fake-cs"
 
 const parse = (config: Parameters<typeof toWire>[0]) => JSON.parse(toWire(config))
 
@@ -69,9 +70,7 @@ function fakeWorld() {
         SetBodyEnabled: vi.fn(), ReadTransforms: vi.fn(() => "[1,2,3]"),
         Dispose: vi.fn(() => calls.push(["Dispose"])),
     }
-    ;(globalThis as any).CS = {
-        OneJS: { Physics2DBridge: { Create: vi.fn(() => world) } },
-    }
+    ;(globalThis as any).CS = fakeCS({ "OneJS.Physics2DBridge": { Create: vi.fn(() => world), LiveWorldCount: 0 } })
     return { world, calls, queue: (e: number[]) => { queued = e } }
 }
 
@@ -139,9 +138,12 @@ describe("createPhysicsWorld", () => {
         expect(fake.world.Dispose).toHaveBeenCalledTimes(1)
     })
 
+    // A host without the bridge, as a stripped build is: Physics2DBridge reads as a path proxy, never undefined.
     it("says something useful when the bridge is missing", () => {
-        ;(globalThis as any).CS = {}
-        expect(() => createPhysicsWorld({}, { bodies: [] })).toThrow(/Physics2DBridge|link\.xml/)
+        ;(globalThis as any).CS = fakeCS({})
+        expect(() => createPhysicsWorld({}, { bodies: [] })).toThrow(/Physics2DBridge was not found\. In a stripped build .*link\.xml/)
+        delete (globalThis as any).CS
+        expect(() => createPhysicsWorld({}, { bodies: [] })).toThrow(/Physics2DBridge was not found/)
     })
 })
 
