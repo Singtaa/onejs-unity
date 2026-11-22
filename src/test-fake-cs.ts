@@ -1,16 +1,30 @@
 /**
+ * How a host reads a static member its type lacks. "proxy": every released
+ * OneJS, a path proxy whose typeof is "function" and whose call throws
+ * "Method not found". "undefined": a OneJS that reads it as undefined
+ * (OneJS branch cs-missing-member-undefined), so the call is JS's own
+ * TypeError. A name that is no type is a path proxy on both.
+ */
+export type Host = "proxy" | "undefined"
+
+/** Both hosts, for a guard that must hold on each. */
+export const HOSTS: Host[] = ["proxy", "undefined"]
+
+/**
  * A `CS` global that answers as OneJS's bootstrap does, for tests of code that
  * asks whether the host's C# has something. `types` maps a full type name to
  * its static members. Any other name is a path proxy, as a real host's is: its
  * typeof is "function", it carries `__csPathProxy`, and calling it throws what
  * QuickJS throws, "Type not found: <owner>" when the owner is no type and
- * "Method not found: <owner>.<name>" when it is. A fake that leaves a missing
- * member undefined instead models no real host, and a guard tested against one
- * passes while it cannot fire (OneJS QuickJSBootstrap.js.txt, __newCsPathProxy).
+ * "Method not found: <owner>.<name>" when it is. On the "undefined" host a
+ * missing member of a type in `types` reads undefined instead. A fake that
+ * leaves a missing member undefined on a "proxy" host models no real host, and
+ * a guard tested against one passes while it cannot fire (OneJS
+ * QuickJSBootstrap.js.txt, __newCsPathProxy).
  *
  * onejs-play keeps a copy in src/__tests__/fake-cs.ts.
  */
-export function fakeCS(types: Record<string, Record<string, unknown>>): any {
+export function fakeCS(types: Record<string, Record<string, unknown>>, { host = "proxy" }: { host?: Host } = {}): any {
     const proxy = (path: string[]): any => {
         const name = path.join(".")
         return new Proxy(function () {}, {
@@ -20,6 +34,9 @@ export function fakeCS(types: Record<string, Record<string, unknown>>): any {
                 if (prop === "toString") return () => `[CSType ${name}]`
                 const members = types[name]
                 if (members !== undefined && prop in members) return members[prop]
+                // A name that leads on to a type here (a nested type, a namespace under this one) stays a path.
+                const next = `${name}.${prop}`
+                if (members !== undefined && host === "undefined" && !Object.keys(types).some((t) => t === next || t.startsWith(`${next}.`))) return undefined
                 return proxy([...path, prop])
             },
             apply() {
@@ -33,3 +50,4 @@ export function fakeCS(types: Record<string, Record<string, unknown>>): any {
     }
     return proxy([])
 }
+
