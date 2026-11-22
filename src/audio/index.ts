@@ -66,7 +66,7 @@ function bridge(): any {
     const cs = (globalThis as any).CS
     // IsPlaying is a pure read every AudioBridge has had; a host without the type answers it with a throw.
     if (cs === undefined || foundIn !== cs) {
-        if (!csHas("OneJS.Audio.AudioBridge", () => cs.OneJS?.Audio?.AudioBridge?.IsPlaying(0))) throw new Error(
+        if (!csHas("OneJS.Audio.AudioBridge", () => cs.OneJS?.Audio?.AudioBridge?.IsPlaying(0), "IsPlaying")) throw new Error(
             "[oj] audio is unavailable: OneJS.Audio.AudioBridge was not found. " +
             "In a stripped build this usually means UnityEngine.AudioModule was not preserved in link.xml.",
         )
