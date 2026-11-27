@@ -22,9 +22,15 @@ const esbuildDir = path.dirname(createRequire(import.meta.url).resolve("esbuild/
 const tmpDirs: string[] = []
 const children: ChildProcess[] = []
 
-afterEach(() => {
-    for (const child of children.splice(0)) if (child.exitCode === null) child.kill()
-    while (tmpDirs.length) fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true })
+// Windows will not remove a folder a process still has open, and the watcher
+// and esbuild's service hold the app folder until they have exited.
+afterEach(async () => {
+    await Promise.all(children.splice(0).map((child) => new Promise<void>((resolve) => {
+        if (child.exitCode !== null || child.signalCode !== null) return resolve()
+        child.once("exit", () => resolve())
+        child.kill()
+    })))
+    while (tmpDirs.length) fs.rmSync(tmpDirs.pop()!, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 })
 })
 
 function makeApp(): string {
