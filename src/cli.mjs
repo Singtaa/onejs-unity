@@ -50,7 +50,8 @@ async function main() {
     }
 
     if (command === "watch") {
-        const ctx = await esbuild.context(config)
+        keepWritingWithoutAReader()
+        const ctx = await esbuild.context(reportThroughNode(config, esbuild))
         await ctx.watch()
         console.log("Watching for changes...")
         return
@@ -65,6 +66,45 @@ async function main() {
         process.exit(1)
     }
     console.log("Build complete!")
+}
+
+/**
+ * The Unity editor reads a watcher's stdout and stderr through pipes, and a
+ * domain reload loses its end of them while the watcher runs on. A write into
+ * a pipe nobody reads fails with EPIPE: on Node's own streams that is an
+ * error event, ignored here, so the watcher keeps building with no one
+ * listening.
+ */
+function keepWritingWithoutAReader() {
+    for (const stream of [process.stdout, process.stderr]) {
+        stream.on("error", (e) => { if (e?.code !== "EPIPE") throw e })
+    }
+}
+
+/**
+ * esbuild's service writes its messages to the stderr it inherits, and it ends
+ * on the first one that has no reader, which ends the watch. So in watch mode
+ * esbuild logs nothing itself, and its errors and warnings are printed here,
+ * through Node's guarded stderr, with the text esbuild would have printed.
+ */
+function reportThroughNode(config, esbuild) {
+    const color = config.color ?? !!process.stderr.isTTY
+    // What the config's own logLevel would have printed: esbuild's default is warnings and errors.
+    const level = config.logLevel ?? "warning"
+    const kinds = level === "silent" ? [] : level === "error" ? ["error"] : ["warning", "error"]
+    const report = {
+        name: "onejs-unity-report",
+        setup(build) {
+            build.onEnd(async (result) => {
+                for (const [kind, messages] of [["warning", result.warnings], ["error", result.errors]]) {
+                    if (!messages.length || !kinds.includes(kind)) continue
+                    const text = await esbuild.formatMessages(messages, { kind, color })
+                    process.stderr.write(text.join(""))
+                }
+            })
+        },
+    }
+    return { ...config, logLevel: "silent", plugins: [...(config.plugins ?? []), report] }
 }
 
 function fail(message) {
